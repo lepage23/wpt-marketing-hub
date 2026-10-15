@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.2.1";
-  var BUILT = "2026-10-15 14:10 BST";
+  var VERSION = "0.3.0";
+  var BUILT = "2026-10-15 14:30 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -255,6 +255,7 @@
     else if ("_seopress_titles_desc" in m) seoFields = { t: m._seopress_titles_title, d: m._seopress_titles_desc, name: "SEOPress" };
     if (!y && seoFields) { metaTitle = seoFields.t || ""; metaDesc = seoFields.d || ""; }
     var hasSeo = !!y || !!seoFields;
+    metaTitle = stripHtml(metaTitle); metaDesc = stripHtml(metaDesc); /* decode &amp; etc. so lengths are right */
     var doc = new DOMParser().parseFromString(html, "text/html");
     var h2 = doc.querySelectorAll("h2").length;
     var imgs = doc.querySelectorAll("img");
@@ -763,8 +764,31 @@
     while (i > -1 && n < 3) { n++; i = hay.indexOf(needle, i + needle.length); }
     return n;
   }
+  /* Find a page's WordPress ID from its web address, for fixes written without one. */
+  function resolveId(p) {
+    var path = (p.link || "").replace(/^https?:\/\/[^\/]+/, "").replace(/\/$/, "");
+    var slug = path.split("/").pop();
+    if (!slug) return wpFetch("/wp/v2/pages?per_page=100&_fields=id,link").then(function (rows) {
+      var home = rows.filter(function (r) { return norm(r.link) === norm(p.link); });
+      if (home.length === 1) return home[0].id;
+      throw new Error("Couldn't match the home page by its address. Ask Claude to add the page ID to this fix.");
+    });
+    return wpFetch("/wp/v2/" + p.postType + "?slug=" + encodeURIComponent(slug) + "&_fields=id,link").then(function (rows) {
+      var exact = rows.filter(function (r) { return norm(r.link) === norm(p.link); });
+      if (exact.length === 1) return exact[0].id;
+      if (rows.length === 1) return rows[0].id;
+      throw new Error("Couldn't find this page by its address (" + p.link + "). It may have moved. Nothing was changed.");
+    });
+  }
+  function norm(u) { return String(u || "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").toLowerCase(); }
+
   function pushFix(p, text) {
     if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
+    if (p.type !== "new_draft" && !(p.pageId > 0) && p.link) {
+      return resolveId(p).then(function (id) {
+        return pushFix(Object.assign({}, p, { pageId: id }), text).then(function (r) { r.pageId = id; return r; });
+      });
+    }
     var base = "/wp/v2/" + p.postType + "/";
     if (p.type === "new_draft") {
       return wpFetch(base, { method: "POST", body: { title: p.pageTitle, content: text, status: "draft" } }).then(function (r) {
@@ -798,6 +822,7 @@
     return Promise.reject(new Error("Unknown fix type."));
   }
   function undoFix(p, st) {
+    if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     var base = "/wp/v2/" + p.postType + "/";
     if (p.type === "meta_title" || p.type === "meta_description") {
       var key = metaKey(p.type); var body = { meta: {} }; body.meta[key] = st.before || "";
@@ -888,7 +913,7 @@
         var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
         pushFix(p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
-          setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "" });
+          setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId });
           logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();

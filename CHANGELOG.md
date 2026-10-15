@@ -6,6 +6,19 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.3.0 · 2026-10-15 14:30 BST
+
+First real batch of website fixes.
+
+- **Batch 1 in the Fix queue:** 45 fixes. 41 new meta descriptions for pages and posts that had none, 3 shortened descriptions that Google was cutting off, and 1 shortened title.
+- **4 new jobs** in Your jobs: the near-empty 8x8 Feature Matrix page, two UCaaS 2026 pages competing for the same search, checking the sector pages on the live site, and the 99 WordPress updates.
+- The hub now finds each page from its web address when you push, so fixes don't need page IDs.
+- The audit decodes `&amp;` and similar, so title and description lengths are counted correctly.
+
+Backups taken:
+
+- `backup/v0.2.1-2026-10-15-1428` (v0.2.1 as it was, before this change)
+
 ## v0.2.1 · 2026-10-15 14:10 BST
 
 - The page audit now reads Rank Math (and SEOPress) titles and meta descriptions when WordPress is connected and the snippet is in. Before, it only understood Yoast, so "Missing meta descriptions" showed 0 on a Rank Math site.
