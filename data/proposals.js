@@ -66,22 +66,40 @@ window.WPT_PROPOSALS = [
   "why": "WPT isn't on the NHS Better Purchasing Framework, so this is a false claim on a live page aimed at NHS buyers. Procurement teams check framework status, and a false claim can rule you out of a tender. Removing the section is the safe fix now. Claude can write an honest replacement section about how NHS trusts buy from WPT once you confirm which frameworks you are on."
  },
  {
+  "id": "b5-01",
+  "created": "2026-10-15",
+  "batch": "Batch 5: NHS page",
+  "type": "manual",
+  "priority": "high",
+  "category": "Content",
+  "pageTitle": "New NHS page",
+  "link": "https://westpiertech.com/healthcare/",
+  "issue": "Build an honest NHS page to replace the BPF one (needs facts from the Mitel meeting)",
+  "why": "A page explaining how NHS trusts can buy from WPT through Mitel's framework route is worth ranking for, and it's exactly what AI tools look for when someone asks who can supply NHS telephony. It replaces the BPF page, which made a claim WPT can't stand behind.",
+  "steps": [
+   "At the Mitel meeting, ask: which NHS or public sector frameworks Mitel is on (exact names and numbers), whether WPT can deliver through them as a Mitel partner, how a trust actually buys that way, and what wording you're allowed to use publicly.",
+   "Also note WPT's Mitel partner level, any approved logos, and any NHS customers you can name (or rough numbers: sites, users).",
+   "Send it all to Claude. The new page (/healthcare/nhs-telephony/) arrives in this queue as a draft for you to approve.",
+   "Once it's live, the old BPF page's Unpublish fix becomes a redirect to the new page."
+  ]
+ },
+ {
   "id": "b3-02",
   "created": "2026-10-15",
   "batch": "Batch 3: false claims",
   "type": "set_status",
   "status": "draft",
   "size": "big",
-  "priority": "critical",
+  "priority": "medium",
   "category": "Content",
   "postType": "pages",
   "pageId": 0,
   "pageTitle": "NHS BPF",
   "link": "https://westpiertech.com/nhs-better-purchasing-framework/",
-  "issue": "A whole page about being on the NHS BPF, which WPT isn't",
+  "issue": "ON HOLD until the new NHS page is live: then this becomes a redirect",
   "current": "Published. It's set to noindex, so Google hides it, but anyone with the link can still read it, and the Healthcare page links to it.",
   "proposed": "Unpublished (saved as a draft). Nothing is deleted. Undo puts it straight back.",
-  "why": "Noindex only hides it from Google. Buyers can still land on it from the Healthcare page, old emails or tender documents. After this, add a redirect from the old address to /healthcare/ in Rank Math, then Redirections, so old links still land somewhere useful. The next audit will flag it if you don't."
+  "why": "Don't approve this yet. The plan is a new, honest NHS page (see the Mitel fix in this queue), then a redirect from this old address to it, so links and any ranking value carry across. The page is already hidden from Google and the Healthcare page no longer links to it."
  },
  {
   "id": "b2-01",

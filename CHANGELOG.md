@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.9.1 · 2026-10-15 17:11 BST
+
+- New Fix queue item (high): build an honest NHS page to replace the BPF one, with the questions to ask at the Mitel meeting.
+- The NHS BPF page Unpublish fix is on hold (medium) until the new NHS page is live, when it becomes a redirect.
+
+Backups taken:
+
+- `backup/v0.9.0-2026-10-15-1711` (v0.9.0 as it was, before this change)
+
 ## v0.9.0 · 2026-10-15 17:07 BST
 
 Claims get fixed, not just found.
