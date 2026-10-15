@@ -11,6 +11,42 @@
 
 window.WPT_PROPOSALS = [
  {
+  "id": "b6-01",
+  "created": "2026-10-15",
+  "batch": "Batch 6: home page image",
+  "type": "manual",
+  "priority": "critical",
+  "category": "Content",
+  "pageTitle": "Home",
+  "link": "https://westpiertech.com/",
+  "issue": "Confirm the certification badges on the home page photo are WPT's own and current",
+  "why": "The engineer photo has three badges baked into it: Cyber Essentials Plus, an 'Approachable Registered' mark and a UKAS-accredited management system certificate (number 10570). WPT holds Cyber Essentials, but has used Westcon's ISO 27001 for tenders rather than its own. If any badge isn't WPT's own, current certificate, it's a false claim like the BPF one, and certification bodies can ask for misused marks to come down.",
+  "steps": [
+   "Check WPT's Cyber Essentials certificate: is it Plus, or standard Cyber Essentials? Is it in date?",
+   "Check whose certificate number 10570 is, and what it covers. If it's Westcon's (or anyone else's), the UKAS badge must come off.",
+   "Tell Claude what you find. Claude will write a fix to replace the image with one showing only the badges you hold, as separate images with proper alt text, which Google and AI tools can read (they can't read badges baked into a photo)."
+  ]
+ },
+ {
+  "id": "b6-02",
+  "created": "2026-10-15",
+  "batch": "Batch 6: home page image",
+  "type": "manual",
+  "priority": "high",
+  "category": "Mobile",
+  "pageTitle": "Home",
+  "link": "https://westpiertech.com/",
+  "issue": "The engineer photo on the home page is squashed",
+  "why": "It's been forced into a tall, narrow box without cropping, so it's pinched sideways. On a phone it will look worse. It's one of the first things a visitor sees, and Google's mobile check marks squashed images as a quality problem.",
+  "steps": [
+   "Open the Home page in Elementor and click the photo of the engineer by the van.",
+   "In the Style tab, set Height to Default. If the design needs that height, keep it and set Object Fit to Cover so the photo crops rather than squashes.",
+   "Click the phone icon at the bottom left of Elementor to check the mobile view, then Update.",
+   "Run the mobile check on the Website & SEO page to confirm it's cleared.",
+   "If the badges in this photo change after the certification check (fix b6-01), Claude will write the replacement at the same time."
+  ]
+ },
+ {
   "id": "b4-01",
   "created": "2026-10-15",
   "batch": "Batch 4: claims check",

@@ -1,0 +1,14 @@
+{"id":"https://westpiertech.com/","loadingExperience":{"id":"https://westpiertech.com/","overall_category":"SLOW","origin_fallback":false,"metrics":{"LARGEST_CONTENTFUL_PAINT_MS":{"percentile":4200,"category":"SLOW"},"CUMULATIVE_LAYOUT_SHIFT_SCORE":{"percentile":5,"category":"FAST"},"INTERACTION_TO_NEXT_PAINT":{"percentile":180,"category":"FAST"}}},
+"lighthouseResult":{"lighthouseVersion":"13.0.1","categories":{"performance":{"score":0.34},"accessibility":{"score":0.82},"seo":{"score":0.92},"best-practices":{"score":0.78}},
+"audits":{
+ "largest-contentful-paint":{"id":"largest-contentful-paint","title":"Largest Contentful Paint","score":0.05,"scoreDisplayMode":"numeric","numericValue":6100,"displayValue":"6.1 s"},
+ "cumulative-layout-shift":{"id":"cumulative-layout-shift","title":"Cumulative Layout Shift","score":0.5,"scoreDisplayMode":"numeric","numericValue":0.31},
+ "total-blocking-time":{"score":0.3,"scoreDisplayMode":"numeric","numericValue":900},
+ "image-aspect-ratio":{"id":"image-aspect-ratio","title":"Displays images with incorrect aspect ratio","score":0,"scoreDisplayMode":"binary","details":{"items":[{"url":"https://westpiertech.com/wp-content/uploads/2025/engineer-van.jpg","displayedAspectRatio":"400 x 560 (0.71)","actualAspectRatio":"1200 x 800 (1.50)"}]}},
+ "image-delivery-insight":{"id":"image-delivery-insight","title":"Improve image delivery","score":0,"scoreDisplayMode":"metricSavings","details":{"items":[{"url":"https://westpiertech.com/wp-content/uploads/2025/hero.png","wastedBytes":820000},{"url":"https://westpiertech.com/wp-content/uploads/2025/small.png","wastedBytes":12000}]}},
+ "target-size":{"id":"target-size","title":"Touch targets do not have sufficient size or spacing.","score":0,"scoreDisplayMode":"binary","details":{"items":[]}},
+ "color-contrast":{"id":"color-contrast","title":"Background and foreground colors do not have a sufficient contrast ratio.","score":0,"scoreDisplayMode":"binary","details":{"items":[]}},
+ "viewport-insight":{"id":"viewport-insight","title":"Optimize viewport for mobile","score":1,"scoreDisplayMode":"metricSavings"},
+ "is-crawlable":{"id":"is-crawlable","title":"Page is not blocked from indexing","score":1,"scoreDisplayMode":"binary"},
+ "final-screenshot":{"score":null,"scoreDisplayMode":"informative"}
+}}}

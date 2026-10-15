@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.9.1";
-  var BUILT = "2026-10-15 17:11 BST";
+  var VERSION = "0.10.0";
+  var BUILT = "2026-10-15 17:23 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -219,6 +219,7 @@
       stat(issues == null ? "–" : issues, issues == null ? "SEO issues (no audit run yet)" : "SEO issues from last audit", issues > 0) +
       (ga4Data() && ga4Data().configured ? stat(fmtNum(ga4Data().totals.keyEvents), "Website leads, last " + ga4Data().days + " days", !+ga4Data().totals.keyEvents) + stat(fmtNum(ga4Data().totals.sessions), "Website visits, last " + ga4Data().days + " days") : "") +
       (perfData() && perfData().totals ? stat(fmtNum(perfData().totals.clicks), "Clicks from Google, last " + perfData().days + " days") : "") +
+      (function () { var d = psiData(); if (!d || !d.pages) return ""; var ok = Object.keys(d.pages).map(function (k) { return d.pages[k]; }).filter(function (r) { return !r.error && r.perf != null; }); if (!ok.length) return ""; var a = Math.round(ok.reduce(function (s, r) { return s + r.perf; }, 0) / ok.length); return stat(a + "/100", "Average mobile speed score", a < 50); })() +
       stat(pendingFixes().length, "Website fixes waiting for approval", pendingFixes().length > 0) +
       stat(jobsToDo(), "Your jobs to do", false) +
       stat(inbox.length, "Inbox items flagged", inbox.length > 0) +
@@ -319,6 +320,7 @@
     renderWpConnect(main);
     renderPerformance(main);
     renderGa4(main);
+    renderMobile(main);
     renderFind(main);
 
     /* Audit panel */
@@ -1461,6 +1463,157 @@
     draw(ga4Data());
   }
 
+  /* ---------- Mobile and speed (Google PageSpeed Insights, mobile strategy) ----------
+     Built against the v5 API reference and Lighthouse 13: audits are read by what Google
+     returns rather than a fixed old list, and real-visitor (CrUX) data is optional. */
+  var PSI_URL = "https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed";
+  var PSI_SKIP = /^(metrics|screenshot-thumbnails|final-screenshot|main-thread-tasks|network-requests|network-rtt|network-server-latency|diagnostics|script-treemap-data|resource-summary|largest-contentful-paint|first-contentful-paint|speed-index|total-blocking-time|cumulative-layout-shift|interactive|max-potential-fid|first-meaningful-paint)$/;
+  function psiKey() { return load("psi-key", ""); }
+  function psiData() { return load("psi", null); }
+  function runPsi(url) {
+    var q = "?url=" + encodeURIComponent(url) + "&strategy=MOBILE&category=PERFORMANCE&category=ACCESSIBILITY&category=SEO&category=BEST_PRACTICES" + (psiKey() ? "&key=" + encodeURIComponent(psiKey()) : "");
+    return fetch(PSI_URL + q).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) {
+          var m = (j.error && j.error.message) || ("Google answered " + r.status);
+          if (r.status === 429) m = "Google's limit for checks without a key has been reached. Add a free API key (steps above) and run it again.";
+          throw new Error(m);
+        }
+        return summarisePsi(j);
+      });
+    });
+  }
+  function summarisePsi(j) {
+    var lr = j.lighthouseResult || {}, cats = lr.categories || {}, audits = lr.audits || {};
+    function sc(c) { return cats[c] && cats[c].score != null ? Math.round(cats[c].score * 100) : null; }
+    function num(id) { return audits[id] && audits[id].numericValue != null ? audits[id].numericValue : null; }
+    var fails = [];
+    Object.keys(audits).forEach(function (id) {
+      var a = audits[id];
+      if (PSI_SKIP.test(id) || a.score == null || a.score >= 0.9) return;
+      if (!/^(binary|numeric|metricSavings)$/.test(a.scoreDisplayMode || "")) return;
+      var items = ((a.details && a.details.items) || []).slice(0, 8).map(function (it) {
+        var u = it.url || (it.node && it.node.snippet) || it.source || "";
+        if (typeof u === "object") u = u.url || "";
+        return { url: String(u).slice(0, 300), wasted: it.wastedBytes || 0, displayed: it.displayedAspectRatio || "", actual: it.actualAspectRatio || "" };
+      });
+      fails.push({ id: id, title: a.title || id, display: a.displayValue || "", score: a.score, items: items });
+    });
+    var le = j.loadingExperience || null, field = null;
+    if (le && le.metrics && !le.origin_fallback) {
+      var mt = le.metrics;
+      function p(k) { return mt[k] ? { p75: mt[k].percentile, cat: mt[k].category } : null; }
+      field = { overall: le.overall_category || "", lcp: p("LARGEST_CONTENTFUL_PAINT_MS"), cls: p("CUMULATIVE_LAYOUT_SHIFT_SCORE"), inp: p("INTERACTION_TO_NEXT_PAINT") };
+    }
+    return { perf: sc("performance"), a11y: sc("accessibility"), seo: sc("seo"), bp: sc("best-practices"),
+      lcp: num("largest-contentful-paint"), cls: num("cumulative-layout-shift"), tbt: num("total-blocking-time"),
+      fails: fails, field: field, version: lr.lighthouseVersion || "", when: new Date().toISOString() };
+  }
+  function failOf(r, id) { return (r.fails || []).filter(function (f) { return f.id === id; })[0]; }
+  function fileName(u) { return String(u || "").split("?")[0].split("/").pop() || u; }
+
+  function buildMobileFixes(d) {
+    var out = []; if (!d || !d.pages) return out;
+    var today = new Date().toISOString().slice(0, 10);
+    var rows = Object.keys(d.pages).map(function (u) { return { url: u, r: d.pages[u] }; }).filter(function (x) { return x.r && !x.r.error; });
+    function add(o) { o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found by mobile check"; o.category = "Mobile"; o.pageTitle = o.pageTitle || "Mobile"; o.link = o.link || "https://westpiertech.com/"; out.push(o); }
+    function pagesWith(fn) { return rows.filter(function (x) { return fn(x.r); }).map(function (x) { return { title: shortPath(x.url), link: x.url, note: fn(x.r) === true ? "" : String(fn(x.r)) }; }); }
+    var squash = [];
+    rows.forEach(function (x) { var f = failOf(x.r, "image-aspect-ratio"); if (f) f.items.forEach(function (it) { squash.push({ title: fileName(it.url), link: x.url, note: "on " + shortPath(x.url) + (it.displayed ? " · shown " + it.displayed + ", really " + it.actual : "") }); }); });
+    if (squash.length) add({ id: "mob-squashed", priority: "high", issue: squash.length + " images are squashed or stretched", pages: squash,
+      why: "An image forced into the wrong shape looks broken, especially on a phone, and Google counts it against the page's quality. It's often the first thing a visitor sees.",
+      steps: ["Open the page in Elementor and click the image listed.", "Go to the Style tab. Set Height to Default (or auto), or keep the height and set Object Fit to Cover so it crops instead of squashing.", "Check it in Elementor's mobile view (the phone icon at the bottom left) before you update.", "Run the mobile check again."] });
+    var vp = pagesWith(function (r) { return !!failOf(r, "viewport-insight") || !!failOf(r, "viewport"); });
+    if (vp.length) add({ id: "mob-viewport", priority: "critical", issue: vp.length + " pages aren't set up for phones (viewport)", pages: vp,
+      why: "Without the mobile viewport setting, phones show a shrunk desktop page. Google treats that as not mobile-friendly.", steps: ["Ask Matt to check the theme (Blocksy) outputs the viewport meta tag on these pages.", "Run the mobile check again."] });
+    var cwv = pagesWith(function (r) { if (!r.field) return false; var bad = []; ["lcp", "cls", "inp"].forEach(function (k) { if (r.field[k] && r.field[k].cat && r.field[k].cat !== "FAST") bad.push(k.toUpperCase() + " " + r.field[k].cat.toLowerCase()); }); return bad.length ? "real visitors: " + bad.join(", ") : false; });
+    if (cwv.length) add({ id: "mob-cwv-field", priority: "high", issue: cwv.length + " pages fail Core Web Vitals for real mobile visitors", pages: cwv,
+      why: "This is Google's measure from real Chrome users over the last 28 days, and it's what feeds rankings. LCP is how fast the main content shows (good under 2.5 s), CLS is how much the page jumps about (good under 0.1), INP is how quickly it responds to taps (good under 200 ms).",
+      steps: ["Start with the fixes below for slow pages, layout shifts and heavy images. They are usually the cause.", "Real-visitor figures update daily but cover 28 days, so give changes a few weeks to show."] });
+    var slow = pagesWith(function (r) { return r.perf != null && r.perf < 50 ? "mobile score " + r.perf + "/100, main content after " + (r.lcp ? (r.lcp / 1000).toFixed(1) + " s" : "?") : false; });
+    if (slow.length) add({ id: "mob-slow", priority: "high", issue: slow.length + " pages score under 50 for mobile speed", pages: slow,
+      why: "Google's test phone is a mid-range handset on a mobile connection. Under 50 means most visitors on phones wait several seconds, and many leave before the page loads.",
+      steps: ["Check SiteGround Optimizer has caching, CSS and JS minifying and lazy loading switched on.", "Fix the heavy images listed in the image fix in this queue.", "Ask Matt whether any plugins load on every page that don't need to (chat widgets, sliders, extra fonts).", "Run the mobile check again."] });
+    var shift = pagesWith(function (r) { return r.cls != null && r.cls > 0.1 ? "layout shift " + r.cls.toFixed(2) : false; });
+    if (shift.length) add({ id: "mob-cls", priority: shift.some(function (p) { return parseFloat(p.note.split(" ").pop()) > 0.25; }) ? "high" : "medium", issue: shift.length + " pages jump about while loading", pages: shift,
+      why: "When images or banners load late and push the text down, people tap the wrong thing. Google measures it as CLS and wants it under 0.1.",
+      steps: ["Look for images without a set width and height, and banners or cookie bars that appear after the page loads.", "In Elementor, give images a fixed size (or aspect ratio) so space is reserved before they load.", "Run the mobile check again."] });
+    var heavy = [];
+    rows.forEach(function (x) { var f = failOf(x.r, "image-delivery-insight"); if (f) f.items.forEach(function (it) { if (it.wasted > 50000) heavy.push({ title: fileName(it.url), link: x.url, note: "could save " + Math.round(it.wasted / 1024) + " KB on " + shortPath(x.url) }); }); });
+    if (heavy.length) add({ id: "mob-images", priority: heavy.length > 15 ? "high" : "medium", issue: heavy.length + " images are much bigger than they need to be", pages: heavy.slice(0, 60),
+      why: "Oversized images are the most common reason pages load slowly on phones. The figures are what Google says each image could save.",
+      steps: ["Turn on image optimisation and WebP in SiteGround Optimizer (Media).", "For the biggest ones, resize to the size actually shown (usually under 1600 px wide) before uploading.", "Run the mobile check again."] });
+    var tap = pagesWith(function (r) { return failOf(r, "target-size") ? "buttons or links too small or close together" : false; });
+    if (tap.length) add({ id: "mob-tap", priority: "medium", issue: tap.length + " pages have buttons or links too small to tap easily", pages: tap,
+      why: "On a phone, small or crowded links mean people tap the wrong thing. It also counts against accessibility, which public sector buyers check.", steps: ["Open each page in Elementor's mobile view.", "Give buttons and menu links more padding (at least 24 px tall) and space between them.", "Run the mobile check again."] });
+    var con = pagesWith(function (r) { return failOf(r, "color-contrast") ? "text hard to read against its background" : false; });
+    if (con.length) add({ id: "mob-contrast", priority: "medium", issue: con.length + " pages have text that's hard to read", pages: con,
+      why: "Low-contrast text is hard to read outdoors on a phone and fails accessibility standards public sector buyers look for.", steps: ["Open Google's full report for each page (link in the mobile check table) to see which text.", "Darken the text or lighten the background in Elementor.", "Run the mobile check again."] });
+    var acc = pagesWith(function (r) { return r.a11y != null && r.a11y < 90 ? "accessibility " + r.a11y + "/100" : false; });
+    if (acc.length) add({ id: "mob-a11y", priority: "medium", issue: acc.length + " pages score under 90 for accessibility", pages: acc,
+      why: "Public sector websites and buyers expect accessible suppliers, and AI tools read accessible pages more reliably.", steps: ["Open Google's full report for each page (link in the mobile check table) and work through the Accessibility section.", "Most fixes are alt text, contrast and labels on forms and buttons."] });
+    return out;
+  }
+
+  function renderMobile(main) {
+    var p = panel("Mobile and speed", "Google's own mobile test (PageSpeed Insights) on every live page. Read-only.");
+    var body = el('<div style="display:flex;flex-direction:column;gap:12px"></div>'); p.appendChild(body); main.appendChild(p);
+    var stop = false;
+    function draw() {
+      var d = psiData();
+      body.innerHTML =
+        '<details' + (psiKey() ? "" : " open") + '><summary class="muted" style="cursor:pointer;font-size:.88rem">API key (free, recommended for checking every page)' + (psiKey() ? " · saved" : "") + "</summary>" +
+        '<ol class="steps-list" style="font-size:.88rem;margin-top:8px"><li>In Google Cloud, open your <b>WPT Hub</b> project.</li><li><b>APIs &amp; Services, then Library</b>. Search <b>PageSpeed Insights API</b> and click <b>Enable</b>.</li><li><b>APIs &amp; Services, then Credentials, then Create credentials, then API key</b>. Copy it.</li><li>Click the new key, then under <b>API restrictions</b> choose <b>Restrict key</b> and tick only <b>PageSpeed Insights API</b>. Save.</li><li>Paste it below. It stays in this browser.</li></ol>' +
+        '<div class="row" style="margin-top:8px"><label class="field" for="psi-key" style="flex:1;min-width:220px">PageSpeed API key<input id="psi-key" type="password" autocomplete="off" placeholder="' + (psiKey() ? "Saved. Paste a new one to replace it." : "AIza…") + '"></label><button type="button" class="btn" id="psi-save" style="align-self:flex-end">Save key</button></div></details>' +
+        '<div class="row"><button type="button" class="btn primary" id="psi-run">Run mobile check on all pages</button><button type="button" class="btn" id="psi-stop" hidden>Stop</button>' +
+        '<span class="muted" style="font-size:.82rem">About 15 to 30 seconds a page, two at a time. Uses the pages from your last audit.</span></div><div id="psi-status"></div><div id="psi-out"></div>';
+      body.querySelector("#psi-save").addEventListener("click", function () { var v = body.querySelector("#psi-key").value.trim(); if (v) { save("psi-key", v); toast("Key saved"); draw(); } });
+      body.querySelector("#psi-run").addEventListener("click", runAll);
+      body.querySelector("#psi-stop").addEventListener("click", function () { stop = true; });
+      table(d);
+    }
+    function table(d) {
+      var out = body.querySelector("#psi-out");
+      if (!d || !d.pages || !Object.keys(d.pages).length) { out.innerHTML = '<div class="empty">No mobile check yet.</div>'; return; }
+      var rows = Object.keys(d.pages).map(function (u) { return { u: u, r: d.pages[u] }; }).sort(function (a, b) { return (a.r.perf == null ? 101 : a.r.perf) - (b.r.perf == null ? 101 : b.r.perf); });
+      var ok = rows.filter(function (x) { return !x.r.error; });
+      var avg = ok.length ? Math.round(ok.reduce(function (s, x) { return s + (x.r.perf || 0); }, 0) / ok.length) : 0;
+      var poor = ok.filter(function (x) { return x.r.perf < 50; }).length;
+      var squashed = ok.filter(function (x) { return failOf(x.r, "image-aspect-ratio"); }).length;
+      function chip(v) { return v == null ? "–" : '<span class="chip ' + (v >= 90 ? "good" : v >= 50 ? "flag" : "bad") + '">' + v + "</span>"; }
+      out.innerHTML = '<div class="stats">' + stat(avg + "/100", "Average mobile speed score", avg < 50) + stat(poor, "Pages under 50", poor > 0) + stat(squashed, "Pages with squashed images", squashed > 0) + stat(ok.length + " of " + rows.length, "Pages checked") + "</div>" +
+        '<p class="muted mono" style="font-size:.78rem">Checked ' + esc(new Date(d.when).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (ok[0] && ok[0].r.version ? " · Lighthouse " + esc(ok[0].r.version) : "") + ". Scores vary a few points between runs; look at the trend. 90+ good, 50 to 89 needs work, under 50 poor.</p>" +
+        '<div class="table-wrap"><table><thead><tr><th>Page</th><th class="num">Speed</th><th class="num">Access.</th><th class="num">SEO</th><th class="num">Main content</th><th class="num">Jumping</th><th>Real visitors</th><th></th></tr></thead><tbody>' +
+        rows.map(function (x) {
+          var r = x.r;
+          if (r.error) return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td colspan="7" class="muted">' + esc(r.error) + "</td></tr>";
+          return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td class="num">' + chip(r.perf) + '</td><td class="num">' + chip(r.a11y) + '</td><td class="num">' + chip(r.seo) + '</td><td class="num">' + (r.lcp ? (r.lcp / 1000).toFixed(1) + " s" : "–") + '</td><td class="num">' + (r.cls != null ? r.cls.toFixed(2) : "–") + "</td><td>" + (r.field ? esc((r.field.overall || "").toLowerCase() || "–") : '<span class="muted">not enough data</span>') + '</td><td><a class="btn small" href="https://pagespeed.web.dev/analysis?url=' + encodeURIComponent(x.u) + '&form_factor=mobile" target="_blank" rel="noopener">Full report</a></td></tr>';
+        }).join("") + "</tbody></table></div>" +
+        (load("auto-fixes-mobile", []).length ? '<div class="row" style="margin-top:10px"><a class="btn primary" href="#fixes">' + load("auto-fixes-mobile", []).length + " mobile fixes in the Fix queue</a></div>" : "");
+    }
+    function runAll() {
+      var audit = load("seo-audit", null), st = body.querySelector("#psi-status");
+      if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return; }
+      var urls = audit.pages.filter(function (p) { return p.live && !p.redirectTo && !p.noindex; }).map(function (p) { return p.link; }).slice(0, 120);
+      var d = { when: new Date().toISOString(), pages: {} }, i = 0, done = 0; stop = false;
+      body.querySelector("#psi-run").disabled = true; body.querySelector("#psi-stop").hidden = false;
+      function next() {
+        if (stop || i >= urls.length) return Promise.resolve();
+        var u = urls[i++];
+        return runPsi(u).then(function (r) { d.pages[u] = r; }, function (e) { d.pages[u] = { error: e.message }; if (/limit/.test(e.message)) stop = true; })
+          .then(function () { done++; st.innerHTML = '<div class="notice info">Checked ' + done + " of " + urls.length + "…</div>"; save("psi", d); return next(); });
+      }
+      Promise.all([next(), next()]).then(function () {
+        save("psi", d); save("auto-fixes-mobile", buildMobileFixes(d)); updateNav();
+        body.querySelector("#psi-run").disabled = false; body.querySelector("#psi-stop").hidden = true;
+        var errs = Object.keys(d.pages).filter(function (k) { return d.pages[k].error; });
+        st.innerHTML = '<div class="notice ' + (errs.length ? "" : "info") + '">' + (stop && done < urls.length ? "Stopped after " + done + " pages. " : "Mobile check finished. ") + (errs.length ? errs.length + " pages couldn't be checked: " + esc(d.pages[errs[0]].error) : "") + "</div>";
+        table(d);
+      });
+    }
+    draw();
+  }
+
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
     elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page" };
@@ -1471,7 +1624,7 @@
   var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
-    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []));
+    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []), load("auto-fixes-mobile", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
@@ -1609,7 +1762,7 @@
     main.innerHTML = head("Website & SEO", "Fix queue", "Everything the website needs for Google and AI search: fixes Claude has written and problems the audit found. Nothing goes live until you approve it.");
     var area = load("fix-area", "All");
     var filt = el('<div class="row"><label class="field" for="fix-area" style="flex-direction:row;align-items:center;gap:8px">Show<select id="fix-area">' +
-      ["All", "Leads", "Content", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
+      ["All", "Leads", "Content", "Mobile", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
     main.appendChild(filt);
     filt.querySelector("select").addEventListener("change", function (e) { area = e.target.value; save("fix-area", area); draw(); });
     var a = wpAuth();

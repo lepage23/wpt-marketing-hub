@@ -6,6 +6,22 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.10.0 · 2026-10-15 17:23 BST
+
+Mobile check across every page.
+
+- **Mobile and speed** panel on Website & SEO runs Google's own mobile test (PageSpeed Insights API v5, mobile) on every live page from the last audit, two at a time, with a progress count and a Stop button. Shows speed, accessibility and SEO scores, how fast the main content appears, how much the page jumps, real-visitor results where Google has them, and a link to Google's full report for each page.
+- Built against Google's current docs: Lighthouse 13 replaced many older checks with "insight" checks, so the hub reads whatever checks Google returns rather than a fixed old list. Real-visitor data is flagged for retirement from this API, so it's optional and nothing breaks when it goes.
+- **Found by mobile check** fixes in a new **Mobile** area of the Fix queue: squashed or stretched images (named, with their shape), pages not set up for phones, real visitors failing Core Web Vitals, pages scoring under 50, pages that jump about while loading, oversized images (with the saving each), buttons too small to tap, hard-to-read text and low accessibility scores.
+- Optional free PageSpeed API key, with setup steps. Stays in your browser.
+- Today page shows the average mobile speed score.
+- **Batch 6:** confirm the certification badges in the home page photo are WPT's own and current (critical), and fix the squashed engineer photo (high).
+- 138 tests, all passing.
+
+Backups taken:
+
+- `backup/v0.9.1-2026-10-15-1718` (v0.9.1 as it was, before this change)
+
 ## v0.9.1 · 2026-10-15 17:11 BST
 
 - New Fix queue item (high): build an honest NHS page to replace the BPF one, with the questions to ask at the Mitel meeting.
