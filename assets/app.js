@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.7.1";
-  var BUILT = "2026-10-15 15:36 BST";
+  var VERSION = "0.7.2";
+  var BUILT = "2026-10-15 15:52 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -723,7 +723,11 @@
     try { token = btoa(a.user + ":" + a.pass); } catch (e) { return Promise.reject(new Error("The username has characters the connection can't send. Use the plain WordPress username.")); }
     var headers = { "Authorization": "Basic " + token };
     if (opts.body) headers["Content-Type"] = "application/json";
-    return fetch(wpBase(a) + path, { method: opts.method || "GET", headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+    var method = opts.method || "GET";
+    /* A unique query on reads stops SiteGround or any other cache serving an old answer. */
+    var url = wpBase(a) + path + (method === "GET" ? (path.indexOf("?") > -1 ? "&" : "?") + "_wpt=" + Date.now() : "");
+    headers["Cache-Control"] = "no-cache";
+    return fetch(url, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined, cache: "no-store" })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok) {

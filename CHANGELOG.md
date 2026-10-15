@@ -6,6 +6,14 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.7.2 · 2026-10-15 15:52 BST
+
+- Every read from WordPress now asks for a fresh answer, so SiteGround's cache (or any other) can't serve an old one. Stops an updated snippet looking out of date.
+
+Backups taken:
+
+- `backup/v0.7.1-2026-10-15-1551` (v0.7.1 as it was, before this change)
+
 ## v0.7.1 · 2026-10-15 15:36 BST
 
 - **Fixed: "No H1" flagged on pages that have one.** The first version of the page checker snippet reports H1s as a count, and the audit read that the wrong way round. The audit now only judges H1s from the current snippet.
