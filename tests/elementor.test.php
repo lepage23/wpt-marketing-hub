@@ -58,3 +58,22 @@ $amb3=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'remove','scope'=>'sec
 ok(is_wp_error($amb3),'vague text in two sections: refused');
 $no=$edit(new WP_REST_Request(array('post_id'=>20,'op'=>'set','find'=>'BPF approval','replace'=>'x')));
 ok(is_wp_error($no) && strpos($no->m,"isn't built with Elementor")!==false,'non-Elementor page: clear refusal');
+// Nested containers like the real Healthcare page: outer container with Cyber Security, the BPF row and Case Studies.
+$nested=array(array('id'=>'outer','elType'=>'container','settings'=>array(),'elements'=>array(
+  array('id'=>'cyber','elType'=>'widget','widgetType'=>'heading','settings'=>array('title'=>'Cyber Security')),
+  array('id'=>'row','elType'=>'container','settings'=>array(),'elements'=>array(
+    array('id'=>'imgcol','elType'=>'container','settings'=>array(),'elements'=>array(array('id'=>'img','elType'=>'widget','widgetType'=>'image','settings'=>array('image'=>array('url'=>'https://westpiertech.com/nhs.png'))))),
+    array('id'=>'txtcol','elType'=>'container','settings'=>array(),'elements'=>array(
+      array('id'=>'h','elType'=>'widget','widgetType'=>'heading','settings'=>array('title'=>'NHS BPF Better Purchasing Framework')),
+      array('id'=>'t','elType'=>'widget','widgetType'=>'text-editor','settings'=>array('editor'=>'<p>One of only 30 approved suppliers.</p>')),
+      array('id'=>'b','elType'=>'widget','widgetType'=>'button','settings'=>array('text'=>'Read more')))))),
+  array('id'=>'cs','elType'=>'widget','widgetType'=>'heading','settings'=>array('title'=>'Case Studies')))));
+$META[10]['_elementor_data']=json_encode($nested);
+$d=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'remove','find'=>'NHS BPF Better Purchasing Framework','dry_run'=>1)));
+ok($d['dry_run'] && count($d['options'])===4,'dry run lists 4 levels: widget, text column, BPF row, outer container');
+ok($META[10]['_elementor_data']===json_encode($nested),'dry run changes nothing');
+ok(strpos($d['options'][2]['text'],'Cyber Security')===false && strpos($d['options'][2]['text'],'Read more')!==false && $d['options'][2]['images']===1,'level 2 = just the BPF row with its image');
+ok(strpos($d['options'][3]['text'],'Case Studies')!==false,'level 3 shows it would also take Case Studies');
+$r=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'remove','find'=>'NHS BPF Better Purchasing Framework','level'=>2)));
+$now=json_decode($META[10]['_elementor_data'],true); $ids=array_map(function($e){return $e['id'];},$now[0]['elements']);
+ok(!is_wp_error($r) && $ids===array('cyber','cs'),'remove level 2: BPF row gone, Cyber Security and Case Studies kept');

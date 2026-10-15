@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.8.2 · 2026-10-15 16:45 BST
+
+- **Removals now show you exactly what will go before anything changes.** The hub asks WordPress for a dry run and lists every option, from the single widget up to the whole outer section, with the text and number of images each would remove. You pick one. Nothing is removed until you've chosen.
+- Why: the first BPF removal took the whole outer Elementor container, which also held other content (Cyber Security and Case Studies).
+- **New fix b3-03** replaces it: remove just the BPF block, with the picker. Undo b3-01 first.
+- Page checker snippet updated (removal levels and dry run). Update it with Copy page checker code.
+- 119 tests, all passing.
+
+Backups taken:
+
+- `backup/v0.8.1-2026-10-15-1643` (v0.8.1 as it was, before this change)
+
 ## v0.8.1 · 2026-10-15 16:32 BST
 
 - **Fixed: "Couldn't reach the site" on every push.** v0.7.2 added a cache header to every request, and WordPress doesn't allow that header from other pages, so the browser blocked the requests. Removed it. The unique address on each read still stops caches serving old answers.

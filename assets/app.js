@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.8.1";
-  var BUILT = "2026-10-15 16:32 BST";
+  var VERSION = "0.8.2";
+  var BUILT = "2026-10-15 16:45 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1542,7 +1542,8 @@
       });
     }
     if (p.type === "elementor_set" || p.type === "elementor_remove") {
-      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_set" ? "set" : "remove", find: p.find, replace: text, scope: p.scope || "widget" } })
+      if (p.type === "elementor_remove" && p.level == null) return Promise.reject(new Error("Choose exactly what to remove first (the options above), so nothing else on the page goes with it."));
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_set" ? "set" : "remove", find: p.find, replace: text, level: p.level, scope: p.scope || "" } })
         .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, needsV4);
     }
     if (p.type === "set_status") {
@@ -1564,6 +1565,16 @@
       });
     }
     return Promise.reject(new Error("Unknown fix type."));
+  }
+  /* Ask WordPress what each removal level would take off the page, without changing anything. */
+  function previewRemoval(p) {
+    var go = p.pageId > 0 ? Promise.resolve(p.pageId) : resolveId(p);
+    return go.then(function (id) {
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: id, op: "remove", find: p.find, dry_run: 1 } }).then(function (r) {
+        if (!r.dry_run) throw new Error("The page checker snippet needs updating before removals can be previewed. Click Copy page checker code on the Website & SEO page.");
+        return r.options;
+      }, needsV4);
+    });
   }
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
@@ -1690,6 +1701,24 @@
     showHint();
     if (!done) ta.addEventListener("input", function () { showHint(); setFix(p.id, { edited: ta.value }); });
 
+    if (!st.status && p.type === "elementor_remove") {
+      var pick = el('<div class="remove-pick"><div class="row"><b style="font-size:.9rem">Choose exactly what to remove</b><button type="button" class="btn small">Show the options</button></div><div class="opts"></div></div>');
+      card.insertBefore(pick, actions);
+      var opts = pick.querySelector(".opts");
+      function loadOpts() {
+        opts.innerHTML = '<div class="notice info">Asking WordPress what each option would remove. Nothing changes yet…</div>';
+        previewRemoval(p).then(function (list) {
+          var chosen = fixState()[p.id] && fixState()[p.id].level;
+          opts.innerHTML = list.map(function (o) {
+            var label = o.level === 0 ? "Just this one " + o.kind : o.level === list.length - 1 ? "The whole outer section" : "The block around it, " + o.level + " level" + (o.level > 1 ? "s" : "") + " out";
+            return '<label class="opt' + (o.unique ? "" : " off") + '"><input type="radio" name="lvl-' + esc(p.id) + '" value="' + o.level + '"' + (String(chosen) === String(o.level) ? " checked" : "") + (o.unique ? "" : " disabled") + "> <span><b>" + esc(label) + "</b>" + (o.images ? ' <span class="muted">· ' + o.images + " image" + (o.images > 1 ? "s" : "") + "</span>" : "") + (o.unique ? "" : ' <span class="muted">· not possible, the text is in more than one block</span>') + '<pre class="was">' + esc(o.text.slice(0, 600)) + (o.text.length > 600 ? "\n…" : "") + "</pre></span></label>";
+          }).join("");
+        }).catch(function (err) { opts.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+      }
+      pick.querySelector("button").addEventListener("click", loadOpts);
+      opts.addEventListener("change", function (e) { if (e.target.name === "lvl-" + p.id) setFix(p.id, { level: +e.target.value }); });
+      var a0 = wpAuth(); if (a0 && a0.ok && !p.example) loadOpts();
+    }
     if (!st.status) {
       actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
         '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : "Approve and push live") + "</button>" +
@@ -1700,7 +1729,8 @@
         var value = ta.value;
         if (!value.trim() && !/^(meta_description|elementor_remove|set_status)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
         var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
-        pushFix(p, value).then(function (r) {
+        var lv = fixState()[p.id] && fixState()[p.id].level;
+        pushFix(p.type === "elementor_remove" ? Object.assign({}, p, { level: lv == null ? null : lv, scope: "" }) : p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
           logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : "Pushed live" });

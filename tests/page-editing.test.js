@@ -14,9 +14,10 @@ eval(['wpAuth','wpBase','wpFetch','norm','hasChecker','checkUrls','isRedirect','
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 (async()=>{save('wp-auth',{site:'https://westpiertech.com',user:'u',pass:'p',ok:true,checker:true});
  const props=JSON.parse(fs.readFileSync(process.argv[3],'utf8').match(/WPT_PROPOSALS = (\[[\s\S]*?\]);\n\n\/\*/)[1]);
- const rm=props.find(x=>x.id==='b3-01'), st=props.find(x=>x.id==='b3-02');
+ const rm=Object.assign({},props.find(x=>x.id==='b3-01'),{level:2}), st=props.find(x=>x.id==='b3-02');
+ try{await pushFix(Object.assign({},rm,{level:null}),'');ok(false,'x')}catch(e){ok(/Choose exactly what to remove/.test(e.message),'removal refused until you choose what goes')}
  const r=await pushFix(rm,'');const ed=calls.find(c=>c[1].endsWith('elementor-edit'));const b=JSON.parse(ed[2]);
- ok(r.backup==='b1'&&r.pageId===42&&b.op==='remove'&&b.scope==='section'&&b.find==='NHS BPF Better Purchasing Framework'&&b.post_id===42,'remove fix: finds Healthcare by address, removes the BPF section');
+ ok(r.backup==='b1'&&r.pageId===42&&b.op==='remove'&&b.level===2&&b.find==='NHS BPF Better Purchasing Framework'&&b.post_id===42,'remove fix: finds Healthcare by address, removes the BPF section');
  try{await undoFix(rm,{backup:'b1',pageId:42});ok(false,'x')}catch(e){ok(/edited since/.test(e.message),'undo refused when page changed since')}
  await undoFix(rm,{backup:'b1',pageId:42},true);ok(JSON.parse(calls[calls.length-1][2]).force===1,'forced undo sends force');
  const s=await pushFix(st,'');ok(pageStatus==='draft'&&s.before==='publish','unpublish: page set to draft, old status kept');

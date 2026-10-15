@@ -384,6 +384,14 @@ add_action( 'rest_api_init', function () {
 			sg_cachepress_purge_cache( get_permalink( $id ) );
 		}
 	};
+	$at_level = function ( $path, $level, $scope ) {
+		if ( 'section' === $scope ) {
+			return array( $path[0] );
+		}
+		$level = max( 0, (int) $level );
+		$keep  = count( $path ) - 2 * $level;
+		return array_slice( $path, 0, max( 1, $keep ) );
+	};
 	$can_post = function ( WP_REST_Request $r ) {
 		$id = (int) $r->get_param( 'post_id' );
 		return $id > 0 && current_user_can( 'edit_post', $id );
@@ -437,9 +445,11 @@ add_action( 'rest_api_init', function () {
 	register_rest_route( 'wpt-hub/v1', '/elementor-edit', array(
 		'methods'             => 'POST',
 		'permission_callback' => $can_post,
-		'callback'            => function ( WP_REST_Request $r ) use ( $plain, $load, $texts, $save ) {
+		'callback'            => function ( WP_REST_Request $r ) use ( $plain, $load, $texts, $save, $at_level ) {
 			$id   = (int) $r->get_param( 'post_id' );
 			$op   = (string) $r->get_param( 'op' );
+			$level = (int) $r->get_param( 'level' );
+			$scope = (string) $r->get_param( 'scope' );
 			$find = $plain( (string) $r->get_param( 'find' ) );
 			$data = $load( $id );
 			if ( ! $data ) {
@@ -467,13 +477,38 @@ add_action( 'rest_api_init', function () {
 			if ( 'remove' === $op ) {
 				$targets = array();
 				foreach ( $matches as $mm ) {
-					$targets[ wp_json_encode( 'section' === (string) $r->get_param( 'scope' ) ? array( $mm['path'][0] ) : $mm['path'] ) ] = 1;
+					$targets[ wp_json_encode( $at_level( $mm['path'], $level, $scope ) ) ] = 1;
 				}
 				if ( count( $targets ) > 1 ) {
-					return new WP_Error( 'wpt_edit', 'That text appears in more than one ' . ( 'section' === (string) $r->get_param( 'scope' ) ? 'section' : 'block' ) . ' of the page, so the hub won\'t guess which to remove. Nothing was changed.', array( 'status' => 409 ) );
+					return new WP_Error( 'wpt_edit', 'That text appears in more than one block at this level, so the hub won\'t guess which to remove. Nothing was changed.', array( 'status' => 409 ) );
 				}
 			}
 			$m      = $matches[0];
+			if ( $r->get_param( 'dry_run' ) && 'remove' === $op ) {
+				$options = array();
+				$depth   = (int) floor( ( count( $m['path'] ) - 1 ) / 2 );
+				for ( $lv = 0; $lv <= $depth; $lv++ ) {
+					$pp = $at_level( $m['path'], $lv, '' );
+					$el = $data;
+					foreach ( $pp as $k ) {
+						$el = $el[ $k ];
+					}
+					$targets = array();
+					foreach ( $matches as $mm ) {
+						$targets[ wp_json_encode( $at_level( $mm['path'], $lv, '' ) ) ] = 1;
+					}
+					$options[] = array(
+						'level'  => $lv,
+						'kind'   => isset( $el['widgetType'] ) ? $el['widgetType'] : ( isset( $el['elType'] ) ? $el['elType'] : 'block' ),
+						'unique' => 1 === count( $targets ),
+						'images' => substr_count( wp_json_encode( $el ), '"url"' ),
+						'text'   => implode( "\n", array_map( function ( $t ) use ( $plain ) {
+							return $plain( $t['value'] );
+						}, $texts( array( $el ) ) ) ),
+					);
+				}
+				return array( 'ok' => true, 'dry_run' => true, 'options' => $options );
+			}
 			$before = wp_json_encode( $data );
 			$detail = array();
 			if ( 'set' === $op ) {
@@ -489,8 +524,7 @@ add_action( 'rest_api_init', function () {
 				$cell   = (string) $r->get_param( 'replace' );
 				unset( $cell, $node );
 			} elseif ( 'remove' === $op ) {
-				$scope = (string) $r->get_param( 'scope' );
-				$path  = 'section' === $scope ? array( $m['path'][0] ) : $m['path'];
+				$path  = $at_level( $m['path'], $level, $scope );
 				$last  = array_pop( $path );
 				$node  = &$data;
 				foreach ( $path as $k ) {
