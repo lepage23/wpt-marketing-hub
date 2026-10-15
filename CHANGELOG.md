@@ -6,6 +6,21 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.8.0 · 2026-10-15 16:13 BST
+
+The hub can now edit the pages themselves, not just their Google titles and descriptions.
+
+- **Page checker version 4** adds page editing for Elementor pages: change the text of one widget, remove a widget or a whole section. Before every edit it saves a full copy of the page, Elementor keeps its own revision too, and the SiteGround cache is cleared for that page. It refuses to act if the text it's looking for has gone or appears in more than one place.
+- **New fix types:** Page text change, Remove from page and Unpublish page. All pushable from the Fix queue with Undo. Undo puts the page back exactly, and warns rather than overwriting if someone has edited the page since (with an option to undo anyway).
+- **Find text on the site:** searches every published page and post, Elementor included, on the Website & SEO page.
+- **Claims check:** a list of claims you've said aren't true (starting with Better Purchasing and BPF). Every audit searches the whole site for them and puts any page still saying them in the Fix queue as critical.
+- **Batch 3:** remove the NHS BPF section from the Healthcare page (critical), and unpublish the NHS BPF page (high).
+- Snippet version check now needs version 4.
+
+Backups taken:
+
+- `backup/v0.7.2-2026-10-15-1606` (v0.7.2 as it was, before this change)
+
 ## v0.7.2 · 2026-10-15 15:52 BST
 
 - Every read from WordPress now asks for a fresh answer, so SiteGround's cache (or any other) can't serve an old one. Stops an updated snippet looking out of date.

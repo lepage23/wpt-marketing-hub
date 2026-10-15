@@ -2,13 +2,51 @@
    Claude adds to this file and pushes it to GitHub. Pull in GitHub Desktop to see new ones.
    Nothing here touches the website until Connor approves it in the Fix queue.
 
-   Fix types: meta_title, meta_description, content_replace, new_draft (the hub pushes these)
+   Fix types: meta_title, meta_description, content_replace, new_draft, elementor_set, elementor_remove,
+   set_status (the hub pushes these)
    and manual (step-by-step fixes you tick off). priority: critical, high, medium, low.
    category: Content, Structure, Indexing, AI search.
    pageId 0 means the hub finds the page from its address when you push.
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
 window.WPT_PROPOSALS = [
+ {
+  "id": "b3-01",
+  "created": "2026-10-15",
+  "batch": "Batch 3: false claims",
+  "type": "elementor_remove",
+  "scope": "section",
+  "size": "big",
+  "priority": "critical",
+  "category": "Content",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "Healthcare",
+  "link": "https://westpiertech.com/healthcare/",
+  "find": "NHS BPF Better Purchasing Framework",
+  "issue": "Whole section claims WPT is an approved NHS BPF supplier",
+  "current": "NHS BPF Better Purchasing Framework\n\nWe're proud to be one of only 30 approved suppliers on the NHS Advanced Telephony Better Purchasing framework (BPF), a national framework that enables NHS organisations to procure communication solutions quickly and in full compliance. With over 20 years' experience in healthcare communications, we support NHS Trusts and ICSs in modernising their systems without the need for a full tender process.\n\n[Image: WPT Assured Supplier, NHS, Approved badge]\n[Button: Read more, to the NHS BPF page]",
+  "proposed": "(This whole section comes off the page: the heading, the paragraph, the NHS 'Approved' image and the Read more button. The rest of the Healthcare page stays as it is.)",
+  "why": "WPT isn't on the NHS Better Purchasing Framework, so this is a false claim on a live page aimed at NHS buyers. Procurement teams check framework status, and a false claim can rule you out of a tender. Removing the section is the safe fix now. Claude can write an honest replacement section about how NHS trusts buy from WPT once you confirm which frameworks you are on."
+ },
+ {
+  "id": "b3-02",
+  "created": "2026-10-15",
+  "batch": "Batch 3: false claims",
+  "type": "set_status",
+  "status": "draft",
+  "size": "big",
+  "priority": "high",
+  "category": "Content",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "NHS BPF",
+  "link": "https://westpiertech.com/nhs-better-purchasing-framework/",
+  "issue": "A whole page about being on the NHS BPF, which WPT isn't",
+  "current": "Published. It's set to noindex, so Google hides it, but anyone with the link can still read it, and the Healthcare page links to it.",
+  "proposed": "Unpublished (saved as a draft). Nothing is deleted. Undo puts it straight back.",
+  "why": "Noindex only hides it from Google. Buyers can still land on it from the Healthcare page, old emails or tender documents. After this, add a redirect from the old address to /healthcare/ in Rank Math, then Redirections, so old links still land somewhere useful. The next audit will flag it if you don't."
+ },
  {
   "id": "b2-01",
   "created": "2026-10-15",

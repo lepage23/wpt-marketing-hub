@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.7.2";
-  var BUILT = "2026-10-15 15:52 BST";
+  var VERSION = "0.8.0";
+  var BUILT = "2026-10-15 16:13 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -319,6 +319,7 @@
     renderWpConnect(main);
     renderPerformance(main);
     renderGa4(main);
+    renderFind(main);
 
     /* Audit panel */
     var p = panel("Page audit", "Reads every page and post live from WordPress. Read-only: nothing on the site is changed.");
@@ -435,6 +436,7 @@
                 storeAutoFixes(autos, Date.now());
                 fetchPerf(load("perf-days", 28)).catch(function () { /* search data is optional */ });
                 fetchGa4(load("perf-days", 28)).catch(function () { /* GA4 is optional */ });
+                runClaimsCheck().catch(function () { /* needs page checker v4 */ });
                 drawAudit(audit); updateNav();
                 var red = pages.filter(function (p) { return p.redirectTo; }).length;
                 status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " addresses checked against the live site (" + red + " redirect elsewhere). " + autos.length + ' technical fixes are in the <a href="#fixes">Fix queue</a>.</div>';
@@ -897,7 +899,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
-      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 3 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 3 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks and Search Console won\'t run.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 4 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 4 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }
@@ -1459,11 +1461,16 @@
   }
 
   /* ---------- Fix queue ---------- */
-  var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps" };
+  var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
+    elementor_set: "Page text change", elementor_remove: "Remove from page", set_status: "Unpublish page" };
+  function needsV4(err) {
+    if (/no route/i.test(err.message)) throw new Error("Page editing needs the latest page checker snippet. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
+    throw err;
+  }
   var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
-    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []));
+    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
@@ -1533,6 +1540,18 @@
         });
       });
     }
+    if (p.type === "elementor_set" || p.type === "elementor_remove") {
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_set" ? "set" : "remove", find: p.find, replace: text, scope: p.scope || "widget" } })
+        .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, needsV4);
+    }
+    if (p.type === "set_status") {
+      return wpFetch(base + p.pageId + "?context=edit&_fields=id,status").then(function (cur) {
+        return wpFetch(base + p.pageId, { method: "POST", body: { status: p.status || "draft" } }).then(function (r) {
+          if (r.status !== (p.status || "draft")) throw new Error("WordPress didn't change the page status. Nothing was changed.");
+          return { before: cur.status, after: r.status };
+        });
+      });
+    }
     if (p.type === "content_replace") {
       return wpFetch(base + p.pageId + "?context=edit&_fields=id,content").then(function (cur) {
         var raw = (cur.content && cur.content.raw) || "";
@@ -1545,9 +1564,13 @@
     }
     return Promise.reject(new Error("Unknown fix type."));
   }
-  function undoFix(p, st) {
+  function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     var base = "/wp/v2/" + p.postType + "/";
+    if (p.type === "elementor_set" || p.type === "elementor_remove") {
+      return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
+    }
+    if (p.type === "set_status") return wpFetch(base + p.pageId, { method: "POST", body: { status: st.before || "publish" } });
     if (p.type === "meta_title" || p.type === "meta_description") {
       var key = metaKey(p.type); var body = { meta: {} }; body.meta[key] = st.before || "";
       return wpFetch(base + p.pageId, { method: "POST", body: body });
@@ -1656,8 +1679,8 @@
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
-      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : "Proposed (you can edit this)") +
-      '<textarea id="fix-' + esc(p.id) + '"' + (done ? " readonly" : "") + (p.type === "content_replace" || p.type === "new_draft" ? ' style="min-height:140px"' : "") + ">" + esc(done ? st.after : text) + "</textarea>" +
+      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status/.test(p.type) ? "What will happen" : "Proposed (you can edit this)") +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done || p.type === "elementor_remove" || p.type === "set_status" ? " readonly" : "") + (/content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
       (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
       '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
       '<div class="fix-actions row"></div><div class="fix-msg"></div>';
@@ -1668,18 +1691,18 @@
 
     if (!st.status) {
       actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
-        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : "Approve and push live") + "</button>" +
+        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : "Approve and push live") + "</button>" +
         '<button type="button" class="btn rej">Reject</button>' + (st.edited != null ? '<button type="button" class="btn small reset">Reset to Claude\'s version</button>' : "");
       actions.querySelector(".go").addEventListener("click", function () {
         var sure = actions.querySelector(".sure");
         if (sure && !sure.checked) { msg.innerHTML = '<div class="notice">Tick the box to confirm you\'ve read this change.</div>'; return; }
         var value = ta.value;
-        if (!value.trim() && p.type !== "meta_description") { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
+        if (!value.trim() && !/^(meta_description|elementor_remove|set_status)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
         var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
         pushFix(p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
-          setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId });
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : "Pushed live" });
+          setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
@@ -1706,10 +1729,74 @@
           setFix(p.id, { status: "undone", undoneAt: when });
           logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: "Undone" });
           toast("Change undone"); redraw();
-        }).catch(function (err) { u.disabled = false; u.textContent = "Undo"; delete u.dataset.sure; msg.innerHTML = '<div class="notice"><b>Couldn\'t undo.</b> ' + esc(err.message) + "</div>"; });
+        }).catch(function (err) {
+          u.disabled = false; u.textContent = "Undo"; delete u.dataset.sure;
+          msg.innerHTML = '<div class="notice"><b>Couldn\'t undo.</b> ' + esc(err.message) + "</div>";
+          if (/edited since/.test(err.message)) {
+            var f = el('<button type="button" class="btn small danger" style="margin-top:8px">Undo anyway and lose the later edits</button>');
+            msg.appendChild(f);
+            f.addEventListener("click", function () {
+              f.disabled = true;
+              undoFix(p, st, true).then(function () {
+                var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+                setFix(p.id, { status: "undone", undoneAt: when });
+                logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: "Undone (forced)" });
+                toast("Change undone"); redraw();
+              }).catch(function (e2) { f.disabled = false; msg.innerHTML = '<div class="notice"><b>Couldn\'t undo.</b> ' + esc(e2.message) + "</div>"; });
+            });
+          }
+        });
       });
     }
     return card;
+  }
+
+  function claimTerms() { return load("claim-terms", ["Better Purchasing", "BPF"]); }
+  function findText(q) {
+    return wpFetch("/wpt-hub/v1/find?q=" + encodeURIComponent(q)).catch(function (err) {
+      if (/no route/i.test(err.message)) throw new Error("Find needs the latest page checker snippet. Click Copy page checker code above, replace it in WordPress and save.");
+      throw err;
+    });
+  }
+  /* Claims Connor has said aren't true: any page still saying them becomes a critical fix. */
+  function runClaimsCheck() {
+    var terms = claimTerms(), found = {};
+    return terms.reduce(function (pr, t) {
+      return pr.then(function () { return findText(t).then(function (rows) { rows.forEach(function (r) { (found[r.link] = found[r.link] || { r: r, terms: [] }).terms.push(t); }); }); });
+    }, Promise.resolve()).then(function () {
+      var today = new Date().toISOString().slice(0, 10), fixes = [];
+      var pages = Object.keys(found).map(function (k) { var x = found[k]; return { title: x.r.title, link: x.r.link, note: "says: " + x.terms.join(", ") + " · " + x.r.hits.map(function (h) { return "\u201c" + h.snippet.slice(0, 120) + "\u201d"; }).join(" ") }; });
+      if (pages.length) fixes.push({ id: "auto-claims", auto: true, type: "manual", priority: "critical", category: "Content", created: today, batch: "Claims check", pageTitle: "Whole site", link: pages[0].link,
+        issue: pages.length + " page" + (pages.length > 1 ? "s" : "") + " still make claims you've said aren't true", pages: pages,
+        why: "Buyers and procurement teams check claims like framework status. One false claim can sink trust in everything else on the site, and in a tender it can disqualify you.",
+        steps: ["Tell Claude which pages are listed here. It will write page text changes or removals into this queue for you to approve.", "Pages marked noindex are still visible to anyone with the link, so fix those too.", "The check runs again with every audit. Change the list of claims on the Website & SEO page."] });
+      save("auto-fixes-claims", fixes); updateNav();
+      return pages;
+    });
+  }
+  function renderFind(main) {
+    var p = panel("Find text on the site", "Searches every published page and post, including Elementor pages. Read-only.");
+    var box = el('<div style="display:flex;flex-direction:column;gap:10px"><div class="row"><label class="field" for="find-q" style="flex:1;min-width:200px">Text to find<input id="find-q" placeholder="e.g. Better Purchasing"></label><button type="button" class="btn primary" id="find-go" style="align-self:flex-end">Find</button></div><div id="find-out"></div>' +
+      '<div class="row"><label class="field" for="claim-terms" style="flex:1;min-width:200px">Claims that aren\'t true (checked on every audit, comma separated)<input id="claim-terms" value="' + esc(claimTerms().join(", ")) + '"></label><button type="button" class="btn" id="claim-run" style="align-self:flex-end">Check now</button></div><div id="claim-out"></div></div>');
+    p.appendChild(box); main.appendChild(p);
+    function results(rows) {
+      if (!rows.length) return '<div class="empty">Not found on any published page.</div>';
+      return '<div class="table-wrap"><table><thead><tr><th>Page</th><th>Where</th><th>Text</th></tr></thead><tbody>' + rows.map(function (r) {
+        return r.hits.map(function (h, i) { return "<tr>" + (i ? "<td></td>" : '<td><a href="' + esc(r.link) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a><div class="muted" style="font-size:.75rem">' + esc(shortPath(r.link)) + (r.elementor ? " · Elementor" : "") + "</div></td>") + '<td class="mono" style="font-size:.78rem">' + esc(h.widget) + "</td><td>" + esc(h.snippet) + "</td></tr>"; }).join("");
+      }).join("") + "</tbody></table></div>";
+    }
+    box.querySelector("#find-go").addEventListener("click", function () {
+      var q = box.querySelector("#find-q").value.trim(), out = box.querySelector("#find-out"); if (!q) return;
+      out.innerHTML = '<div class="notice info">Searching…</div>';
+      findText(q).then(function (rows) { out.innerHTML = results(rows); }, function (err) { out.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+    });
+    box.querySelector("#find-q").addEventListener("keydown", function (e) { if (e.key === "Enter") box.querySelector("#find-go").click(); });
+    box.querySelector("#claim-terms").addEventListener("change", function (e) { save("claim-terms", e.target.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean)); });
+    box.querySelector("#claim-run").addEventListener("click", function () {
+      var out = box.querySelector("#claim-out"); out.innerHTML = '<div class="notice info">Checking…</div>';
+      runClaimsCheck().then(function (pages) { out.innerHTML = pages.length ? '<div class="notice"><b>' + pages.length + " page" + (pages.length > 1 ? "s" : "") + ' still say this.</b> Listed as a critical fix in the <a href="#fixes">Fix queue</a>.</div>' : '<div class="notice info">None of these claims appear on any published page.</div>'; },
+        function (err) { out.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+    });
   }
 
   function renderChangeLog(main) {
