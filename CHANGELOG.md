@@ -12,7 +12,7 @@ Finished versions are branches named `release/v<version>`.
 
 Backups taken:
 
-- `` (v0.8.2 as it was, before this change)
+- `backup/v0.8.2-2026-10-15-1647` (v0.8.2 as it was, before this change)
 
 ## v0.8.2 · 2026-10-15 16:45 BST
 
