@@ -6,6 +6,20 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.7.0 · 2026-10-15 15:25 BST
+
+Google Analytics 4, connected directly.
+
+- **New snippet `docs/wordpress-ga4.php`.** Reads GA4 through the Google Analytics Data API with a read-only service account. The key is uploaded once from the hub, stored in WordPress for admins only, and never sent back out. Reports are cached for an hour.
+- **Website traffic and leads panel** on Website & SEO: leads (key events), visits, people, engagement and visits from AI tools, with change against the previous period. Daily charts for visits and leads. Tables for channels with lead rate, landing pages, AI tool referrals (ChatGPT, Perplexity, Copilot, Gemini, Claude and others) and which events count as leads. Step-by-step setup built in.
+- **Found in Google Analytics** fixes in a new **Leads** area of the Fix queue: GA4 not counting any leads (critical, names the form event to switch on if there is one), pages bringing Google visitors but no enquiries, and pages where most visits don't engage.
+- Today page shows website leads and visits.
+- GA4 refreshes after each audit, alongside Search Console.
+
+Backups taken:
+
+- `backup/v0.6.0-2026-10-15-1522` (v0.6.0 as it was, before this change)
+
 ## v0.6.0 · 2026-10-15 15:18 BST
 
 Google Search Console (and Analytics where available) in the hub.

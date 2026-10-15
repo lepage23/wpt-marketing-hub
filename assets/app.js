@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.6.0";
-  var BUILT = "2026-10-15 15:18 BST";
+  var VERSION = "0.7.0";
+  var BUILT = "2026-10-15 15:25 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -217,6 +217,7 @@
       stat(leads.length, "Open leads", false) +
       stat(due.length, "Lead actions due today or late", due.length > 0) +
       stat(issues == null ? "–" : issues, issues == null ? "SEO issues (no audit run yet)" : "SEO issues from last audit", issues > 0) +
+      (ga4Data() && ga4Data().configured ? stat(fmtNum(ga4Data().totals.keyEvents), "Website leads, last " + ga4Data().days + " days", !+ga4Data().totals.keyEvents) + stat(fmtNum(ga4Data().totals.sessions), "Website visits, last " + ga4Data().days + " days") : "") +
       (perfData() && perfData().totals ? stat(fmtNum(perfData().totals.clicks), "Clicks from Google, last " + perfData().days + " days") : "") +
       stat(pendingFixes().length, "Website fixes waiting for approval", pendingFixes().length > 0) +
       stat(jobsToDo(), "Your jobs to do", false) +
@@ -317,6 +318,7 @@
       '<a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a>");
     renderWpConnect(main);
     renderPerformance(main);
+    renderGa4(main);
 
     /* Audit panel */
     var p = panel("Page audit", "Reads every page and post live from WordPress. Read-only: nothing on the site is changed.");
@@ -432,6 +434,7 @@
                 var autos = buildAutoFixes(audit);
                 storeAutoFixes(autos, Date.now());
                 fetchPerf(load("perf-days", 28)).catch(function () { /* search data is optional */ });
+                fetchGa4(load("perf-days", 28)).catch(function () { /* GA4 is optional */ });
                 drawAudit(audit); updateNav();
                 var red = pages.filter(function (p) { return p.redirectTo; }).length;
                 status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " addresses checked against the live site (" + red + " redirect elsewhere). " + autos.length + ' technical fixes are in the <a href="#fixes">Fix queue</a>.</div>';
@@ -1308,12 +1311,139 @@
     return out;
   }
 
+  /* ---------- Google Analytics 4 (direct, via the WPT Hub GA4 snippet) ---------- */
+  var AI_SOURCE = /chatgpt|openai|perplexity|copilot|gemini\.google|claude\.ai|you\.com|phind|deepseek|meta\.ai|mistral/i;
+  function ga4Data() { return load("ga4", null); }
+  function fetchGa4(days, fresh) {
+    return wpFetch("/wpt-hub/v1/ga4?days=" + (days || 28) + (fresh ? "&fresh=1" : "")).then(function (d) {
+      if (d && d.configured) { d.loaded = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }); save("ga4", d); save("auto-fixes-ga4", buildGa4Fixes(d)); }
+      else { save("ga4", d); save("auto-fixes-ga4", []); }
+      updateNav(); return d;
+    });
+  }
+  function gaDate(s) { s = String(s || ""); return s.length === 8 ? s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6) : s; }
+
+  function buildGa4Fixes(d) {
+    var out = []; if (!d || !d.configured) return out;
+    var today = new Date().toISOString().slice(0, 10), home = "https://westpiertech.com";
+    function add(o) { o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found in Google Analytics"; out.push(o); }
+    var leads = +(d.totals || {}).keyEvents || 0;
+    var anyKey = (d.events || []).some(function (e) { return +e.keyEvents > 0; });
+    var formEvents = (d.events || []).filter(function (e) { return /form|lead|submit|contact|enquir|call|phone|thank/i.test(e.eventName); });
+    if (!leads && !anyKey) add({ id: "ga4-no-leads", priority: "critical", category: "Leads", pageTitle: "Google Analytics", link: home + "/",
+      issue: "GA4 isn't counting any leads",
+      pages: formEvents.map(function (e) { return { title: e.eventName, link: home + "/", note: e.eventCount + " times in " + d.days + " days, not marked as a key event" }; }),
+      why: "Without key events, GA4 can't tell you which pages, searches or channels produce enquiries, so there's no way to prove what marketing brings in. This is the single most important thing to set up.",
+      steps: formEvents.length ? ["In GA4 go to Admin, then Data display, then Events.", "Find the event(s) listed here and switch on 'Mark as key event'.", "Key events count from that moment on. Check back here in a few days."]
+        : ["Ask Matt how enquiry forms are built (WPForms is installed).", "Easiest route: send each form to a thank-you page, then in GA4 Admin, Events, create an event when page_location contains /thank-you/ and mark it as a key event.", "Also mark clicks on the phone number as a key event if calls matter.", "Tell Claude once it's set up and the hub will start showing leads by page and channel."] });
+    (d.organic_landing || []).forEach(function (r) {
+      var path = r.landingPage || ""; if (!path || path === "(not set)" || +r.sessions < 30 || +r.keyEvents > 0 || !leads) return;
+      add({ id: "ga4-organic-noleads-" + path.replace(/\W+/g, "-").replace(/^-+|-+$/g, "").slice(0, 70), priority: "medium", category: "Leads", pageTitle: path, link: home + path,
+        issue: "Brings in " + r.sessions + " visits from Google but no enquiries",
+        why: "Search is doing its job getting people here, but the page isn't turning them into leads. Usually it's a missing or weak next step: no clear call to action, no phone number near the top, or a form buried at the bottom.",
+        steps: ["Open the page and check there's a clear call to action in the first screen, the phone number is visible, and the form or contact button appears more than once.", "Ask Claude for a call-to-action block written for this page.", "Check back here after a month."] });
+    });
+    (d.landing || []).forEach(function (r) {
+      var path = r.landingPage || ""; if (!path || path === "(not set)" || +r.sessions < 50 || +r.engagementRate >= 0.35) return;
+      add({ id: "ga4-bounce-" + path.replace(/\W+/g, "-").replace(/^-+|-+$/g, "").slice(0, 70), priority: "medium", category: "Content", pageTitle: path, link: home + path,
+        issue: Math.round(r.engagementRate * 100) + "% of " + r.sessions + " visits actually engage with the page",
+        why: "Most visitors leave within seconds without scrolling or clicking. The page either loads slowly, doesn't match what they searched for, or doesn't show quickly that they're in the right place.",
+        steps: ["Check the page's speed at pagespeed.web.dev.", "Look at Search performance for the searches bringing people here, and make sure the first screen speaks to them directly.", "Ask Claude to rewrite the opening of the page."] });
+    });
+    return out;
+  }
+
+  function renderGa4(main) {
+    var p = panel("Website traffic and leads", "Straight from Google Analytics 4. Read-only.");
+    var body = el('<div style="display:flex;flex-direction:column;gap:14px"></div>'); p.appendChild(body); main.appendChild(p);
+    var days = load("perf-days", 28);
+    function setupForm(msg) {
+      body.innerHTML = (msg || "") + '<div class="notice info"><b>One-off setup, about 15 minutes.</b> You create a read-only robot login for Google Analytics, then upload its key here. The key goes straight to your WordPress and never into chat or GitHub.</div>' +
+        '<ol class="steps-list" style="font-size:.9rem">' +
+        "<li>Go to <b>console.cloud.google.com</b>, signed in with the Google account that owns GA4. Create a project called <b>WPT Hub</b>.</li>" +
+        "<li>In that project: <b>APIs &amp; Services, then Library</b>. Search <b>Google Analytics Data API</b> and click <b>Enable</b>.</li>" +
+        "<li><b>IAM &amp; Admin, then Service Accounts, then Create service account</b>. Name it <b>wpt-hub</b>, skip the optional steps, click <b>Done</b>.</li>" +
+        "<li>Open the new account, go to <b>Keys, then Add key, then Create new key, then JSON</b>. A file downloads. Keep it safe and don't email it. If Google says key creation is disabled, Matt needs to allow it for this project.</li>" +
+        "<li>Copy the account's email (ends in <b>iam.gserviceaccount.com</b>). In GA4 go to <b>Admin, then Property access management, then +</b>, paste the email, choose <b>Viewer</b> and Add.</li>" +
+        "<li>In GA4 <b>Admin, then Property details</b>, copy the <b>Property ID</b> (a number).</li>" +
+        "<li>Add the <b>WPT Hub GA4</b> snippet from docs/wordpress-ga4.php, same way as the others.</li>" +
+        "<li>Fill in the two boxes below and click <b>Connect</b>. Then delete the downloaded key file from your computer.</li></ol>" +
+        '<div class="form-grid"><label class="field" for="ga4-prop">GA4 property ID<input id="ga4-prop" inputmode="numeric" placeholder="123456789"></label>' +
+        '<label class="field" for="ga4-key">Key file (.json)<input id="ga4-key" type="file" accept=".json,application/json"></label></div>' +
+        '<div class="row"><button type="button" class="btn primary" id="ga4-connect">Connect</button></div><div id="ga4-msg"></div>';
+      body.querySelector("#ga4-connect").addEventListener("click", function () {
+        var prop = body.querySelector("#ga4-prop").value.trim(), f = body.querySelector("#ga4-key").files[0], m = body.querySelector("#ga4-msg");
+        if (!prop || !f) { m.innerHTML = '<div class="notice">Add the property ID and choose the key file first.</div>'; return; }
+        var btn = body.querySelector("#ga4-connect"); btn.disabled = true; btn.textContent = "Connecting…";
+        var r = new FileReader();
+        r.onload = function () {
+          wpFetch("/wpt-hub/v1/ga4-setup", { method: "POST", body: { property: prop, key: String(r.result) } }).then(function (res) {
+            toast("Connected. " + res.sessions_last_7_days + " sessions in the last 7 days");
+            return fetchGa4(days, true).then(draw);
+          }).catch(function (err) {
+            btn.disabled = false; btn.textContent = "Connect";
+            var msg = /no route/i.test(err.message) ? "Add the WPT Hub GA4 snippet (docs/wordpress-ga4.php) to WordPress first." : err.message;
+            m.innerHTML = '<div class="notice"><b>Not connected.</b> ' + esc(msg) + "</div>";
+          });
+        };
+        r.readAsText(f);
+      });
+    }
+    function draw(d) {
+      var a = wpAuth();
+      if (!a || !a.ok) { body.innerHTML = '<div class="empty">Connect WordPress above first.</div>'; return; }
+      if (!d) { body.innerHTML = '<div class="row"><button type="button" class="btn" id="ga4-load">Load Google Analytics</button></div>'; body.querySelector("#ga4-load").addEventListener("click", refresh); return; }
+      if (!d.configured) return setupForm();
+      var t = d.totals || {}, pv = d.prev || {};
+      var aiRows = (d.sources || []).filter(function (r) { return AI_SOURCE.test(r.sessionSource); });
+      var aiSessions = aiRows.reduce(function (s, r) { return s + (+r.sessions || 0); }, 0);
+      body.innerHTML = '<div class="row"><span class="muted mono" style="font-size:.78rem">GA4 property ' + esc(d.property) + " · last " + d.days + " days · loaded " + esc(d.loaded || "") + '</span><button type="button" class="btn small" id="ga4-refresh">Refresh</button><button type="button" class="btn small danger" id="ga4-off">Disconnect</button></div>' +
+        '<div class="stats">' +
+        '<div class="stat' + (+t.keyEvents ? "" : " flag") + '"><span class="n">' + fmtNum(t.keyEvents) + deltaChip(pctChange(t.keyEvents, pv.keyEvents), true) + '</span><span class="l">Leads (key events)</span></div>' +
+        '<div class="stat"><span class="n">' + fmtNum(t.sessions) + deltaChip(pctChange(t.sessions, pv.sessions), true) + '</span><span class="l">Visits</span></div>' +
+        '<div class="stat"><span class="n">' + fmtNum(t.totalUsers) + deltaChip(pctChange(t.totalUsers, pv.totalUsers), true) + '</span><span class="l">People</span></div>' +
+        '<div class="stat"><span class="n">' + Math.round((+t.engagementRate || 0) * 100) + '%</span><span class="l">Visits that engage</span></div>' +
+        '<div class="stat"><span class="n">' + fmtNum(aiSessions) + '</span><span class="l">Visits from AI tools</span></div></div>' +
+        '<div class="grid charts"></div><div class="grid tables"></div>';
+      var charts = body.querySelector(".charts");
+      charts.appendChild(lineChart((d.daily || []).map(function (r) { return { d: gaDate(r.date), v: r.sessions }; }), "Visits", fmtNum));
+      charts.appendChild(lineChart((d.daily || []).map(function (r) { return { d: gaDate(r.date), v: r.keyEvents }; }), "Leads", fmtNum));
+      var tables = body.querySelector(".tables");
+      function tbl(title, head, rows) { return el('<div><h3 style="margin-bottom:6px">' + esc(title) + '</h3><div class="table-wrap"><table><thead><tr>' + head + "</tr></thead><tbody>" + (rows || '<tr><td colspan="4" class="muted">Nothing yet.</td></tr>') + "</tbody></table></div></div>"); }
+      tables.appendChild(tbl("Where visits come from", '<th>Channel</th><th class="num">Visits</th><th class="num">Leads</th><th class="num">Lead rate</th>',
+        (d.channels || []).slice().sort(function (x, y) { return y.sessions - x.sessions; }).map(function (r) { return "<tr><td>" + esc(r.sessionDefaultChannelGroup) + '</td><td class="num">' + r.sessions + '</td><td class="num">' + r.keyEvents + '</td><td class="num">' + (r.sessions ? (r.keyEvents / r.sessions * 100).toFixed(1) + "%" : "–") + "</td></tr>"; }).join("")));
+      tables.appendChild(tbl("Pages people land on", '<th>Page</th><th class="num">Visits</th><th class="num">Leads</th><th class="num">Engage</th>',
+        (d.landing || []).slice(0, 15).map(function (r) { return '<tr><td><a href="https://westpiertech.com' + esc(r.landingPage) + '" target="_blank" rel="noopener">' + esc(r.landingPage) + '</a></td><td class="num">' + r.sessions + '</td><td class="num">' + r.keyEvents + '</td><td class="num">' + Math.round(r.engagementRate * 100) + "%</td></tr>"; }).join("")));
+      tables.appendChild(tbl("Visits from AI tools", '<th>Source</th><th class="num">Visits</th><th class="num">Leads</th>',
+        aiRows.map(function (r) { return "<tr><td>" + esc(r.sessionSource) + '</td><td class="num">' + r.sessions + '</td><td class="num">' + r.keyEvents + "</td></tr>"; }).join("")));
+      var evs = (d.events || []).filter(function (e) { return +e.keyEvents > 0; });
+      tables.appendChild(tbl("What counts as a lead", '<th>Key event</th><th class="num">Count</th>',
+        evs.map(function (e) { return "<tr><td>" + esc(e.eventName) + '</td><td class="num">' + e.keyEvents + "</td></tr>"; }).join("")));
+      var n = load("auto-fixes-ga4", []).length;
+      if (n) body.appendChild(el('<div class="row"><a class="btn primary" href="#fixes">' + n + " Analytics findings in the Fix queue</a></div>"));
+      body.querySelector("#ga4-refresh").addEventListener("click", function () { refresh(true); });
+      body.querySelector("#ga4-off").addEventListener("click", function (e) {
+        var b = e.target; if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Click again to disconnect"; return; }
+        wpFetch("/wpt-hub/v1/ga4-setup", { method: "DELETE" }).then(function () { save("ga4", { configured: false }); save("auto-fixes-ga4", []); toast("Disconnected. Delete the key in Google Cloud too."); setupForm(); updateNav(); })
+          .catch(function (err) { toast(err.message); });
+      });
+    }
+    function refresh(fresh) {
+      body.insertBefore(el('<div class="notice info">Loading from Google Analytics…</div>'), body.firstChild);
+      fetchGa4(days, fresh === true).then(draw, function (err) {
+        if (/no route/i.test(err.message)) return setupForm();
+        draw(ga4Data()); body.insertBefore(el('<div class="notice"><b>Couldn\'t load Google Analytics.</b> ' + esc(err.message) + "</div>"), body.firstChild);
+      });
+    }
+    draw(ga4Data());
+  }
+
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps" };
   var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
-    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []));
+    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
@@ -1424,7 +1554,7 @@
     main.innerHTML = head("Website & SEO", "Fix queue", "Everything the website needs for Google and AI search: fixes Claude has written and problems the audit found. Nothing goes live until you approve it.");
     var area = load("fix-area", "All");
     var filt = el('<div class="row"><label class="field" for="fix-area" style="flex-direction:row;align-items:center;gap:8px">Show<select id="fix-area">' +
-      ["All", "Content", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
+      ["All", "Leads", "Content", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
     main.appendChild(filt);
     filt.querySelector("select").addEventListener("change", function (e) { area = e.target.value; save("fix-area", area); draw(); });
     var a = wpAuth();

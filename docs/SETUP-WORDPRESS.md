@@ -62,6 +62,17 @@ Lets the hub show clicks, searches and positions from Google Search Console, and
 
 This needs the latest page checker snippet (step 5).
 
+## 7. Connect Google Analytics 4 (direct)
+
+Follow the numbered steps in the hub: **Website & SEO > Website traffic and leads**. In short:
+
+1. Google Cloud: create a project, enable the **Google Analytics Data API**, create a service account and download its **JSON key**.
+2. GA4: add the service account's email as a **Viewer** under Property access management, and copy the **Property ID**.
+3. WordPress: add `docs/wordpress-ga4.php` as a third snippet (**WPT Hub GA4**, PHP, Run everywhere).
+4. Hub: enter the Property ID, choose the key file, click **Connect**. Then delete the key file from your computer.
+
+The key is stored in WordPress (admins only) and never sent back out. Disconnect in the hub removes it. Also delete the key in Google Cloud if you stop using it.
+
 ## If the test fails
 
 - **"Check the username and application password"**: retype the username exactly as it appears in WordPress, and paste a fresh application password.
