@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.2.0";
-  var BUILT = "2026-10-15 12:48 BST";
+  var VERSION = "0.2.1";
+  var BUILT = "2026-10-15 14:10 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -249,6 +249,12 @@
     var y = item.yoast_head_json || null;
     var metaTitle = y && y.title ? y.title : "";
     var metaDesc = y && (y.description || (y.og_description)) ? (y.description || y.og_description) : "";
+    /* Rank Math and SEOPress fields only come back when the hub is connected and the snippet is in. */
+    var m = item.meta || {}, seoFields = null;
+    if ("rank_math_description" in m) seoFields = { t: m.rank_math_title, d: m.rank_math_description, name: "Rank Math" };
+    else if ("_seopress_titles_desc" in m) seoFields = { t: m._seopress_titles_title, d: m._seopress_titles_desc, name: "SEOPress" };
+    if (!y && seoFields) { metaTitle = seoFields.t || ""; metaDesc = seoFields.d || ""; }
+    var hasSeo = !!y || !!seoFields;
     var doc = new DOMParser().parseFromString(html, "text/html");
     var h2 = doc.querySelectorAll("h2").length;
     var imgs = doc.querySelectorAll("img");
@@ -260,7 +266,7 @@
     var modified = (item.modified || "").slice(0, 10);
     var issues = [];
     if (words < 300) issues.push("Thin content (" + words + " words)");
-    if (y && !metaDesc) issues.push("No meta description");
+    if (hasSeo && !metaDesc) issues.push(y ? "No meta description" : "No custom meta description");
     if (metaDesc && metaDesc.length > 160) issues.push("Meta description too long");
     if (metaDesc && metaDesc.length < 70) issues.push("Meta description short");
     if (metaTitle && metaTitle.length > 60) issues.push("Title tag over 60 characters");
@@ -270,16 +276,22 @@
     if (modified && modified < daysAgo(365)) issues.push("Not updated in over a year");
     return {
       id: item.id, type: type, title: stripHtml(item.title && item.title.rendered) || "(no title)", link: item.link, modified: modified,
-      words: words, metaTitle: metaTitle, metaDesc: metaDesc, h2: h2, noAlt: noAlt, internal: internal, issues: issues, hasYoast: !!y
+      words: words, metaTitle: metaTitle, metaDesc: metaDesc, h2: h2, noAlt: noAlt, internal: internal, issues: issues, hasSeo: hasSeo, seoName: y ? "Yoast SEO" : seoFields ? seoFields.name : ""
     };
   }
   function apiUrl(site, type, page) {
     return site.replace(/\/$/, "") + "/wp-json/wp/v2/" + type + "?per_page=100&page=" + page + "&_fields=id,link,title,modified,content,yoast_head_json";
   }
   function fetchAll(site, type) {
-    var all = [];
+    var all = [], a = wpAuth();
+    var authed = a && a.pass && a.ok && a.site.replace(/\/$/, "") === site.replace(/\/$/, "");
+    function get(page) {
+      if (!authed) return fetch(apiUrl(site, type, page));
+      var token; try { token = btoa(a.user + ":" + a.pass); } catch (e) { return fetch(apiUrl(site, type, page)); }
+      return fetch(apiUrl(site, type, page).replace("_fields=", "context=edit&_fields=meta,"), { headers: { "Authorization": "Basic " + token } });
+    }
     function next(page) {
-      return fetch(apiUrl(site, type, page)).then(function (r) {
+      return get(page).then(function (r) {
         if (r.status === 400 && page > 1) return all;
         if (!r.ok) throw new Error("The site answered " + r.status + " for " + type + ".");
         return r.json().then(function (j) {
@@ -331,12 +343,12 @@
       if (only) list = list.filter(function (x) { return x.issues.length; });
       var total = audit.pages.reduce(function (n, x) { return n + x.issues.length; }, 0);
       var thin = audit.pages.filter(function (x) { return x.words < 300; }).length;
-      var noDesc = audit.pages.filter(function (x) { return x.hasYoast && !x.metaDesc; }).length;
+      var noDesc = audit.pages.filter(function (x) { return x.hasSeo && !x.metaDesc; }).length;
       var stale = audit.pages.filter(function (x) { return x.modified && x.modified < daysAgo(365); }).length;
-      var yoast = audit.pages.some(function (x) { return x.hasYoast; });
+      var seoSeen = audit.pages.some(function (x) { return x.hasSeo; });
       results.innerHTML = '<div class="stats" style="margin-bottom:12px">' + stat(audit.pages.length, "Pages and posts checked") + stat(total, "Issues found", total > 0) +
         stat(thin, "Thin pages (under 300 words)", thin > 0) + stat(noDesc, "Missing meta descriptions", noDesc > 0) + stat(stale, "Not updated in a year", stale > 0) + "</div>" +
-        (yoast ? "" : '<div class="notice" style="margin-bottom:12px">No SEO plugin data came back, so titles and meta descriptions could not be checked. Yoast exposes these through the API. If the site uses a different SEO plugin, tell Claude which one.</div>') +
+        (seoSeen ? "" : '<div class="notice" style="margin-bottom:12px">SEO titles and meta descriptions couldn\'t be checked, so "Missing meta descriptions" reads 0 until they can. For Rank Math, connect WordPress above, add the snippet from docs/wordpress-snippet.php, then run the audit again.</div>') +
         '<p class="muted mono" style="margin-bottom:8px">Last run ' + esc(audit.when) + " · " + esc(audit.site) + "</p>" +
         '<div class="table-wrap"><table><thead><tr><th>Page</th><th>Type</th><th class="num">Words</th><th class="num">Title len</th><th class="num">Desc len</th><th class="num">H2s</th><th class="num">Int. links</th><th>Updated</th><th>Issues</th></tr></thead><tbody>' +
         list.map(function (x) {

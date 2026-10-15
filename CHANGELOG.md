@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.2.1 · 2026-10-15 14:10 BST
+
+- The page audit now reads Rank Math (and SEOPress) titles and meta descriptions when WordPress is connected and the snippet is in. Before, it only understood Yoast, so "Missing meta descriptions" showed 0 on a Rank Math site.
+- Pages with no custom description in Rank Math are flagged "No custom meta description".
+- Clearer notice when SEO fields can't be read yet.
+
+Backups taken:
+
+- `backup/v0.2.0-2026-10-15-1409` (v0.2.0 as it was, before this change)
+
 ## v0.2.0 · 2026-10-15 12:48 BST
 
 The hub can now push website fixes, but only ones you approve.
