@@ -1282,6 +1282,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "ga4-job-1",
+  "job": "Ask Matt which website forms send the submit_lead_form event",
+  "page": "All pages with enquiry forms (WPForms)",
+  "details": "GA4 saw 6 form submissions but only 2 submit_lead_form events in 28 days, so some enquiry forms may not be sending it. Every form that's a real enquiry (contact, quote, Talk to an Expert, Get started) should send submit_lead_form. Newsletter sign-ups shouldn't. Once Matt confirms, tell Claude and the hub's lead numbers will be complete.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "b3-job-1",
   "job": "Check the Healthcare page after the BPF section was removed",
   "page": "/healthcare/",

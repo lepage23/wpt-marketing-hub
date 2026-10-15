@@ -6,6 +6,14 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.8.5 · 2026-10-15 17:00 BST
+
+- New job: ask Matt which website forms send the submit_lead_form event (GA4 saw 6 form submissions but only 2 lead form events).
+
+Backups taken:
+
+- `backup/v0.8.4-2026-10-15-1700` (v0.8.4 as it was, before this change)
+
 ## v0.8.4 · 2026-10-15 16:58 BST
 
 - Removed fix b3-03 ("Remove just the BPF block"). The BPF section was already removed by b3-01.
