@@ -2,7 +2,9 @@
    Claude adds to this file and pushes it to GitHub. Pull in GitHub Desktop to see new ones.
    Nothing here touches the website until Connor approves it in the Fix queue.
 
-   Fix types: meta_title, meta_description, content_replace, new_draft.
+   Fix types: meta_title, meta_description, content_replace, new_draft (the hub pushes these)
+   and manual (step-by-step fixes you tick off). priority: critical, high, medium, low.
+   category: Content, Structure, Indexing, AI search.
    pageId 0 means the hub finds the page from its address when you push.
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
@@ -20,7 +22,9 @@ window.WPT_PROPOSALS = [
   "issue": "Claims NHS BPF approved supplier status, which WPT doesn't have",
   "current": "Unified communications, mobile, connectivity and cybersecurity for hospitals, clinics and NHS Trusts. NHS BPF approved supplier with 20 years in healthcare.",
   "proposed": "Unified communications, mobile, connectivity and cyber security for hospitals, clinics and NHS trusts, from a team with 20 years in healthcare.",
-  "why": "This is live in Google now and says WPT is on the NHS Better Purchasing Framework. An NHS buyer who checks would find that isn't true. Fix this one first."
+  "why": "This is live in Google now and says WPT is on the NHS Better Purchasing Framework. An NHS buyer who checks would find that isn't true. Fix this one first.",
+  "category": "Content",
+  "priority": "critical"
  },
  {
   "id": "b1-13",
@@ -35,7 +39,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 53 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 53 characters on the live page.)",
   "proposed": "Training for your team on new phone systems, Teams calling and contact centre tools, so people get the most from what you've paid for. From West Pier.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 53 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 53 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-16",
@@ -50,7 +56,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 50 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 50 characters on the live page.)",
   "proposed": "Communications for technology companies: cloud phones, Teams calling, mobile, connectivity and cyber security that scale as your team grows.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 50 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 50 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-17",
@@ -65,7 +73,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 47 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 47 characters on the live page.)",
   "proposed": "Communications for police and the public sector: control room telephony, unified communications and connectivity from a supplier already working with UK forces.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 47 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 47 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-18",
@@ -80,7 +90,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 57 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 57 characters on the live page.)",
   "proposed": "Unified communications for UK businesses: calling, meetings, chat and contact centre on one platform, from 8x8, Microsoft Teams, Zoom, 3CX or Gamma.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 57 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 57 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-21",
@@ -95,7 +107,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 35 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 35 characters on the live page.)",
   "proposed": "Which business phone system is best for you? A plain-English comparison of 8x8, Microsoft Teams, Zoom Phone, 3CX and Gamma, and who each one suits.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 35 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 35 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-26",
@@ -110,7 +124,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 51 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 51 characters on the live page.)",
   "proposed": "How to make Microsoft Teams work properly with 8x8, 3CX, Gamma and Zoom. The integration options, what each involves and the setups that hold up.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 51 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 51 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-29",
@@ -125,7 +141,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 29 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 29 characters on the live page.)",
   "proposed": "How modern phone systems connect to school MIS, admissions and parent communication tools like Arbor, SIMS and Bromcom, and what it means for your office.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 29 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 29 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-32",
@@ -140,7 +158,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 49 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 49 characters on the live page.)",
   "proposed": "Will AI replace contact centre agents? What AI handles well today, where people still matter and how UK contact centres are using both.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 49 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 49 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-34",
@@ -155,7 +175,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 27 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 27 characters on the live page.)",
   "proposed": "How modern phone systems connect to estate agent software, so calls can bring up client details automatically. What's possible and what to ask for.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 27 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 27 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-38",
@@ -170,7 +192,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 33 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 33 characters on the live page.)",
   "proposed": "The best internet phone providers for UK small businesses in 2026, compared on price, features and support, with advice on picking the right one.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 33 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 33 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-40",
@@ -185,7 +209,9 @@ window.WPT_PROPOSALS = [
   "issue": "Auto-generated description only 49 characters",
   "current": "(No custom description. Rank Math writes one from the page text: 49 characters on the live page.)",
   "proposed": "Already paying for Microsoft 365? When Teams calling is enough on its own, and when a separate business phone system still makes sense.",
-  "why": "Rank Math is filling this in from the page text and it comes out at 49 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page."
+  "why": "Rank Math is filling this in from the page text and it comes out at 49 characters. Too short to tell searchers why to click, so Google often swaps in a random line from the page.",
+  "category": "Content",
+  "priority": "high"
  },
  {
   "id": "b1-01",
@@ -200,7 +226,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom meta description",
   "current": "",
   "proposed": "The top 10 UCaaS providers for UK businesses in 2026, compared on features, pricing, support and fit. A practical guide from West Pier Technologies.",
-  "why": "Google writes its own snippet when there's no description, often from the menu or cookie banner. A clear one tells searchers what they'll get and lifts clicks. This is your biggest page at 8,000 words, so it's the one most worth fixing."
+  "why": "Google writes its own snippet when there's no description, often from the menu or cookie banner. A clear one tells searchers what they'll get and lifts clicks. This is your biggest page at 8,000 words, so it's the one most worth fixing.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-02",
@@ -215,7 +243,9 @@ window.WPT_PROPOSALS = [
   "issue": "Meta description too long (164 characters)",
   "current": "Compare 8x8, 3CX, Gamma, Avaya Cloud Office, Microsoft Teams and AWS side by side. Check features, pricing and support to find the right platform for your business.",
   "proposed": "Compare 8x8, 3CX, Gamma, Avaya Cloud Office, Teams and AWS side by side. Features, pricing and support, so you can pick the right phone system.",
-  "why": "Over 160 characters, so Google cuts it off mid-sentence in search results."
+  "why": "Over 160 characters, so Google cuts it off mid-sentence in search results.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b1-04",
@@ -230,7 +260,9 @@ window.WPT_PROPOSALS = [
   "issue": "Meta description too long (161 characters)",
   "current": "Gamma-powered business voice, connectivity, mobile, Teams calling, SIP trunks and resilience. Unified communications built around how your organisation operates.",
   "proposed": "Gamma voice, connectivity, mobile, Teams calling and SIP trunks for UK organisations, set up and supported by West Pier Technologies.",
-  "why": "Over 160 characters, so Google cuts it off mid-sentence in search results."
+  "why": "Over 160 characters, so Google cuts it off mid-sentence in search results.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b1-20",
@@ -245,7 +277,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag too long (64 characters)",
   "current": "What Is an AI Receptionist? How It Works and Why It Isn't an IVR",
   "proposed": "What Is an AI Receptionist and How Does It Work?",
-  "why": "Over 60 characters, so Google truncates it. Your newest post, so worth getting right while it's fresh."
+  "why": "Over 60 characters, so Google truncates it. Your newest post, so worth getting right while it's fresh.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b1-22",
@@ -260,7 +294,9 @@ window.WPT_PROPOSALS = [
   "issue": "Meta description too long (180 characters)",
   "current": "8x8 Small Business launched in July 2026 with no fixed seats and no annual licence, only for UK companies under 100 users. Here is what changed and what it means for your business.",
   "proposed": "8x8 Small Business launched in July 2026: no fixed seats and no annual licence for UK firms under 100 users. What changed and what it means for you.",
-  "why": "Over 160 characters, so Google cuts it off mid-sentence in search results."
+  "why": "Over 160 characters, so Google cuts it off mid-sentence in search results.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-02",
@@ -275,7 +311,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 101 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 101 characters on the live page.)",
   "proposed": "Already Pay for Microsoft 365? Do You Need a Phone System?",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-03",
@@ -290,7 +328,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 106 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 106 characters on the live page.)",
   "proposed": "Microsoft 365 Price Rise July 2026: What It Means for You",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-04",
@@ -305,7 +345,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 125 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 125 characters on the live page.)",
   "proposed": "Teams Phone Integration with 8x8, 3CX, Gamma and Zoom",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-05",
@@ -320,7 +362,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 121 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 121 characters on the live page.)",
   "proposed": "Phone Systems and School MIS Integration Explained",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-06",
@@ -335,7 +379,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 86 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 86 characters on the live page.)",
   "proposed": "Integrating Phone Systems with Estate Agent Software",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-07",
@@ -350,7 +396,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 105 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 105 characters on the live page.)",
   "proposed": "Why Independent UK Telecoms Providers Are Growing",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-08",
@@ -365,7 +413,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 105 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 105 characters on the live page.)",
   "proposed": "Cloud Phone Systems for UK Financial Services Firms",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-09",
@@ -380,7 +430,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 63 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 63 characters on the live page.)",
   "proposed": "Will AI Replace Contact Centre Agents? | West Pier",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-10",
@@ -395,7 +447,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 61 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 61 characters on the live page.)",
   "proposed": "Which Yealink Phone Is Best for You? | West Pier",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-11",
@@ -410,7 +464,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 97 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 97 characters on the live page.)",
   "proposed": "Best Contact Centre Software for UK Small Businesses 2026",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-12",
@@ -425,7 +481,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 102 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 102 characters on the live page.)",
   "proposed": "Best Cloud Call Recording Services in the UK (2026)",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-13",
@@ -440,7 +498,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 98 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 98 characters on the live page.)",
   "proposed": "Best Internet Phone Providers for UK Small Businesses",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-14",
@@ -455,7 +515,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 84 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 84 characters on the live page.)",
   "proposed": "Top 10 UCaaS Providers 2026: UK Comparison | West Pier",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-15",
@@ -470,7 +532,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 101 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 101 characters on the live page.)",
   "proposed": "8x8 Small Business: Pay-As-You-Go Phones for UK SMEs",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-16",
@@ -485,7 +549,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 137 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 137 characters on the live page.)",
   "proposed": "AI Voice Cloning Fraud: What UK Businesses Should Do",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-17",
@@ -500,7 +566,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 113 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 113 characters on the live page.)",
   "proposed": "PSTN Switch Off 2027: What Breaks and What to Do First",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-18",
@@ -515,7 +583,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 94 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 94 characters on the live page.)",
   "proposed": "8x8 AI Studio: Built-In AI for UK Businesses | West Pier",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-19",
@@ -530,7 +600,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 80 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 80 characters on the live page.)",
   "proposed": "What Is 8x8 Engage? A Practical Guide | West Pier",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-20",
@@ -545,7 +617,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 113 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 113 characters on the live page.)",
   "proposed": "What Is ISDN? Switch Off Dates and What to Do Next",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-21",
@@ -560,7 +634,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 95 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 95 characters on the live page.)",
   "proposed": "Where to Buy VoIP Phones That Work with Your Provider",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-22",
@@ -575,7 +651,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 93 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 93 characters on the live page.)",
   "proposed": "Planning a UCaaS Review? 6 Questions Before You Renew",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b2-23",
@@ -590,7 +668,9 @@ window.WPT_PROPOSALS = [
   "issue": "Title tag 64 characters, Google cuts it off around 60",
   "current": "(No custom title. Rank Math adds \" | West Pier Technologies\" to the page name: 64 characters on the live page.)",
   "proposed": "Avaya IP Office End of Sale and Support | West Pier",
-  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front."
+  "why": "Google shows roughly the first 60 characters of a title, so this one ends in \"...\" in search results. The new version keeps the words people search for at the front.",
+  "category": "Content",
+  "priority": "medium"
  },
  {
   "id": "b1-08",
@@ -605,7 +685,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 133 characters on the live page.)",
   "proposed": "Zoom Phone for UK businesses: cloud calling alongside Zoom Meetings, with number porting, setup and ongoing support from West Pier Technologies.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-09",
@@ -620,7 +702,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 158 characters on the live page.)",
   "proposed": "3CX business phone systems supplied, installed and supported across the UK. Cloud or on-premise, with mobile apps, call recording and CRM integration.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-10",
@@ -635,7 +719,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 140 characters on the live page.)",
   "proposed": "Avaya phone systems supported across the UK, from IP Office maintenance to moving to the cloud. West Pier is an Avaya partner with engineers around the UK.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-11",
@@ -650,7 +736,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 106 characters on the live page.)",
   "proposed": "West Pier is an 8x8 partner for UK businesses. Cloud phones, video, contact centre and AI, set up, ported and supported by a team based in Brighton.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-12",
@@ -665,7 +753,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 107 characters on the live page.)",
   "proposed": "Amazon Web Services for UK business communications, from cloud contact centre to calling. Designed, set up and supported by West Pier Technologies.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-14",
@@ -680,7 +770,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 154 characters on the live page.)",
   "proposed": "AI and automation for business communications: AI receptionists, call summaries, smart routing and contact centre automation, set up by West Pier.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-19",
@@ -695,7 +787,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 157 characters on the live page.)",
   "proposed": "West Pier Technologies is a Brighton-based telecoms provider. We supply and support phone systems, connectivity, mobile and cyber security for UK organisations.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-23",
@@ -710,7 +804,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 152 characters on the live page.)",
   "proposed": "AI voice cloning fraud is costing UK businesses money. What the government warned, how the scams work and the first steps to protect your phones.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-24",
@@ -725,7 +821,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 154 characters on the live page.)",
   "proposed": "The PSTN switch off lands in 2027. What stops working, what it costs to move and what UK businesses should do first, in plain English.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-25",
@@ -740,7 +838,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 155 characters on the live page.)",
   "proposed": "Microsoft 365 prices rose on 1 July 2026. Which plans changed, what it means for your bill and how to keep your communications costs under control.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-27",
@@ -755,7 +855,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 156 characters on the live page.)",
   "proposed": "8x8 AI Studio adds built-in AI to 8x8 calling and contact centre. What it does, how UK businesses are using it and how to get started.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-28",
@@ -770,7 +872,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 70 characters on the live page.)",
   "proposed": "8x8 Engage explained: contact centre tools for teams who handle customer calls without running a full contact centre. What it does and who it suits.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-30",
@@ -785,7 +889,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 160 characters on the live page.)",
   "proposed": "What is ISDN, when is it switched off and what should UK businesses do next? A plain guide to the switch off dates and your replacement options.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-31",
@@ -800,7 +906,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 84 characters on the live page.)",
   "proposed": "The leading cloud phone system providers for UK banks, wealth managers and financial firms, compared on call recording, compliance and security.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-33",
@@ -815,7 +923,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 153 characters on the live page.)",
   "proposed": "Which Yealink phone is best for you? A quick guide to the main Yealink desk phones and who each one suits, from reception desks to hot desks.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-35",
@@ -830,7 +940,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 72 characters on the live page.)",
   "proposed": "Is Avaya still worth it in 2026? What's changed, who still runs it and your options if you're on IP Office and weighing up a move to the cloud.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-36",
@@ -845,7 +957,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 124 characters on the live page.)",
   "proposed": "The best contact centre software for UK small businesses in 2026, compared on features, pricing and how easy each one is to run day to day.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-37",
@@ -860,7 +974,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 125 characters on the live page.)",
   "proposed": "The top cloud call recording services for UK businesses in 2026, compared on compliance, storage, search and how well they fit your phone system.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-39",
@@ -875,7 +991,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 102 characters on the live page.)",
   "proposed": "Where to buy VoIP phones that work with 8x8, Microsoft Teams, Zoom, 3CX and Gamma in the UK, and how to check a handset is certified first.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-41",
@@ -890,7 +1008,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 156 characters on the live page.)",
   "proposed": "What does Avaya integrate with? A plain guide to Avaya IP Office and cloud integrations with CRMs, Microsoft Teams and contact centre tools.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-42",
@@ -905,7 +1025,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 156 characters on the live page.)",
   "proposed": "Running Avaya IP Office in 2026? Support status, upgrade paths and when moving to the cloud makes sense, from an Avaya partner.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-43",
@@ -920,7 +1042,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 154 characters on the live page.)",
   "proposed": "Why independent UK telecoms providers are growing while the big operators consolidate, and what it means for service, pricing and support.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-44",
@@ -935,7 +1059,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 154 characters on the live page.)",
   "proposed": "What does 8x8 integrate with? Microsoft Teams, Salesforce, HubSpot, Zendesk and more, plus how the integrations work day to day for UK teams.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-45",
@@ -950,7 +1076,9 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 153 characters on the live page.)",
   "proposed": "The top UCaaS platforms for 2026 at a glance: who leads on calling, meetings and contact centre, and how to shortlist the right one for you.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
  },
  {
   "id": "b1-46",
@@ -965,7 +1093,151 @@ window.WPT_PROPOSALS = [
   "issue": "No custom description, auto-generated from page text",
   "current": "(No custom description. Rank Math writes one from the page text: 151 characters on the live page.)",
   "proposed": "Planning a UCaaS review in 2026? Six questions to ask before you renew, so you don't roll over a contract that no longer fits your business.",
-  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones."
+  "why": "Rank Math builds this from the opening lines of the page, which rarely reads as a reason to click. A written one leads with what the searcher wants and who you are. Lower priority than the short ones.",
+  "category": "Content",
+  "priority": "low"
+ },
+ {
+  "id": "ai-01",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "high",
+  "category": "AI search",
+  "pageTitle": "Google Business Profile",
+  "link": "https://westpiertech.com/",
+  "issue": "Check and fill in the Google Business Profile for the Brighton office",
+  "why": "Your Business Profile is what Google shows for 'phone systems Brighton' on maps and in the local pack, and it's one of the main sources Google's AI answers use for local businesses. A half-filled profile loses those searches to competitors.",
+  "steps": [
+   "Go to business.google.com and sign in with the account that manages WPT. If nobody has it, use 'Claim this business'.",
+   "Set the primary category to 'Telecommunications service provider' and add secondary ones such as 'Telephone company' and 'Internet service provider'.",
+   "Add every service (business phone systems, 8x8, 3CX, Teams calling, contact centre, connectivity, mobile) with a one-line description each.",
+   "Check the address, phone 01273 391200, website and opening hours match the website exactly.",
+   "Add 5 to 10 real photos: office, team, engineers on site.",
+   "Mark this done and tell Claude. It can write a month of Business Profile posts."
+  ]
+ },
+ {
+  "id": "ai-02",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "high",
+  "category": "AI search",
+  "pageTitle": "Reviews",
+  "link": "https://westpiertech.com/",
+  "issue": "Start asking happy customers for Google reviews",
+  "why": "Review count and recency are big local ranking factors, and AI tools quote reviews when asked who's good in an area. A steady trickle of fresh reviews beats a burst once a year.",
+  "steps": [
+   "In your Business Profile, copy the 'Ask for reviews' link.",
+   "Ask Garry and the engineers for 10 customers who'd happily leave one.",
+   "Send each a short personal email with the link. Claude can draft it.",
+   "Reply to every review, good or bad, within a few days."
+  ]
+ },
+ {
+  "id": "ai-03",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "high",
+  "category": "AI search",
+  "pageTitle": "Partner directories",
+  "link": "https://westpiertech.com/",
+  "issue": "Check WPT is listed and linked in each partner's 'find a partner' directory",
+  "why": "8x8, Gamma, 3CX and Zoom partner locators are trusted pages that link to you. They tell Google and AI tools you're a real, accredited partner, which is exactly what buyers ask ChatGPT about.",
+  "steps": [
+   "Search each partner's partner-finder for 'West Pier': 8x8, Gamma, 3CX and Zoom.",
+   "Where you're listed, check the name, website link (https://westpiertech.com/), phone and partner level are right.",
+   "Where you're missing, ask your partner manager to add you.",
+   "Tell Claude which are live so they can be linked from your partner pages too."
+  ]
+ },
+ {
+  "id": "ai-04",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "medium",
+  "category": "AI search",
+  "pageTitle": "Business listings",
+  "link": "https://westpiertech.com/",
+  "issue": "Claim Bing Places and Apple Business Connect",
+  "why": "Bing Places feeds Microsoft Copilot and Bing Maps. Apple Business Connect feeds Apple Maps and Siri. Both are free and most competitors haven't bothered.",
+  "steps": [
+   "Go to bingplaces.com and import your Google Business Profile (quickest route).",
+   "Go to businessconnect.apple.com and claim West Pier Technologies at the Brighton address.",
+   "Use exactly the same name, address and phone number as Google and the website."
+  ]
+ },
+ {
+  "id": "ai-05",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "medium",
+  "category": "AI search",
+  "pageTitle": "Directory consistency",
+  "link": "https://westpiertech.com/",
+  "issue": "Make sure name, address and phone match everywhere you're listed",
+  "why": "Search engines and AI tools cross-check your details across the web. Different addresses or old phone numbers make them less sure who you are, and less likely to recommend you.",
+  "steps": [
+   "Search Google for \"West Pier Technologies\" and note every directory that lists you (Yell, Thomson Local, Companies House, LinkedIn, partner sites).",
+   "Fix any old address, old phone number or wrong website link.",
+   "Use the same format everywhere: West Pier Technologies, the same address lines, 01273 391200, https://westpiertech.com/."
+  ]
+ },
+ {
+  "id": "ai-06",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "high",
+  "category": "AI search",
+  "pageTitle": "Service pages",
+  "link": "https://westpiertech.com/",
+  "issue": "Add an FAQ section to each main service and partner page",
+  "why": "AI tools and Google's AI Overviews pull answers from clear question-and-answer content. Pages with real buyer questions answered in two or three sentences get quoted far more often.",
+  "steps": [
+   "Claude will write 5 to 8 real buyer questions and answers for each partner page (8x8, 3CX, Gamma, Zoom, Teams, Avaya) as drafts in this queue.",
+   "Approve them, then paste each set into an FAQ block in Elementor (or Rank Math's FAQ block) on the matching page.",
+   "Rank Math adds FAQ schema automatically when you use its block."
+  ]
+ },
+ {
+  "id": "ai-07",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "medium",
+  "category": "AI search",
+  "pageTitle": "Blog posts",
+  "link": "https://westpiertech.com/",
+  "issue": "Show who wrote each blog post",
+  "why": "Google and AI tools weigh who's behind advice. Posts with a named author, role and short bio read as expert advice. Posts by 'admin' don't.",
+  "steps": [
+   "In WordPress, Users, then Profile: fill in your display name, a two-line bio and a photo.",
+   "Check your theme shows the author box on posts (Blocksy: Customise, then Single Posts, then Author Box).",
+   "Make sure each post shows your name, not 'admin'.",
+   "Rank Math adds the author to the article schema automatically."
+  ]
+ },
+ {
+  "id": "ai-08",
+  "created": "2026-10-15",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "high",
+  "category": "Content",
+  "pageTitle": "Case studies",
+  "link": "https://westpiertech.com/",
+  "issue": "Publish three short case studies",
+  "why": "Proof is what turns a visitor into a lead, and it's what AI tools look for when someone asks for a provider who's done this before. You work with police forces and public sector, so a couple of anonymised stories would carry weight.",
+  "steps": [
+   "Pick three customers who'd agree (or anonymise: 'a UK police force', 'a 40-seat law firm').",
+   "For each, note the problem, what WPT did, and one number (calls answered, cost saved, time to switch).",
+   "Send the notes to Claude. The case studies come back as drafts in this queue."
+  ]
  }
 ];
 

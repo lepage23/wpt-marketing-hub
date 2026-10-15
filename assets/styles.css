@@ -155,6 +155,7 @@ pre.was { margin: 0; background: var(--sunk); border-radius: var(--radius); padd
 .fix textarea { font-family: var(--font-mono); font-size: .85rem; }
 .fix h2 a { color: var(--fg); text-decoration: none; }
 .fix h2 a:hover { text-decoration: underline; }
+ul.where, ol.steps-list { margin: 6px 0 0; padding-left: 20px; font-size: .88rem; display: flex; flex-direction: column; gap: 4px; }
 .hint { font-size: .75rem; color: var(--muted); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 @media (max-width: 700px) { .cols2 { grid-template-columns: 1fr; } }

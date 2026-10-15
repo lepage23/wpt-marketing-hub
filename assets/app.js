@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.4.1";
-  var BUILT = "2026-10-15 14:55 BST";
+  var VERSION = "0.5.0";
+  var BUILT = "2026-10-15 15:10 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -333,9 +333,10 @@
     function showUrl() { paste.querySelector("#seo-api-url").textContent = apiUrl(form.querySelector("#seo-site").value, "pages", 1); }
     showUrl(); form.addEventListener("input", showUrl);
 
-    function storeAudit(pages, site) {
-      var audit = { when: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }), site: site, pages: pages };
+    function storeAudit(pages, site, siteData, statusMap) {
+      var audit = { when: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }), site: site, pages: pages, siteData: siteData || null, status: statusMap || null };
       save("seo-audit", audit); drawAudit(audit); updateNav();
+      return audit;
     }
     function drawAudit(audit) {
       if (!audit) { results.innerHTML = '<div class="empty">No audit yet. Press Run audit now.</div>'; return; }
@@ -353,6 +354,7 @@
       results.innerHTML = '<div class="stats" style="margin-bottom:12px">' + stat(audit.pages.length, "Pages and posts checked") + stat(total, "Issues found", total > 0) +
         stat(thin, "Thin pages (under 300 words)", thin > 0) + stat(noDesc, "Missing meta descriptions", noDesc > 0) + stat(stale, "Not updated in a year", stale > 0) + (redirected ? stat(redirected, "Redirect elsewhere (skipped)") : "") + "</div>" +
         (seoSeen ? "" : '<div class="notice" style="margin-bottom:12px">SEO titles and meta descriptions couldn\'t be checked, so "Missing meta descriptions" reads 0 until they can. For Rank Math, connect WordPress above, add the snippet from docs/wordpress-snippet.php, then run the audit again.</div>') +
+        siteSummary(audit) +
         '<p class="muted mono" style="margin-bottom:8px">Last run ' + esc(audit.when) + " · " + esc(audit.site) + (liveSeen ? " · checked against the live site" : " · WordPress data only, redirects not checked") + "</p>" +
         '<div class="table-wrap"><table><thead><tr><th>Page</th><th>Type</th><th class="num">Words</th><th class="num">Title len</th><th class="num">Desc len</th><th class="num">H2s</th><th class="num">Int. links</th><th>Updated</th><th>Issues</th></tr></thead><tbody>' +
         list.map(function (x) {
@@ -363,12 +365,30 @@
             (x.issues.length ? x.issues.map(function (i) { return '<span class="chip flag">' + esc(i) + "</span>"; }).join(" ") : '<span class="chip good">Clear</span>') + "</td></tr>";
         }).join("") + "</tbody></table></div>";
     }
+    function siteSummary(audit) {
+      var d = audit.siteData; if (!d) return "";
+      function line(ok, label, note) { return '<div class="list-item"><span class="chip ' + (ok ? "good" : "flag") + '">' + (ok ? "OK" : "Fix") + '</span><div><div class="t">' + esc(label) + '</div><div class="s">' + esc(note) + "</div></div><span></span></div>"; }
+      var rb = d.robots && d.robots.status === 200;
+      var aiBlocked = rb ? AI_BOTS.filter(function (b) { return robotsBlocks(d.robots.body, b); }) : [];
+      var maps = (d.sitemaps || []).filter(function (m) { return m.status === 200; }).length;
+      var homeRow = audit.pages.filter(function (p) { return norm(p.link) === norm(d.home); })[0] || {};
+      return '<div class="panel" style="margin-bottom:12px;background:var(--bg)"><h3>Site checks</h3><div class="list">' +
+        line(d.blog_public !== 0, "Search engines allowed", d.blog_public !== 0 ? "WordPress isn't blocking search engines." : "WordPress is set to discourage search engines.") +
+        line(rb, "robots.txt", rb ? "Found." : "Missing or not loading.") +
+        line(rb && !aiBlocked.length, "AI search crawlers", aiBlocked.length ? "Blocked: " + aiBlocked.join(", ") : "ChatGPT, Claude, Perplexity, Gemini and Copilot crawlers can read the site.") +
+        line(maps > 0, "XML sitemap", maps ? (d.sitemap_urls || []).length + " addresses across " + maps + " sitemap files." : "No working sitemap found.") +
+        line(!!homeRow.googleVerify, "Google Search Console tag", homeRow.googleVerify ? "Found on the home page." : "Not found on the home page (fine if verified through DNS).") +
+        line(!!homeRow.bingVerify, "Bing Webmaster Tools tag", homeRow.bingVerify ? "Found on the home page." : "Not found on the home page.") +
+        line(d.llms === 200, "llms.txt for AI tools", d.llms === 200 ? "Found." : "Not set up yet.") +
+        line(true, "Redirect rules", (d.redirections || []).length + " rules in Rank Math.") +
+        "</div></div>";
+    }
     drawAudit(load("seo-audit", null));
 
     actions.querySelector("#seo-only").addEventListener("change", function () { drawAudit(load("seo-audit", null)); });
     actions.querySelector("#seo-copy").addEventListener("click", function () {
       var a = load("seo-audit", null); if (!a) return toast("Run an audit first");
-      var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Custom description set", compute: function (r) { return r.customDesc ? "yes" : "no"; } }, { label: "Redirects to", compute: function (r) { return r.redirectTo || ""; } }, { label: "Checked live", compute: function (r) { return r.live ? "yes" : r.redirectTo ? "redirect" : "no"; } }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
+      var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Custom description set", compute: function (r) { return r.customDesc ? "yes" : "no"; } }, { label: "Redirects to", compute: function (r) { return r.redirectTo || ""; } }, { label: "Checked live", compute: function (r) { return r.live ? "yes" : r.redirectTo ? "redirect" : "no"; } }, { label: "H1", compute: function (r) { return (r.h1 || []).join(" / "); } }, { label: "Schema", compute: function (r) { return (r.schema || []).join(" "); } }, { label: "Canonical", compute: function (r) { return r.canonical || ""; } }, { label: "Noindex", compute: function (r) { return r.noindex ? "yes" : ""; } }, { label: "Content links", compute: function (r) { return (r.linksContent || []).length; } }, { label: "Images missing alt", compute: function (r) { return r.imagesNoAlt || 0; } }, { label: "Server ms", compute: function (r) { return r.ms || ""; } }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
       copyText(toCsv(cols, a.pages), "Audit copied as CSV");
     });
     actions.querySelector("#seo-run").addEventListener("click", function () {
@@ -390,9 +410,26 @@
             var targets = applyLive(pages, live);
             return (targets.length ? checkUrls(targets, prog) : Promise.resolve({})).then(function (live2) {
               targets.forEach(function (u) { pages.push(liveOnlyRow(u, live2[norm(u)])); });
-              storeAudit(pages, site);
-              var red = pages.filter(function (p) { return p.redirectTo; }).length;
-              status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " items checked against the live site. " + red + " redirect elsewhere and are skipped.</div>";
+              status.innerHTML = '<div class="notice info">Checking the site: robots.txt, sitemap, redirects and links…</div>';
+              return siteAudit(pages, prog).then(function (res) {
+                var known = {}; pages.forEach(function (p) { known[norm(p.link)] = true; });
+                var inMap = {}; (res.site.sitemap_urls || []).forEach(function (u) { inMap[norm(u)] = true; });
+                Object.keys(res.extraRows).forEach(function (k) {
+                  var r = res.extraRows[k];
+                  if (known[k] || !r || r.status !== 200 || !(r.title || (r.h1 || []).length)) return;
+                  if (!inMap[k] && /\/(tag|category|author|page)\//.test(r.url)) return;
+                  pages.push(liveOnlyRow(r.url, r)); known[k] = true;
+                });
+                var audit = storeAudit(pages, site, res.site, res.status);
+                var autos = buildAutoFixes(audit);
+                storeAutoFixes(autos, Date.now());
+                drawAudit(audit); updateNav();
+                var red = pages.filter(function (p) { return p.redirectTo; }).length;
+                status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " addresses checked against the live site (" + red + " redirect elsewhere). " + autos.length + ' technical fixes are in the <a href="#fixes">Fix queue</a>.</div>';
+              }, function (err) {
+                storeAudit(pages, site);
+                status.innerHTML = '<div class="notice"><b>Pages checked, but the site-wide check didn\'t run.</b> ' + esc(err.message) + ' If it says "No route was found", update the page checker snippet with the new version in docs/wordpress-page-checker.php.</div>';
+              });
             });
           });
         })
@@ -711,6 +748,12 @@
     }
     return nextChunk();
   }
+  function copyLive(p, r) {
+    p.linksAll = r.links_all || []; p.linksContent = r.links_content || []; p.h1 = r.h1 || []; p.canonical = r.canonical || "";
+    p.schema = r.schema || []; p.ogImage = r.og_image || ""; p.googleVerify = !!r.google_verify; p.bingVerify = !!r.bing_verify;
+    p.images = r.images || 0; p.imagesNoAlt = r.images_no_alt || 0; p.ms = r.ms || 0; p.noindex = !!r.noindex;
+    return p;
+  }
   function isRedirect(r) { return r && r.status >= 300 && r.status < 400; }
   function shortPath(u) { return String(u || "").replace(/^https?:\/\/[^\/]+/, "") || "/"; }
   function liveIssues(r) {
@@ -722,6 +765,9 @@
     if (t.length > 60) out.push("Title tag over 60 characters");
     if (r.h2 === 0 && r.words > 150) out.push("No H2 subheadings");
     if (r.noindex) out.push("Set to noindex");
+    if (r.h1 && !r.h1.length) out.push("No H1");
+    if (r.h1 && r.h1.length > 1) out.push(r.h1.length + " H1s");
+    if (r.canonical && norm(r.canonical) !== norm(r.url)) out.push("Canonical points elsewhere");
     return out;
   }
   var API_ONLY_ISSUE = /^(Thin content|No (custom )?meta description|Meta description (too long|short)|Title tag over|No H2)/;
@@ -737,7 +783,7 @@
       p.liveStatus = r.status;
       if (isRedirect(r)) { p.redirectTo = r.location; p.issues = []; return; }
       if (r.status !== 200) { p.issues = ["Live page answers " + r.status]; return; }
-      p.words = r.words; p.metaTitle = r.title || ""; p.metaDesc = r.description || ""; p.h2 = r.h2; p.hasSeo = true; p.live = true;
+      p.words = r.words; p.metaTitle = r.title || ""; p.metaDesc = r.description || ""; p.h2 = r.h2; p.hasSeo = true; p.live = true; copyLive(p, r);
       p.issues = p.issues.filter(function (i) { return !API_ONLY_ISSUE.test(i); }).concat(liveIssues(r));
     });
     var targets = [];
@@ -746,7 +792,7 @@
   }
   function liveOnlyRow(url, r) {
     if (!r || r.error || r.status !== 200) return { title: shortPath(url), link: url, type: "Live page", words: 0, metaTitle: "", metaDesc: "", h2: 0, internal: "–", modified: "", hasSeo: true, liveOnly: true, issues: [r && r.error ? "Live check failed: " + r.error : "Live page answers " + (r ? r.status : "nothing")] };
-    return { title: r.title || shortPath(url), link: url, type: "Live page", words: r.words, metaTitle: r.title || "", metaDesc: r.description || "", h2: r.h2, internal: "–", modified: "", hasSeo: true, live: true, liveOnly: true, issues: liveIssues(r) };
+    return copyLive({ title: r.title || shortPath(url), link: url, type: "Live page", words: r.words, metaTitle: r.title || "", metaDesc: r.description || "", h2: r.h2, internal: "–", modified: "", hasSeo: true, live: true, liveOnly: true, liveStatus: 200, issues: liveIssues(r) }, r);
   }
 
   function renderWpConnect(main) {
@@ -824,9 +870,251 @@
       "</div>";
   }
 
+  /* ---------- Technical SEO and AEO checks ----------
+     Turns the live audit into Fix queue items. Each finding has a stable id, so a
+     fix you've marked done or dismissed stays that way, and findings that are gone
+     on the next audit drop out of the queue. */
+  var PRI_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+  var AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Bingbot", "Applebot"];
+  var STOP = { a: 1, an: 1, and: 1, the: 1, for: 1, of: 1, to: 1, in: 1, on: 1, with: 1, is: 1, are: 1, what: 1, how: 1, your: 1, you: 1, uk: 1, it: 1, do: 1, does: 1, west: 1, pier: 1, technologies: 1, 2026: 1, 2027: 1, guide: 1, best: 1, top: 1 };
+
+  function robotsBlocks(body, bot) {
+    /* True if robots.txt disallows the whole site for this bot (its own group, or * when it has none). */
+    var groups = [], cur = null;
+    String(body || "").split(/\r?\n/).forEach(function (line) {
+      line = line.replace(/#.*/, "").trim(); if (!line) return;
+      var m = line.match(/^([a-z-]+)\s*:\s*(.*)$/i); if (!m) return;
+      var k = m[1].toLowerCase(), v = m[2].trim();
+      if (k === "user-agent") { if (!cur || cur.rules.length) { cur = { agents: [], rules: [] }; groups.push(cur); } cur.agents.push(v.toLowerCase()); }
+      else if (cur && (k === "disallow" || k === "allow")) cur.rules.push({ k: k, v: v });
+    });
+    var own = groups.filter(function (g) { return g.agents.indexOf(bot.toLowerCase()) > -1; });
+    var use = own.length ? own : groups.filter(function (g) { return g.agents.indexOf("*") > -1; });
+    return use.some(function (g) {
+      var dis = g.rules.some(function (r) { return r.k === "disallow" && r.v === "/"; });
+      var allowAll = g.rules.some(function (r) { return r.k === "allow" && r.v === "/"; });
+      return dis && !allowAll;
+    });
+  }
+  function titleWords(t) {
+    return String(t || "").toLowerCase().replace(/\|.*$/, "").split(/[^a-z0-9]+/).filter(function (w) { return w.length > 1 && !STOP[w]; });
+  }
+  function overlap(a, b) {
+    if (!a.length || !b.length) return 0;
+    var n = a.filter(function (w) { return b.indexOf(w) > -1; }).length;
+    return n / Math.min(a.length, b.length);
+  }
+
+  /* Run the site-wide check and extra address checks, then store everything on the audit. */
+  function siteAudit(pages, prog) {
+    return wpFetch("/wpt-hub/v1/site").then(function (site) {
+      var status = {};
+      pages.forEach(function (p) { if (p.liveStatus || p.live) status[norm(p.link)] = { status: p.liveStatus || 200, location: p.redirectTo || "" }; });
+      var extra = [];
+      function want(u) { var k = norm(u); if (!status[k] && extra.indexOf(u) < 0 && extra.length < 250) extra.push(u); }
+      (site.sitemap_urls || []).forEach(want);
+      pages.forEach(function (p) { (p.linksAll || []).forEach(want); });
+      (site.redirections || []).forEach(function (r) { if (r.url_to && /^https?:/.test(r.url_to)) want(r.url_to); else if (r.url_to) want(site.home.replace(/\/$/, "") + "/" + r.url_to.replace(/^\//, "")); });
+      if (!extra.length) return { site: site, status: status, extraRows: {} };
+      return checkUrls(extra, prog).then(function (live) {
+        Object.keys(live).forEach(function (k) { var r = live[k]; status[k] = { status: r.status || 0, location: r.location || "", error: r.error || "" }; });
+        return { site: site, status: status, extraRows: live };
+      });
+    });
+  }
+
+  function indexable(p) { return !p.redirectTo && p.live && !p.noindex; }
+  function pageRef(p, note) { return { title: p.title, link: p.link, note: note || "" }; }
+
+  function buildAutoFixes(audit) {
+    var out = [], site = audit.siteData, status = audit.status || {}, pages = audit.pages, today = new Date().toISOString().slice(0, 10);
+    if (!site) return out;
+    var home = site.home, idx = pages.filter(indexable);
+    var byKey = {}; pages.forEach(function (p) { byKey[norm(p.link)] = p; });
+    var claude = {}; proposals().forEach(function (f) { if (!f.auto) claude[f.type + "|" + norm(f.link)] = true; });
+    function add(o) {
+      o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found by audit";
+      o.link = o.link || home; o.pageTitle = o.pageTitle || "Whole site";
+      out.push(o);
+    }
+
+    /* Indexing */
+    if (site.blog_public === 0) add({ id: "auto-blog-public", priority: "critical", category: "Indexing", issue: "WordPress is telling search engines not to index the site",
+      why: "The 'Discourage search engines' box is ticked. Google may drop the whole site from results.", steps: ["In WordPress go to Settings, then Reading.", "Untick 'Discourage search engines from indexing this site'.", "Save Changes."] });
+    var rb = site.robots;
+    if (!rb || rb.status !== 200) add({ id: "auto-robots-missing", priority: "high", category: "Indexing", issue: "No robots.txt file",
+      why: "Search engines check robots.txt first. Without one they can still crawl, but you lose the chance to point them at your sitemap.", steps: ["In WordPress go to Rank Math, then General Settings, then Edit robots.txt.", "Make sure it contains: User-agent: * / Allow: / and a Sitemap: line pointing at https://westpiertech.com/sitemap_index.xml.", "Save, then run the audit again."] });
+    else {
+      if (robotsBlocks(rb.body, "Googlebot") || robotsBlocks(rb.body, "*")) add({ id: "auto-robots-blocks-all", priority: "critical", category: "Indexing", issue: "robots.txt blocks search engines from the whole site",
+        why: "A 'Disallow: /' rule tells Google not to crawl anything.", steps: ["Rank Math, then General Settings, then Edit robots.txt.", "Remove the 'Disallow: /' line under User-agent: *.", "Save and run the audit again."] });
+      var blocked = AI_BOTS.filter(function (b) { return robotsBlocks(rb.body, b); });
+      if (blocked.length) add({ id: "auto-robots-ai", priority: "high", category: "AI search", issue: "robots.txt blocks AI search tools: " + blocked.join(", "),
+        why: "These are the crawlers behind ChatGPT search, Claude, Perplexity, Gemini, Copilot and Apple. Blocked, they can't read your pages, so they won't recommend you.", steps: ["Rank Math, then General Settings, then Edit robots.txt.", "Remove the Disallow: / rules for " + blocked.join(", ") + ".", "Save and run the audit again."] });
+      if (!/^\s*sitemap\s*:/im.test(rb.body)) add({ id: "auto-robots-sitemap", priority: "low", category: "Indexing", issue: "robots.txt doesn't point to the sitemap",
+        why: "Every search engine reads robots.txt, so it's the easiest place to tell them where the sitemap is.", steps: ["Rank Math, then General Settings, then Edit robots.txt.", "Add this line at the end: Sitemap: https://westpiertech.com/sitemap_index.xml", "Save."] });
+    }
+    var goodMaps = (site.sitemaps || []).filter(function (m) { return m.status === 200; });
+    if (!goodMaps.length) add({ id: "auto-sitemap-missing", priority: "high", category: "Indexing", issue: "No working XML sitemap found",
+      why: "The sitemap is the list of pages you want search engines to find. Without it, new pages take longer to show up.", steps: ["Rank Math, then Dashboard, then make sure the Sitemap module is switched on.", "Open https://westpiertech.com/sitemap_index.xml to check it loads.", "Run the audit again."] });
+    else {
+      var smKeys = {}; (site.sitemap_urls || []).forEach(function (u) { smKeys[norm(u)] = u; });
+      var badInMap = Object.keys(smKeys).filter(function (k) { var s = status[k]; var p = byKey[k]; return (s && s.status && s.status !== 200) || (p && p.noindex); })
+        .map(function (k) { var s = status[k] || {}; var p = byKey[k]; return { title: shortPath(smKeys[k]), link: smKeys[k], note: p && p.noindex ? "set to noindex" : s.status >= 300 && s.status < 400 ? "redirects to " + shortPath(s.location) : "answers " + s.status }; });
+      if (badInMap.length) add({ id: "auto-sitemap-bad", priority: "high", category: "Indexing", issue: badInMap.length + " addresses in the sitemap aren't live pages", pages: badInMap,
+        why: "The sitemap should only list pages you want in Google. Listing redirects, missing pages or noindexed pages wastes Google's crawl and makes the sitemap look unreliable.", steps: ["For redirected pages: in WordPress, open the old page and set it to draft, or in Rank Math set it to noindex, so it drops out of the sitemap.", "For pages answering 404: remove them or redirect them in Rank Math, then Redirections.", "For noindexed pages: Rank Math leaves them out automatically once the setting is saved. If one still shows, re-save the page.", "Run the audit again."] });
+      var missing = idx.filter(function (p) { return !smKeys[norm(p.link)]; }).map(function (p) { return pageRef(p); });
+      if (missing.length) add({ id: "auto-sitemap-missing-pages", priority: "medium", category: "Indexing", issue: missing.length + " live pages aren't in the sitemap", pages: missing,
+        why: "Pages missing from the sitemap are slower to be found and re-crawled. This often happens with pages built outside the normal page list.", steps: ["If they're normal WordPress pages: Rank Math, then Sitemap Settings, and check that post type is included.", "If they're Matt's pages: ask Matt to add them to the sitemap (Rank Math can include extra addresses, or his code can register them).", "Run the audit again."] });
+    }
+    var bare = norm(home);
+    function exact(u) { return String(u || "").replace(/\/$/, "").toLowerCase(); }
+    (site.variants || []).forEach(function (v) {
+      if (exact(v.url) === exact(home)) return;
+      var label = v.url.replace(/\/$/, "");
+      if (v.error) { if (/www\./.test(v.url) && /^https:/.test(v.url)) add({ id: "auto-variant-" + label.replace(/\W+/g, "-"), priority: "low", category: "Structure", issue: label + " doesn't load", why: "Some people still type www. If it doesn't load, they think the site is down.", steps: ["Ask Matt to add a www record in DNS and redirect it to https://westpiertech.com/ with a 301."] }); return; }
+      var straight = exact(v.location) === exact(home);
+      if (v.status === 200) add({ id: "auto-variant-" + label.replace(/\W+/g, "-"), priority: "high", category: "Structure", issue: label + " shows the site without redirecting",
+        why: "Two addresses showing the same site split your Google ranking between them.", steps: ["Ask Matt to make " + label + " redirect to https://westpiertech.com/ with a 301 (permanent) redirect, at the host or in .htaccess."] });
+      else if (v.status >= 300 && v.status < 400 && (!straight || v.status === 302 || v.status === 307)) add({ id: "auto-variant-" + label.replace(/\W+/g, "-"), priority: "medium", category: "Structure", issue: label + (!straight ? " redirects via " + shortPath(v.location) + " instead of straight to the main address" : " uses a temporary (" + v.status + ") redirect"),
+        why: "The redirect to the main address should be a single permanent (301) hop. Extra hops and temporary redirects leak ranking strength.", steps: ["Ask Matt to point " + label + " straight at https://westpiertech.com/ with a 301 redirect."] });
+    });
+    var homeRow = byKey[bare];
+    if (homeRow && homeRow.live) {
+      if (!homeRow.googleVerify) add({ id: "auto-verify-google", priority: "medium", category: "Indexing", issue: "Can't see Google Search Console verification on the home page",
+        why: "Search Console is where Google tells you which pages it has indexed, which searches you appear for and what's broken. If it's already verified another way (for example through DNS), mark this done.", steps: ["Go to search.google.com/search-console and add westpiertech.com (Domain property).", "Verify through DNS (Matt) or copy the HTML tag into Rank Math, then General Settings, then Webmaster Tools, then Google Search Console.", "Submit https://westpiertech.com/sitemap_index.xml under Sitemaps."] });
+      if (!homeRow.bingVerify) add({ id: "auto-verify-bing", priority: "medium", category: "AI search", issue: "Can't see Bing Webmaster Tools verification",
+        why: "Bing's index feeds Microsoft Copilot and is used by other AI search tools. Being set up properly in Bing matters more now than it used to. If it's verified another way, mark this done.", steps: ["Go to bing.com/webmasters and sign in.", "Use 'Import from Google Search Console' (quickest) or add the site and copy the meta tag into Rank Math, then General Settings, then Webmaster Tools, then Bing.", "Submit the sitemap.", "In Rank Math, switch on Instant Indexing (IndexNow) so Bing hears about changes straight away."] });
+      var hs = homeRow.schema || [];
+      if (!hs.some(function (t) { return /Organization|LocalBusiness|Corporation|ProfessionalService/.test(t); })) add({ id: "auto-schema-org", priority: "high", category: "AI search", issue: "Home page has no Organisation or LocalBusiness schema", link: homeRow.link,
+        why: "This is the structured data that tells Google and AI tools who WPT is, where you are and how to contact you. It feeds the knowledge panel and AI answers about the business.", steps: ["Rank Math, then Titles & Meta, then Local SEO.", "Set 'Person or Company' to Company, fill in name, logo, address, phone 01273 391200 and opening hours.", "Save, purge the cache and run the audit again."] });
+    }
+    if (site.llms !== 200) add({ id: "auto-llms", priority: "low", category: "AI search", issue: "No llms.txt file",
+      why: "llms.txt is a short plain-text summary of the site for AI tools: what you do, your key pages and how to contact you. It's new and not every AI tool reads it yet, but it's cheap to add.", steps: ["Ask Claude to write the llms.txt for WPT.", "Rank Math has an llms.txt option under General Settings in recent versions. If yours doesn't, Matt uploads the file to the site root.", "Check https://westpiertech.com/llms.txt loads, then run the audit again."] });
+
+    /* Redirect rules */
+    var rules = (site.redirections || []).filter(function (r) { return r.status === "active"; });
+    function abs(u) { return /^https?:/.test(u) ? u : home.replace(/\/$/, "") + "/" + String(u || "").replace(/^\//, ""); }
+    var chains = [], dead = [], temp = [];
+    rules.forEach(function (r) {
+      var src = (r.sources || []).map(function (s) { return s.pattern; }).join(", ");
+      var t = status[norm(abs(r.url_to))];
+      if (t && t.status >= 300 && t.status < 400) chains.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "which redirects again to " + shortPath(t.location) });
+      else if (t && t.status >= 400) dead.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "target answers " + t.status });
+      if (String(r.header_code) === "302" || String(r.header_code) === "307") temp.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "uses " + r.header_code });
+    });
+    if (dead.length) add({ id: "auto-redirect-dead", priority: "high", category: "Structure", issue: dead.length + " redirects send visitors to a page that doesn't exist", pages: dead,
+      why: "Anyone following an old link lands on an error, and Google drops the ranking the old page had.", steps: ["Rank Math, then Redirections.", "Edit each rule listed to point at the right live page.", "Run the audit again."] });
+    if (chains.length) add({ id: "auto-redirect-chain", priority: "medium", category: "Structure", issue: chains.length + " redirects go through more than one hop", pages: chains,
+      why: "Each extra hop slows the visit down and loses some ranking strength. Google may stop following long chains.", steps: ["Rank Math, then Redirections.", "Change each rule listed to point straight at the final page.", "Run the audit again."] });
+    if (temp.length) add({ id: "auto-redirect-temp", priority: "medium", category: "Structure", issue: temp.length + " redirects are set as temporary", pages: temp,
+      why: "Temporary (302/307) redirects tell Google the old page is coming back, so it keeps the old address in results. Moves that are permanent should be 301.", steps: ["Rank Math, then Redirections.", "Edit each rule listed and change the type to 301 Permanent Move.", "Save."] });
+
+    /* Links */
+    var broken = [], toRedirect = [], inbound = {};
+    pages.forEach(function (p) {
+      if (!p.live) return;
+      (p.linksAll || []).forEach(function (u) { var k = norm(u); if (k !== norm(p.link)) inbound[k] = (inbound[k] || 0) + 1; });
+      (p.linksContent || []).forEach(function (u) {
+        var s = status[norm(u)]; if (!s) return;
+        if (s.status >= 400 || s.status === 0) broken.push({ title: p.title, link: p.link, note: "links to " + shortPath(u) + " (" + (s.status || "no answer") + ")" });
+        else if (s.status >= 300 && s.status < 400) toRedirect.push({ title: p.title, link: p.link, note: "links to " + shortPath(u) + ", which redirects to " + shortPath(s.location) });
+      });
+    });
+    if (broken.length) add({ id: "auto-links-broken", priority: "high", category: "Structure", issue: broken.length + " broken links in page content", pages: broken,
+      why: "Broken links frustrate visitors and waste the link's value. Google sees them as a sign the site isn't looked after.", steps: ["Open each page listed in Elementor or the editor.", "Find the link noted and point it at the right live page, or remove it.", "Run the audit again."] });
+    if (toRedirect.length) add({ id: "auto-links-redirected", priority: "medium", category: "Structure", issue: toRedirect.length + " links point at old addresses that redirect", pages: toRedirect,
+      why: "They still work, but every click goes through a redirect, and some link value is lost. Pointing straight at the new address is cleaner.", steps: ["Open each page listed in Elementor or the editor.", "Change the link noted to the new address shown.", "Run the audit again."] });
+    var orphans = idx.filter(function (p) { return norm(p.link) !== bare && !inbound[norm(p.link)]; }).map(function (p) { return pageRef(p); });
+    if (orphans.length) add({ id: "auto-orphans", priority: "high", category: "Structure", issue: orphans.length + " pages have no links pointing to them", pages: orphans,
+      why: "If no page on the site links to a page, Google struggles to find it and treats it as unimportant. These are effectively hidden.", steps: ["Decide where each page belongs: the menu, a parent page, or related blog posts.", "Add a link to it from at least two relevant pages. Claude can suggest where.", "Run the audit again."] });
+    var fewLinks = idx.filter(function (p) { return p.type === "Post" && (p.linksContent || []).filter(function (u) { return norm(u) !== norm(p.link); }).length < 3; }).map(function (p) { return pageRef(p, (p.linksContent || []).length + " links in the article"); });
+    if (fewLinks.length) add({ id: "auto-posts-few-links", priority: "medium", category: "Structure", issue: fewLinks.length + " blog posts link to fewer than 3 other pages", pages: fewLinks,
+      why: "Links from posts to your service pages pass ranking strength to the pages that win leads, and help readers take the next step.", steps: ["Ask Claude for a batch of internal link suggestions.", "Add 3 to 5 links per post to the most relevant service and partner pages.", "Run the audit again."] });
+
+    /* Page structure */
+    var noH1 = idx.filter(function (p) { return !(p.h1 || []).length; }).map(function (p) { return pageRef(p); });
+    if (noH1.length) add({ id: "auto-h1-missing", priority: "high", category: "Structure", issue: noH1.length + " pages have no H1 heading", pages: noH1,
+      why: "The H1 is the main heading that tells search engines and AI tools what the page is about.", steps: ["Open each page in Elementor.", "Set the main heading widget's HTML tag to H1 (Heading widget, then Content, then HTML Tag).", "Run the audit again."] });
+    var multiH1 = idx.filter(function (p) { return (p.h1 || []).length > 1; }).map(function (p) { return pageRef(p, p.h1.length + " H1s: " + p.h1.slice(0, 3).join(" / ")); });
+    if (multiH1.length) add({ id: "auto-h1-multiple", priority: "medium", category: "Structure", issue: multiH1.length + " pages have more than one H1", pages: multiH1,
+      why: "One clear main heading per page is easiest for search engines to read. Extra H1s blur what the page is about.", steps: ["Open each page in Elementor.", "Keep one main heading as H1 and change the others to H2.", "Run the audit again."] });
+    var canon = idx.filter(function (p) { return p.canonical && norm(p.canonical) !== norm(p.link); }).map(function (p) { return pageRef(p, "canonical says " + shortPath(p.canonical)); });
+    if (canon.length) add({ id: "auto-canonical", priority: "high", category: "Indexing", issue: canon.length + " pages tell Google a different address is the real one", pages: canon,
+      why: "A canonical pointing elsewhere tells Google to ignore this page and rank the other address instead.", steps: ["Open each page, then Rank Math, then Advanced.", "Clear the Canonical URL box (or set it to the page's own address).", "Save and run the audit again."] });
+    idx.concat(pages.filter(function (p) { return p.live && p.noindex; })).filter(function (p) { return p.noindex; }).forEach(function (p) {
+      add({ id: "auto-noindex-" + norm(p.link).replace(/\W+/g, "-"), priority: "high", category: "Indexing", pageTitle: p.title, link: p.link, issue: "Set to noindex, so it won't appear in Google",
+        why: "If this is deliberate, choose 'Not doing this' and it won't come back. If not, the page is invisible in search.", steps: ["Open the page, then Rank Math, then Advanced.", "Untick No Index.", "Save and run the audit again."] });
+    });
+    function dupes(field, label, pri) {
+      var groups = {};
+      idx.forEach(function (p) { var v = (p[field] || "").trim().toLowerCase(); if (v) (groups[v] = groups[v] || []).push(p); });
+      Object.keys(groups).forEach(function (v) {
+        var g = groups[v]; if (g.length < 2) return;
+        add({ id: "auto-dupe-" + field + "-" + v.replace(/\W+/g, "-").slice(0, 60), priority: pri, category: "Content", issue: g.length + " pages share the same " + label, pages: g.map(function (p) { return pageRef(p); }),
+          why: "When pages share a " + label + ", Google can't tell them apart and may show the wrong one, or neither. The shared text is: " + g[0][field], steps: ["Give each page listed its own " + label + " describing what's different about it. Claude can write these in the next batch.", "Run the audit again."] });
+      });
+    }
+    dupes("metaTitle", "title", "high"); dupes("metaDesc", "meta description", "medium");
+    var pairs = [];
+    for (var i = 0; i < idx.length; i++) for (var j = i + 1; j < idx.length; j++) {
+      var a = idx[i], b = idx[j];
+      if (overlap(titleWords(a.title), titleWords(b.title)) >= 0.75 && titleWords(a.title).length >= 2) pairs.push([a, b]);
+    }
+    pairs.slice(0, 15).forEach(function (pr) {
+      add({ id: "auto-cannibal-" + (norm(pr[0].link) + "-" + norm(pr[1].link)).replace(/\W+/g, "-").slice(0, 90), priority: "medium", category: "Content", pageTitle: pr[0].title, link: pr[0].link,
+        issue: "May compete with \"" + pr[1].title + "\" for the same searches", pages: [pageRef(pr[0]), pageRef(pr[1])],
+        why: "Two pages chasing the same search split the ranking between them, so often neither makes page one. If they really cover different things, choose 'Not doing this'.", steps: ["Decide which page should rank for this topic.", "Either merge the other into it and redirect the old address (Rank Math, then Redirections, 301), or rewrite one so it targets a clearly different search.", "Tell Claude which, and it can write the changes."] });
+    });
+
+    /* Content and AEO */
+    var thin = idx.filter(function (p) { return p.words < 300 && !/contact|get-started|news/.test(p.link); }).map(function (p) { return pageRef(p, p.words + " words"); });
+    if (thin.length) add({ id: "auto-thin", priority: "high", category: "Content", issue: thin.length + " pages have under 300 words", pages: thin,
+      why: "Thin pages rarely rank and give AI tools little to quote. Service and sector pages need enough detail to answer what a buyer would ask.", steps: ["Ask Claude to write fuller versions (they arrive in the Fix queue as drafts).", "Paste the approved copy into Elementor, or ask Matt to.", "Run the audit again."] });
+    var noSchema = idx.filter(function (p) { return !(p.schema || []).length; }).map(function (p) { return pageRef(p); });
+    if (noSchema.length) add({ id: "auto-schema-none", priority: "medium", category: "AI search", issue: noSchema.length + " pages have no structured data", pages: noSchema,
+      why: "Structured data (schema) labels the page for search engines and AI tools: what it is, who wrote it, what it offers. Rank Math adds it per page.", steps: ["Open each page, then Rank Math, then Schema.", "Pick a type: Article for blog posts, Service for service pages, WebPage for the rest.", "Save and run the audit again."] });
+    var postsNoArticle = idx.filter(function (p) { return p.type === "Post" && (p.schema || []).length && !(p.schema || []).some(function (t) { return /Article|BlogPosting/.test(t); }); }).map(function (p) { return pageRef(p); });
+    if (postsNoArticle.length) add({ id: "auto-schema-article", priority: "medium", category: "AI search", issue: postsNoArticle.length + " blog posts aren't marked up as articles", pages: postsNoArticle,
+      why: "Article schema tells Google and AI tools it's an article, who wrote it and when. That feeds Top Stories, AI answers and the 'last updated' date people see.", steps: ["Rank Math, then Titles & Meta, then Posts: set Schema Type to Article (BlogPosting).", "For existing posts, open each one, then Rank Math, then Schema, and switch to Article.", "Run the audit again."] });
+    var noOg = idx.filter(function (p) { return !p.ogImage; }).map(function (p) { return pageRef(p); });
+    if (noOg.length) add({ id: "auto-og-image", priority: "low", category: "Content", issue: noOg.length + " pages have no social sharing image", pages: noOg,
+      why: "When someone shares the page on LinkedIn, Teams or WhatsApp, it shows a blank box instead of an image. Fewer clicks.", steps: ["Rank Math, then Titles & Meta, then Global Meta: set a default OpenGraph image (your logo on brand colours works).", "For key pages, set their own image in Rank Math, then Social.", "Run the audit again."] });
+    var noAlt = idx.filter(function (p) { return p.imagesNoAlt > 0; }).map(function (p) { return pageRef(p, p.imagesNoAlt + " of " + p.images + " images"); });
+    if (noAlt.length) add({ id: "auto-alt", priority: "medium", category: "Content", issue: noAlt.length + " pages have images with no alt text", pages: noAlt,
+      why: "Alt text is how Google Images, screen readers and AI tools understand a picture. Missing alt text also counts against accessibility, which public sector buyers check.", steps: ["Go to Media, then Library, open each image used on these pages and fill in Alt Text.", "Describe what the image shows in a short sentence. Claude can draft these if you send the image file names.", "Run the audit again."] });
+    var slow = idx.filter(function (p) { return p.ms > 2000; }).map(function (p) { return pageRef(p, (p.ms / 1000).toFixed(1) + " seconds for the server to send it"); });
+    if (slow.length) add({ id: "auto-slow", priority: slow.length > 10 ? "high" : "medium", category: "Structure", issue: slow.length + " pages take over 2 seconds to load from the server", pages: slow,
+      why: "Speed affects rankings and whether people wait. This measures the server alone, before images and scripts, so real visitors wait longer.", steps: ["Check SiteGround caching is on for these pages (SG Optimizer, then Caching).", "Ask Matt to check for heavy plugins on these pages.", "Test them at pagespeed.web.dev and send Claude the results."] });
+    var titleGap = idx.filter(function (p) { return (p.metaTitle || "").length > 60 && !claude["meta_title|" + norm(p.link)]; }).map(function (p) { return pageRef(p, p.metaTitle.length + " characters"); });
+    if (titleGap.length) add({ id: "auto-titles-long", priority: "medium", category: "Content", issue: titleGap.length + " more pages have titles Google will cut off", pages: titleGap,
+      why: "These aren't in a Claude batch yet. Google shows about 60 characters.", steps: ["Ask Claude for the next batch of titles, which will cover these.", "Or shorten them yourself in Rank Math, then Edit Snippet."] });
+    var descGap = idx.filter(function (p) { var d = p.metaDesc || ""; return (d.length < 70 || d.length > 160) && !claude["meta_description|" + norm(p.link)]; }).map(function (p) { return pageRef(p, (p.metaDesc || "").length + " characters"); });
+    if (descGap.length) add({ id: "auto-desc-gap", priority: "medium", category: "Content", issue: descGap.length + " more pages have descriptions that are missing, too short or too long", pages: descGap,
+      why: "These aren't in a Claude batch yet.", steps: ["Ask Claude for the next batch of descriptions, which will cover these.", "Or write them yourself in Rank Math, then Edit Snippet."] });
+    return out;
+  }
+
+  /* Save auto fixes; reopen ones marked done that the audit still finds. */
+  function storeAutoFixes(list, auditTime) {
+    var s = fixState(), changed = false;
+    list.forEach(function (f) {
+      var st = s[f.id];
+      if (st && st.status === "done" && st.doneTs && st.doneTs < auditTime) { delete st.status; st.reopened = true; changed = true; }
+    });
+    if (changed) save("fix-state", s);
+    save("auto-fixes", list);
+  }
+
   /* ---------- Fix queue ---------- */
-  var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft" };
-  function proposals() { return (window.WPT_PROPOSALS || []).slice(); }
+  var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps" };
+  var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+  var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
+  function proposals() {
+    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []));
+    return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
+      return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
+    }).map(function (x) { return x.p; });
+  }
   function fixState() { return load("fix-state", {}); }
   function setFix(id, patch) { var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s); }
   function pendingFixes() {
@@ -930,20 +1218,25 @@
 
   function renderFixes(main) {
     var view = load("fix-view", "waiting");
-    main.innerHTML = head("Website & SEO", "Fix queue", "Fixes Claude has written for the website. Nothing goes live until you approve it.");
+    main.innerHTML = head("Website & SEO", "Fix queue", "Everything the website needs for Google and AI search: fixes Claude has written and problems the audit found. Nothing goes live until you approve it.");
+    var area = load("fix-area", "All");
+    var filt = el('<div class="row"><label class="field" for="fix-area" style="flex-direction:row;align-items:center;gap:8px">Show<select id="fix-area">' +
+      ["All", "Content", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
+    main.appendChild(filt);
+    filt.querySelector("select").addEventListener("change", function (e) { area = e.target.value; save("fix-area", area); draw(); });
     var a = wpAuth();
     if (!a || !a.pass || !a.ok) main.appendChild(el('<div class="notice"><b>WordPress isn\'t connected yet.</b> You can read and edit fixes, but pushing needs the connection set up on the <a href="#seo">Website & SEO</a> page.</div>'));
     var tabs = el('<div class="row" role="tablist"></div>'); main.appendChild(tabs);
     var list = el('<div style="display:flex;flex-direction:column;gap:14px"></div>'); main.appendChild(list);
 
     function draw() {
-      var s = fixState(), all = proposals();
+      var s = fixState(), all = proposals().filter(function (p) { return area === "All" || (p.category || "Content") === area; });
       var groups = {
         waiting: all.filter(function (p) { return !(s[p.id] && s[p.id].status); }),
-        pushed: all.filter(function (p) { return s[p.id] && (s[p.id].status === "pushed" || s[p.id].status === "undone"); }),
+        pushed: all.filter(function (p) { return s[p.id] && /^(pushed|undone|done)$/.test(s[p.id].status); }),
         rejected: all.filter(function (p) { return s[p.id] && s[p.id].status === "rejected"; })
       };
-      var names = { waiting: "Waiting for you", pushed: "Pushed", rejected: "Rejected" };
+      var names = { waiting: "Waiting for you", pushed: "Done", rejected: "Not doing" };
       tabs.innerHTML = Object.keys(groups).map(function (g) {
         return '<button type="button" role="tab" class="btn' + (g === view ? " primary" : "") + '" data-view="' + g + '" aria-selected="' + (g === view) + '">' + names[g] + " (" + groups[g].length + ")</button>";
       }).join("");
@@ -960,15 +1253,51 @@
     updateNav();
   }
 
+  function headChips(p, st) {
+    return '<div class="row">' + '<span class="chip ' + PRI_CHIP[p.priority || "medium"] + '">' + PRI_LABEL[p.priority || "medium"] + "</span>" +
+      '<span class="chip info">' + esc(TYPE_LABEL[p.type] || p.type) + "</span>" + '<span class="chip">' + esc(p.category || "Content") + "</span>" +
+      (p.auto ? '<span class="chip">Found by audit</span>' : "") + (p.example ? '<span class="chip ex">example</span>' : "") +
+      (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">Still found on the last audit</span>' : "") + "</div>";
+  }
+  function manualCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>');
+    var pages = p.pages || [];
+    card.innerHTML =
+      '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' + headChips(p, st) +
+      "<h2>" + esc(p.issue) + "</h2>" +
+      (pages.length ? "" : '<p class="muted" style="font-size:.86rem"><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.pageTitle) + "</a></p>") + "</div>" +
+      '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
+      '<p style="font-size:.9rem"><b>Why it matters:</b> ' + esc(p.why) + "</p>" +
+      (pages.length ? '<details' + (pages.length <= 6 ? " open" : "") + '><summary style="cursor:pointer;font-size:.88rem"><b>Where (' + pages.length + ")</b></summary><ul class=\"where\">" +
+        pages.map(function (x) { return '<li><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.title) + "</a>" + (x.note ? ' <span class="muted">· ' + esc(x.note) + "</span>" : "") + "</li>"; }).join("") + "</ul></details>" : "") +
+      '<div><b style="font-size:.9rem">How to fix it</b><ol class="steps-list">' + (p.steps || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div>" +
+      '<div class="fix-actions row"></div>';
+    var actions = card.querySelector(".fix-actions");
+    if (!st.status) {
+      actions.innerHTML = '<button type="button" class="btn primary">Mark as done</button><button type="button" class="btn rej">Not doing this</button>';
+      actions.querySelector(".primary").addEventListener("click", function () {
+        var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+        setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now(), reopened: false });
+        logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Steps", action: "Marked done: " + p.issue });
+        toast(p.auto ? "Marked done. The next audit will check it." : "Marked done"); redraw(); updateNav();
+      });
+      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    } else {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "done" ? "Done " + esc(st.doneAt || "") : "Not doing this") + '</span><button type="button" class="btn small">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
+    }
+    return card;
+  }
+
   function fixCard(p, st, redraw) {
+    if (p.type === "manual") return manualCard(p, st, redraw);
     var text = st.edited != null ? st.edited : p.proposed;
     var isMeta = p.type === "meta_title" || p.type === "meta_description";
     var done = st.status === "pushed" || st.status === "undone";
     var card = el('<article class="panel fix"></article>');
     card.innerHTML =
       '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' +
-      '<div class="row"><span class="chip info">' + esc(TYPE_LABEL[p.type] || p.type) + '</span><span class="chip ' + (p.size === "big" ? "flag" : "") + '">' + (p.size === "big" ? "Big change" : "Small change") + "</span>" +
-      (p.example ? '<span class="chip ex">example</span>' : "") + (st.status === "undone" ? '<span class="chip">Undone</span>' : st.status === "pushed" ? '<span class="chip good">Live</span>' : "") + "</div>" +
+      headChips(p, st).replace("</div>", (p.size === "big" ? '<span class="chip flag">Big change</span>' : "") + (st.status === "undone" ? '<span class="chip">Undone</span>' : st.status === "pushed" ? '<span class="chip good">Live</span>' : "") + "</div>") +
       '<h2><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.pageTitle) + "</a></h2>" +
       '<p class="muted" style="font-size:.86rem">' + esc(p.issue) + "</p></div>" +
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +

@@ -6,6 +6,23 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.5.0 · 2026-10-15 15:10 BST
+
+The Fix queue is now the single list of everything the website needs for Google and AI search.
+
+- **Page checker version 2.** Reads each page the way a search engine does: H1s, canonical, noindex, schema types, social image, links in the content and in the menus, images missing alt text, and server response time. Adds a site-wide check: robots.txt, sitemaps, llms.txt, http and www redirects, the "discourage search engines" setting and Rank Math's redirect rules.
+- **Found by audit:** every run turns its findings into Fix queue items with priority, area, the pages affected and step-by-step instructions. Covers indexing, robots.txt and AI crawler access, sitemap problems, http/www redirects, Search Console and Bing verification, Organisation schema, llms.txt, dead and chained redirects, temporary redirects, broken links, links to redirected addresses, orphan pages, posts with few internal links, missing or multiple H1s, canonicals pointing elsewhere, noindex pages, duplicate titles and descriptions, pages competing for the same search, thin pages, missing schema and article markup, missing social images, images without alt text, slow pages, and titles or descriptions not yet in a Claude batch.
+- Fixes marked done that the next audit still finds are reopened and labelled.
+- **Fix queue:** priority labels (Critical, High, Medium, Low) and sorting, a filter by area (Content, Structure, Indexing, AI search), step-by-step fixes with Mark as done and Not doing this, and tabs renamed Waiting / Done / Not doing.
+- **Site checks** summary on the Website & SEO page.
+- **8 new fixes from Claude** for off-site and AI search: Google Business Profile, reviews, partner directories, Bing Places and Apple Business Connect, consistent business details, FAQ sections, author bios and case studies.
+- Batch 1 and 2 fixes now carry priorities: Healthcare critical, very short descriptions high, long titles medium, the rest low.
+- Audit CSV adds H1, schema, canonical, noindex, content links, images missing alt and server time.
+
+Backups taken:
+
+- `backup/v0.4.1-2026-10-15-1503` (v0.4.1 as it was, before this change)
+
 ## v0.4.1 · 2026-10-15 14:55 BST
 
 - **Batch 2 in the Fix queue:** 22 shorter SEO titles for pages and posts Google is cutting off, plus a fix for the Healthcare description, which wrongly claims NHS BPF approved supplier status.
