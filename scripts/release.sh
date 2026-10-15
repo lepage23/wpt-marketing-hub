@@ -10,6 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 NEW="$1"; SUMMARY="${2:-Release}"
+python3 scripts/build-snippets.py   # keep the hub's Copy code buttons in step with docs/*.php
 HUMAN="$(TZ=Europe/London date '+%Y-%m-%d %H:%M %Z')"
 
 echo "$NEW" > VERSION

@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.7.0";
-  var BUILT = "2026-10-15 15:25 BST";
+  var VERSION = "0.7.1";
+  var BUILT = "2026-10-15 15:36 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -761,7 +761,7 @@
     return nextChunk();
   }
   function copyLive(p, r) {
-    p.linksAll = r.links_all || []; p.linksContent = r.links_content || []; p.h1 = r.h1 || []; p.canonical = r.canonical || "";
+    p.linksAll = r.links_all || []; p.linksContent = r.links_content || []; p.h1 = Array.isArray(r.h1) ? r.h1 : []; p.canonical = r.canonical || "";
     p.schema = r.schema || []; p.ogImage = r.og_image || ""; p.googleVerify = !!r.google_verify; p.bingVerify = !!r.bing_verify;
     p.images = r.images || 0; p.imagesNoAlt = r.images_no_alt || 0; p.ms = r.ms || 0; p.noindex = !!r.noindex;
     return p;
@@ -777,8 +777,8 @@
     if (t.length > 60) out.push("Title tag over 60 characters");
     if (r.h2 === 0 && r.words > 150) out.push("No H2 subheadings");
     if (r.noindex) out.push("Set to noindex");
-    if (r.h1 && !r.h1.length) out.push("No H1");
-    if (r.h1 && r.h1.length > 1) out.push(r.h1.length + " H1s");
+    if (Array.isArray(r.h1) && !r.h1.length) out.push("No H1");
+    if (Array.isArray(r.h1) && r.h1.length > 1) out.push(r.h1.length + " H1s");
     if (r.canonical && norm(r.canonical) !== norm(r.url)) out.push("Canonical points elsewhere");
     return out;
   }
@@ -818,10 +818,21 @@
       '<div class="row"><button type="button" class="btn primary" id="wp-test">Save and test</button>' +
       '<button type="button" class="btn danger" id="wp-forget"' + (a.pass ? "" : " hidden") + ">Remove password from this browser</button></div>" +
       '<div id="wp-result"></div>' +
+      '<div class="row" style="font-size:.86rem"><span class="muted">WordPress snippets:</span>' +
+      '<button type="button" class="btn small" data-snip="seo">Copy SEO fields code</button>' +
+      '<button type="button" class="btn small" data-snip="checker">Copy page checker code</button>' +
+      '<button type="button" class="btn small" data-snip="ga4">Copy GA4 code</button>' +
+      '<span class="muted">Paste into Snippets in WordPress, replacing what\'s there.</span></div>' +
       '<details><summary class="muted" style="cursor:pointer;font-size:.88rem">Where do I get an application password?</summary>' +
       '<p class="muted" style="font-size:.86rem;margin-top:8px">In WordPress go to Users, then Profile. Scroll to Application Passwords, type "Marketing Hub" and click Add. Copy the password it shows and paste it above. Never paste it into a chat or email. You can revoke it from the same screen at any time.</p></details></div>');
     p.appendChild(box); main.appendChild(p);
     var res = box.querySelector("#wp-result");
+    box.addEventListener("click", function (e) {
+      var k = e.target.getAttribute("data-snip"); if (!k) return;
+      var code = (window.WPT_SNIPPETS || {})[k];
+      if (!code) return toast("Snippet code not found. Pull the latest version of the hub.");
+      copyText(code, "Copied. Paste it into the snippet in WordPress and save.");
+    });
     if (a.ok) res.innerHTML = connectSummary(a);
 
     box.querySelector("#wp-test").addEventListener("click", function () {
@@ -839,12 +850,17 @@
         var ns = (idx && idx.namespaces) || [];
         next.seo = ns.indexOf("yoast/v1") > -1 ? "yoast" : ns.indexOf("rankmath/v1") > -1 ? "rankmath" : ns.some(function (n) { return n.indexOf("seopress") === 0; }) ? "seopress" : ns.some(function (n) { return n.indexOf("aioseo") === 0; }) ? "aioseo" : "none";
         next.checker = ns.indexOf("wpt-hub/v1") > -1;
+        next.checkerVersion = 0;
         var k = SEO_KEYS[next.seo];
         if (!k) return null;
         return wpFetch("/wp/v2/pages?context=edit&per_page=1&_fields=id,meta").then(function (rows) {
           var m = rows[0] && rows[0].meta;
           next.metaReady = !!(m && Object.prototype.hasOwnProperty.call(m, k.title));
         });
+      }).then(function () {
+        if (!next.checker) return;
+        return wpFetch("/wpt-hub/v1/analytics?days=7").then(function (d) { next.checkerVersion = (d && d.version) || 3; },
+          function () { return wpFetch("/wpt-hub/v1/site").then(function () { next.checkerVersion = 2; }, function () { next.checkerVersion = 1; }); });
       }).then(function () {
         next.ok = true; next.tested = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
         save("wp-auth", next); res.innerHTML = connectSummary(next);
@@ -877,7 +893,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
-      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker ? '<span class="chip good">Page checker ready</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 3 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 3 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks and Search Console won\'t run.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }

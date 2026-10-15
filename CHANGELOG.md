@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.7.1 · 2026-10-15 15:36 BST
+
+- **Fixed: "No H1" flagged on pages that have one.** The first version of the page checker snippet reports H1s as a count, and the audit read that the wrong way round. The audit now only judges H1s from the current snippet.
+- **Snippet version check.** Save and test now reports which page checker version is installed and says plainly when it's out of date (site checks and Search Console need version 3).
+- **Copy code buttons** for each WordPress snippet (SEO fields, page checker, GA4) in the Connect WordPress box, so there's no copying out of files. Generated from docs/*.php on every release.
+
+Backups taken:
+
+- `backup/v0.7.0-2026-10-15-1535` (v0.7.0 as it was, before this change)
+
 ## v0.7.0 · 2026-10-15 15:25 BST
 
 Google Analytics 4, connected directly.
