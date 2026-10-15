@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.8.3";
-  var BUILT = "2026-10-15 16:47 BST";
+  var VERSION = "0.8.4";
+  var BUILT = "2026-10-15 16:58 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1647,6 +1647,16 @@
       (p.auto ? '<span class="chip">Found by audit</span>' : "") + (p.example ? '<span class="chip ex">example</span>' : "") +
       (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">Still found on the last audit</span>' : "") + "</div>";
   }
+  function offerAlreadyDone(p, box, redraw) {
+    var b = el('<div class="row" style="margin-top:8px"><span class="muted" style="font-size:.86rem">If this has already been sorted, you can close it.</span><button type="button" class="btn small primary">Mark as done</button></div>');
+    box.appendChild(b);
+    b.querySelector("button").addEventListener("click", function () {
+      var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now() });
+      logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type] || "Fix", action: "Marked done (already sorted)" });
+      toast("Marked done"); redraw(); updateNav();
+    });
+  }
   function manualCard(p, st, redraw) {
     var card = el('<article class="panel fix"></article>');
     var pages = p.pages || [];
@@ -1713,7 +1723,10 @@
             var label = o.level === 0 ? "Just this one " + o.kind : o.level === list.length - 1 ? "The whole outer section" : "The block around it, " + o.level + " level" + (o.level > 1 ? "s" : "") + " out";
             return '<label class="opt' + (o.unique ? "" : " off") + '"><input type="radio" name="lvl-' + esc(p.id) + '" value="' + o.level + '"' + (String(chosen) === String(o.level) ? " checked" : "") + (o.unique ? "" : " disabled") + "> <span><b>" + esc(label) + "</b>" + (o.images ? ' <span class="muted">· ' + o.images + " image" + (o.images > 1 ? "s" : "") + "</span>" : "") + (o.unique ? "" : ' <span class="muted">· not possible, the text is in more than one block</span>') + '<pre class="was">' + esc(o.text.slice(0, 600)) + (o.text.length > 600 ? "\n…" : "") + "</pre></span></label>";
           }).join("");
-        }).catch(function (err) { opts.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+        }).catch(function (err) {
+          opts.innerHTML = '<div class="notice">' + esc(err.message) + "</div>";
+          if (/isn't on the page any more/.test(err.message)) offerAlreadyDone(p, opts, redraw);
+        });
       }
       pick.querySelector("button").addEventListener("click", loadOpts);
       opts.addEventListener("change", function (e) { if (e.target.name === "lvl-" + p.id) setFix(p.id, { level: +e.target.value }); });
@@ -1739,6 +1752,7 @@
         }).catch(function (err) {
           btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : "Approve and push live";
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
+          if (/isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
         });
       });
       actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Rejected"); redraw(); updateNav(); });

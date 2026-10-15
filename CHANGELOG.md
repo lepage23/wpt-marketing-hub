@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.8.4 · 2026-10-15 16:58 BST
+
+- Removed fix b3-03 ("Remove just the BPF block"). The BPF section was already removed by b3-01.
+- When a fix's text is no longer on the page (because it's already been sorted), the card now offers **Mark as done** instead of leaving you stuck.
+
+Backups taken:
+
+- `backup/v0.8.3-2026-10-15-1658` (v0.8.3 as it was, before this change)
+
 ## v0.8.3 · 2026-10-15 16:47 BST
 
 - New job: check the Healthcare page after the BPF section was removed (Cyber Security and Case Studies went with it).

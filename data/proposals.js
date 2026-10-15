@@ -11,25 +11,6 @@
 
 window.WPT_PROPOSALS = [
  {
-  "id": "b3-03",
-  "created": "2026-10-15",
-  "batch": "Batch 3: false claims",
-  "type": "elementor_remove",
-  "scope": "",
-  "size": "big",
-  "priority": "critical",
-  "category": "Content",
-  "postType": "pages",
-  "pageId": 0,
-  "pageTitle": "Healthcare",
-  "link": "https://westpiertech.com/healthcare/",
-  "find": "NHS BPF Better Purchasing Framework",
-  "issue": "Remove just the BPF block (you pick exactly what goes)",
-  "current": "NHS BPF Better Purchasing Framework\n\nWe're proud to be one of only 30 approved suppliers on the NHS Advanced Telephony Better Purchasing framework (BPF)...\n\n[Image: WPT Assured Supplier, NHS, Approved badge]\n[Button: Read more]",
-  "proposed": "(Only the option you choose below comes off the page. Pick the one whose text is just the BPF heading, paragraph and Read more button, with 1 image.)",
-  "why": "The first version of this fix removed the whole outer section, which also held other content. This one asks WordPress what each option would remove and lets you choose. If you haven't undone the first fix, this will say the text isn't on the page, which is expected."
- },
- {
   "id": "b3-01",
   "created": "2026-10-15",
   "batch": "Batch 3: false claims",
