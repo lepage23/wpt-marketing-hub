@@ -10,6 +10,7 @@ out=$( {
   node tests/ga4-fixes.test.js assets/app.js tests/fixtures/ga4_fixture.json
   node tests/page-editing.test.js assets/app.js data/proposals.js
   node tests/headers.test.js assets/app.js
+  node tests/claim-rules.test.js assets/app.js
   php tests/page-checker.test.php docs/wordpress-page-checker.php | grep -E "^(PASS|FAIL)"
   php tests/analytics.test.php docs/wordpress-page-checker.php /dev/null
   php tests/ga4.test.php docs/wordpress-ga4.php /dev/null

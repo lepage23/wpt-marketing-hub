@@ -2,7 +2,7 @@
    Claude adds to this file and pushes it to GitHub. Pull in GitHub Desktop to see new ones.
    Nothing here touches the website until Connor approves it in the Fix queue.
 
-   Fix types: meta_title, meta_description, content_replace, new_draft, elementor_set, elementor_remove,
+   Fix types: meta_title, meta_description, content_replace, new_draft, elementor_set, elementor_swap, elementor_remove,
    set_status (the hub pushes these)
    and manual (step-by-step fixes you tick off). priority: critical, high, medium, low.
    category: Content, Structure, Indexing, AI search.
@@ -10,6 +10,42 @@
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
 window.WPT_PROPOSALS = [
+ {
+  "id": "b4-01",
+  "created": "2026-10-15",
+  "batch": "Batch 4: claims check",
+  "type": "elementor_swap",
+  "size": "small",
+  "priority": "critical",
+  "category": "Content",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "Home",
+  "link": "https://westpiertech.com/",
+  "find": "an assured BPF supplier to the NHS",
+  "issue": "Home page says WPT is an assured BPF supplier to the NHS",
+  "current": "...West Pier is an assured BPF supplier to the NHS and provide and...",
+  "proposed": "a long-standing supplier to the NHS",
+  "why": "Your home page is the most-visited page on the site and this line claims framework status WPT doesn't have. The swap keeps the sentence and the 20-year NHS history your Healthcare page already states, and drops only the false BPF claim. Only this phrase changes; the rest of the paragraph stays as it is."
+ },
+ {
+  "id": "b4-02",
+  "created": "2026-10-15",
+  "batch": "Batch 4: claims check",
+  "type": "elementor_swap",
+  "size": "small",
+  "priority": "critical",
+  "category": "Content",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "Business Services",
+  "link": "https://westpiertech.com/business-services/",
+  "find": "an assured BPF supplier to leading UK businesses",
+  "issue": "Business Services page says WPT is an assured BPF supplier",
+  "current": "...West Pier is an assured BPF supplier to leading UK businesses an...",
+  "proposed": "a trusted communications provider to leading UK businesses",
+  "why": "BPF is an NHS framework, so it makes no sense on a business services page and isn't true either way. Only this phrase changes; the rest of the paragraph stays as it is."
+ },
  {
   "id": "b3-01",
   "created": "2026-10-15",
@@ -36,7 +72,7 @@ window.WPT_PROPOSALS = [
   "type": "set_status",
   "status": "draft",
   "size": "big",
-  "priority": "high",
+  "priority": "critical",
   "category": "Content",
   "postType": "pages",
   "pageId": 0,

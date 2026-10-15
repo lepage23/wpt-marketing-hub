@@ -6,6 +6,7 @@ const SEO_KEYS={};const calls=[];let pageStatus='publish';
 global.fetch=async(url,o={})=>{const u=new URL(url);calls.push([o.method,u.pathname,o.body]);
  if(u.pathname.endsWith('/wpt-hub/v1/check'))return{ok:true,status:200,json:async()=>JSON.parse(o.body).urls.map(x=>({url:x,status:200}))};
  if(u.searchParams.get('slug'))return{ok:true,status:200,json:async()=>[{id:42,link:'https://westpiertech.com/'+u.searchParams.get('slug')+'/'}]};
+ if(/\/wp\/v2\/pages$/.test(u.pathname))return{ok:true,status:200,json:async()=>[{id:42,link:'https://westpiertech.com/'}]};
  if(u.pathname.endsWith('elementor-edit')){const b=JSON.parse(o.body);return{ok:true,status:200,json:async()=>({ok:true,backup:'b1',before:'NHS BPF text',after:'',op:b.op,scope:b.scope,post:b.post_id})};}
  if(u.pathname.endsWith('elementor-undo')){const b=JSON.parse(o.body);return b.force?{ok:true,status:200,json:async()=>({ok:true})}:{ok:false,status:409,json:async()=>({message:'The page has been edited since this fix went live.'})};}
  if(/\/pages\/42/.test(u.pathname)){if(o.method==='POST')pageStatus=JSON.parse(o.body).status;return{ok:true,status:200,json:async()=>({id:42,status:pageStatus})};}
@@ -20,6 +21,8 @@ const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
  ok(r.backup==='b1'&&r.pageId===42&&b.op==='remove'&&b.level===2&&b.find==='NHS BPF Better Purchasing Framework'&&b.post_id===42,'remove fix: finds Healthcare by address, removes the BPF section');
  try{await undoFix(rm,{backup:'b1',pageId:42});ok(false,'x')}catch(e){ok(/edited since/.test(e.message),'undo refused when page changed since')}
  await undoFix(rm,{backup:'b1',pageId:42},true);ok(JSON.parse(calls[calls.length-1][2]).force===1,'forced undo sends force');
+ const sw=props.find(x=>x.id==='b4-01'); calls.length=0; const rs=await pushFix(sw,sw.proposed); const bs=JSON.parse(calls.find(c=>c[1].endsWith('elementor-edit'))[2]);
+ ok(bs.op==='swap'&&bs.find==='an assured BPF supplier to the NHS'&&bs.replace==='a long-standing supplier to the NHS'&&rs.backup==='b1','phrase swap fix sends only the phrase and its replacement');
  const s=await pushFix(st,'');ok(pageStatus==='draft'&&s.before==='publish','unpublish: page set to draft, old status kept');
  await undoFix(st,{before:s.before,pageId:42});ok(pageStatus==='publish','undo republishes');
  global.fetch=async(url,o)=>{const u=new URL(url);if(u.pathname.endsWith('/check'))return{ok:true,status:200,json:async()=>[{url:rm.link,status:200}]};if(u.searchParams.get('slug'))return{ok:true,status:200,json:async()=>[{id:42,link:rm.link}]};return{ok:false,status:404,json:async()=>({message:'No route was found matching the URL and request method.'})};};

@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 4, adds search performance and Elementor page editing).
+ * WPT Marketing Hub: page checker (version 5, adds search performance and Elementor page editing).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -273,7 +273,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 4, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 5, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -471,7 +471,7 @@ add_action( 'rest_api_init', function () {
 			if ( ! $matches ) {
 				return new WP_Error( 'wpt_edit', 'The text this fix looks for isn\'t on the page any more, so someone may have changed it. Nothing was changed.', array( 'status' => 409 ) );
 			}
-			if ( count( $seen ) > 1 && 'set' === $op ) {
+			if ( count( $seen ) > 1 && ( 'set' === $op || 'swap' === $op ) ) {
 				return new WP_Error( 'wpt_edit', 'That text appears in more than one place on the page, so the hub can\'t tell which to change. Nothing was changed.', array( 'status' => 409 ) );
 			}
 			if ( 'remove' === $op ) {
@@ -522,6 +522,29 @@ add_action( 'rest_api_init', function () {
 				}
 				$detail = array( 'before' => $cell, 'after' => (string) $r->get_param( 'replace' ) );
 				$cell   = (string) $r->get_param( 'replace' );
+				unset( $cell, $node );
+			} elseif ( 'swap' === $op ) {
+				/* Swap one phrase inside a widget's text, leaving the rest of it untouched. */
+				$node = &$data;
+				foreach ( $m['path'] as $k ) {
+					$node = &$node[ $k ];
+				}
+				$cell = &$node['settings'];
+				foreach ( $m['keys'] as $k ) {
+					$cell = &$cell[ $k ];
+				}
+				$old    = (string) $cell;
+				$phrase = (string) $r->get_param( 'find' );
+				$new    = (string) $r->get_param( 'replace' );
+				if ( 1 !== substr_count( $old, $phrase ) ) {
+					$alt = str_replace( array( '&nbsp;', "\xC2\xA0" ), ' ', $old );
+					if ( 1 !== substr_count( $alt, $phrase ) ) {
+						return new WP_Error( 'wpt_edit', 'Found the text, but formatting inside it (bold, a link or similar) stops a clean swap. Nothing was changed. Ask Claude to rewrite this fix as a full text change.', array( 'status' => 409 ) );
+					}
+					$old = $alt;
+				}
+				$cell   = str_replace( $phrase, $new, $old );
+				$detail = array( 'before' => $phrase, 'after' => $new );
 				unset( $cell, $node );
 			} elseif ( 'remove' === $op ) {
 				$path  = $at_level( $m['path'], $level, $scope );

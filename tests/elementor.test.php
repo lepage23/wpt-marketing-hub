@@ -77,3 +77,15 @@ ok(strpos($d['options'][3]['text'],'Case Studies')!==false,'level 3 shows it wou
 $r=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'remove','find'=>'NHS BPF Better Purchasing Framework','level'=>2)));
 $now=json_decode($META[10]['_elementor_data'],true); $ids=array_map(function($e){return $e['id'];},$now[0]['elements']);
 ok(!is_wp_error($r) && $ids===array('cyber','cs'),'remove level 2: BPF row gone, Cyber Security and Case Studies kept');
+// Phrase swap inside a paragraph, like the Home and Business Services BPF claims.
+$home=array(array('id'=>'s','elType'=>'section','settings'=>array(),'elements'=>array(
+  array('id'=>'p','elType'=>'widget','widgetType'=>'text-editor','settings'=>array('editor'=>'<p><a href="/unified-communications/">Unified Communications</a> and Cybersecurity - Built to Empower Your Business</p><p>West Pier is an assured BPF supplier to the NHS and provide and support systems nationwide.</p>')))));
+$META[10]['_elementor_data']=json_encode($home);
+$r=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'swap','find'=>'an assured BPF supplier to the NHS','replace'=>'a long-standing supplier to the NHS')));
+$v=json_decode($META[10]['_elementor_data'],true)[0]['elements'][0]['settings']['editor'];
+ok(!is_wp_error($r) && strpos($v,'West Pier is a long-standing supplier to the NHS and provide')!==false && strpos($v,'<a href="/unified-communications/">')!==false,'swap: only the phrase changes, links and the rest stay');
+ok($r['before']==='an assured BPF supplier to the NHS' && $r['after']==='a long-standing supplier to the NHS','swap reports the phrase before and after');
+$u=$undo(new WP_REST_Request(array('post_id'=>10,'backup'=>$r['backup'])));
+ok(!is_wp_error($u) && json_decode($META[10]['_elementor_data'],true)==$home,'swap undo restores the paragraph');
+$bad=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'swap','find'=>'Unified Communications and Cybersecurity','replace'=>'x')));
+ok(is_wp_error($bad) && strpos($bad->m,'formatting inside it')!==false && json_decode($META[10]['_elementor_data'],true)==$home,'phrase split by a link: clear refusal, nothing changed');

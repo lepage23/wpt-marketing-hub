@@ -6,6 +6,21 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.9.0 · 2026-10-15 17:07 BST
+
+Claims get fixed, not just found.
+
+- **Phrase change** fix type: swaps one phrase inside a paragraph and leaves the rest, including links and formatting, untouched. Undo restores the paragraph exactly. Refuses cleanly if a link or bold text splits the phrase.
+- **Batch 4 (critical):** Home page "an assured BPF supplier to the NHS" becomes "a long-standing supplier to the NHS". Business Services "an assured BPF supplier to leading UK businesses" becomes "a trusted communications provider to leading UK businesses".
+- Unpublishing the NHS BPF page is now critical.
+- **Automatic replacements** on the Website & SEO page: write "wrong phrase => right phrase" once, and every audit turns each page using the wrong phrase into a push-ready fix, without waiting for Claude. Skips anything Claude has already written a fix for.
+- Page checker snippet is version 5 (adds phrase change). Update it with Copy page checker code.
+- 128 tests, all passing.
+
+Backups taken:
+
+- `backup/v0.8.5-2026-10-15-1705` (v0.8.5 as it was, before this change)
+
 ## v0.8.5 · 2026-10-15 17:00 BST
 
 - New job: ask Matt which website forms send the submit_lead_form event (GA4 saw 6 form submissions but only 2 lead form events).
