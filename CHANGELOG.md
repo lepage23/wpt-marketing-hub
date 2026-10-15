@@ -6,6 +6,23 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.4.0 · 2026-10-15 14:42 BST
+
+The audit now checks the live site, not just WordPress's page list.
+
+- New **page checker** snippet (`docs/wordpress-page-checker.php`). With it added, the audit asks the site what a visitor actually gets at each address.
+- Pages that **redirect** are greyed out, labelled with where they go, and left out of the counts and fixes.
+- The pages they redirect to (like Matt's `/business-phone-systems/.../brighton/` pages) are added to the audit as **Live page** rows and checked properly.
+- Word count, title, description and subheadings now come from the **live page**, so Elementor pages are measured correctly.
+- The hub **won't push** a fix to an address that redirects. It stops and says so.
+- Connection test shows whether the page checker is in.
+- Audit CSV gains: custom description set, redirects to, checked live.
+- Removed the three Brighton fixes from batch 1. They pointed at old pages Matt has redirected.
+
+Backups taken:
+
+- `backup/v0.3.0-2026-10-15-1440` (v0.3.0 as it was, before this change)
+
 ## v0.3.0 · 2026-10-15 14:30 BST
 
 First real batch of website fixes.

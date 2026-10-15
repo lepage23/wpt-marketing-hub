@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.3.0";
-  var BUILT = "2026-10-15 14:30 BST";
+  var VERSION = "0.4.0";
+  var BUILT = "2026-10-15 14:42 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -340,19 +340,23 @@
     function drawAudit(audit) {
       if (!audit) { results.innerHTML = '<div class="empty">No audit yet. Press Run audit now.</div>'; return; }
       var only = actions.querySelector("#seo-only").checked;
-      var list = audit.pages.slice().sort(function (a, b) { return b.issues.length - a.issues.length; });
+      var list = audit.pages.slice().sort(function (a, b) { return (a.redirectTo ? 1 : 0) - (b.redirectTo ? 1 : 0) || b.issues.length - a.issues.length; });
       if (only) list = list.filter(function (x) { return x.issues.length; });
       var total = audit.pages.reduce(function (n, x) { return n + x.issues.length; }, 0);
-      var thin = audit.pages.filter(function (x) { return x.words < 300; }).length;
-      var noDesc = audit.pages.filter(function (x) { return x.hasSeo && !x.metaDesc; }).length;
+      var real = audit.pages.filter(function (x) { return !x.redirectTo; });
+      var redirected = audit.pages.length - real.length;
+      var thin = real.filter(function (x) { return x.words < 300; }).length;
+      var noDesc = real.filter(function (x) { return x.hasSeo && !x.metaDesc; }).length;
       var stale = audit.pages.filter(function (x) { return x.modified && x.modified < daysAgo(365); }).length;
       var seoSeen = audit.pages.some(function (x) { return x.hasSeo; });
+      var liveSeen = audit.pages.some(function (x) { return x.live || x.redirectTo; });
       results.innerHTML = '<div class="stats" style="margin-bottom:12px">' + stat(audit.pages.length, "Pages and posts checked") + stat(total, "Issues found", total > 0) +
-        stat(thin, "Thin pages (under 300 words)", thin > 0) + stat(noDesc, "Missing meta descriptions", noDesc > 0) + stat(stale, "Not updated in a year", stale > 0) + "</div>" +
+        stat(thin, "Thin pages (under 300 words)", thin > 0) + stat(noDesc, "Missing meta descriptions", noDesc > 0) + stat(stale, "Not updated in a year", stale > 0) + (redirected ? stat(redirected, "Redirect elsewhere (skipped)") : "") + "</div>" +
         (seoSeen ? "" : '<div class="notice" style="margin-bottom:12px">SEO titles and meta descriptions couldn\'t be checked, so "Missing meta descriptions" reads 0 until they can. For Rank Math, connect WordPress above, add the snippet from docs/wordpress-snippet.php, then run the audit again.</div>') +
-        '<p class="muted mono" style="margin-bottom:8px">Last run ' + esc(audit.when) + " · " + esc(audit.site) + "</p>" +
+        '<p class="muted mono" style="margin-bottom:8px">Last run ' + esc(audit.when) + " · " + esc(audit.site) + (liveSeen ? " · checked against the live site" : " · WordPress data only, redirects not checked") + "</p>" +
         '<div class="table-wrap"><table><thead><tr><th>Page</th><th>Type</th><th class="num">Words</th><th class="num">Title len</th><th class="num">Desc len</th><th class="num">H2s</th><th class="num">Int. links</th><th>Updated</th><th>Issues</th></tr></thead><tbody>' +
         list.map(function (x) {
+          if (x.redirectTo) return '<tr class="dim"><td><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.title) + "</a></td><td>" + esc(x.type) + '</td><td colspan="6" class="muted">Skipped</td><td><span class="chip info">Redirects to ' + esc(shortPath(x.redirectTo)) + "</span></td></tr>";
           return "<tr><td><a href=\"" + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.title) + '</a></td><td>' + esc(x.type) + '</td><td class="num">' + x.words +
             '</td><td class="num">' + (x.metaTitle ? x.metaTitle.length : "–") + '</td><td class="num">' + (x.metaDesc ? x.metaDesc.length : "–") + '</td><td class="num">' + x.h2 +
             '</td><td class="num">' + x.internal + '</td><td class="mono">' + esc(x.modified) + "</td><td>" +
@@ -364,7 +368,7 @@
     actions.querySelector("#seo-only").addEventListener("change", function () { drawAudit(load("seo-audit", null)); });
     actions.querySelector("#seo-copy").addEventListener("click", function () {
       var a = load("seo-audit", null); if (!a) return toast("Run an audit first");
-      var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
+      var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Custom description set", compute: function (r) { return r.customDesc ? "yes" : "no"; } }, { label: "Redirects to", compute: function (r) { return r.redirectTo || ""; } }, { label: "Checked live", compute: function (r) { return r.live ? "yes" : r.redirectTo ? "redirect" : "no"; } }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
       copyText(toCsv(cols, a.pages), "Audit copied as CSV");
     });
     actions.querySelector("#seo-run").addEventListener("click", function () {
@@ -375,8 +379,22 @@
       Promise.all(types.map(function (t) { return fetchAll(site, t).then(function (items) { return items.map(function (i) { return auditItem(i, t === "pages" ? "Page" : "Post", site); }); }); }))
         .then(function (sets) {
           var pages = [].concat.apply([], sets);
-          storeAudit(pages, site);
-          status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " items checked.</div>";
+          if (!hasChecker()) {
+            pages.forEach(function (p) { p.customDesc = !!p.metaDesc; });
+            storeAudit(pages, site);
+            status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " items checked. Add the page checker snippet to also catch redirects.</div>";
+            return;
+          }
+          function prog(d, n) { status.innerHTML = '<div class="notice info">Checking live pages: ' + d + " of " + n + "…</div>"; }
+          return checkUrls(pages.map(function (p) { return p.link; }), prog).then(function (live) {
+            var targets = applyLive(pages, live);
+            return (targets.length ? checkUrls(targets, prog) : Promise.resolve({})).then(function (live2) {
+              targets.forEach(function (u) { pages.push(liveOnlyRow(u, live2[norm(u)])); });
+              storeAudit(pages, site);
+              var red = pages.filter(function (p) { return p.redirectTo; }).length;
+              status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " items checked against the live site. " + red + " redirect elsewhere and are skipped.</div>";
+            });
+          });
         })
         .catch(function (err) {
           status.innerHTML = '<div class="notice"><b>The audit couldn\'t reach the site.</b> ' + esc(err.message || "") +
@@ -675,6 +693,62 @@
     return kind === "meta_title" ? k.title : k.desc;
   }
 
+  /* Live page checks via the page checker snippet (docs/wordpress-page-checker.php). */
+  function hasChecker() { var a = wpAuth(); return !!(a && a.pass && a.ok && a.checker); }
+  function checkUrls(urls, onProgress) {
+    var out = {}, list = urls.slice(), done = 0;
+    function nextChunk() {
+      if (!list.length) return Promise.resolve(out);
+      var chunk = list.splice(0, 8);
+      return wpFetch("/wpt-hub/v1/check", { method: "POST", body: { urls: chunk } }).then(function (rows) {
+        (rows || []).forEach(function (r) {
+          if (r.location) { try { r.location = new URL(r.location, r.url).href; } catch (e) { /* keep as is */ } }
+          out[norm(r.url)] = r;
+        });
+        done += chunk.length; if (onProgress) onProgress(done, urls.length);
+        return nextChunk();
+      });
+    }
+    return nextChunk();
+  }
+  function isRedirect(r) { return r && r.status >= 300 && r.status < 400; }
+  function shortPath(u) { return String(u || "").replace(/^https?:\/\/[^\/]+/, "") || "/"; }
+  function liveIssues(r) {
+    var out = [], d = r.description || "", t = r.title || "";
+    if (r.words < 300) out.push("Thin content (" + r.words + " words on the live page)");
+    if (!d) out.push("No meta description");
+    else if (d.length > 160) out.push("Meta description too long");
+    else if (d.length < 70) out.push("Meta description short");
+    if (t.length > 60) out.push("Title tag over 60 characters");
+    if (r.h2 === 0 && r.words > 150) out.push("No H2 subheadings");
+    if (r.noindex) out.push("Set to noindex");
+    return out;
+  }
+  var API_ONLY_ISSUE = /^(Thin content|No (custom )?meta description|Meta description (too long|short)|Title tag over|No H2)/;
+  /* Merge live results into audited pages, and add pages that only exist as redirect targets. */
+  function applyLive(pages, live) {
+    var known = {};
+    pages.forEach(function (p) {
+      known[norm(p.link)] = true;
+      var r = live[norm(p.link)];
+      p.customDesc = !!p.metaDesc;
+      if (!r) return;
+      if (r.error) { p.issues.push("Live check failed: " + r.error); return; }
+      p.liveStatus = r.status;
+      if (isRedirect(r)) { p.redirectTo = r.location; p.issues = []; return; }
+      if (r.status !== 200) { p.issues = ["Live page answers " + r.status]; return; }
+      p.words = r.words; p.metaTitle = r.title || ""; p.metaDesc = r.description || ""; p.h2 = r.h2; p.hasSeo = true; p.live = true;
+      p.issues = p.issues.filter(function (i) { return !API_ONLY_ISSUE.test(i); }).concat(liveIssues(r));
+    });
+    var targets = [];
+    pages.forEach(function (p) { if (p.redirectTo && !known[norm(p.redirectTo)] && targets.indexOf(p.redirectTo) < 0) targets.push(p.redirectTo); });
+    return targets;
+  }
+  function liveOnlyRow(url, r) {
+    if (!r || r.error || r.status !== 200) return { title: shortPath(url), link: url, type: "Live page", words: 0, metaTitle: "", metaDesc: "", h2: 0, internal: "–", modified: "", hasSeo: true, liveOnly: true, issues: [r && r.error ? "Live check failed: " + r.error : "Live page answers " + (r ? r.status : "nothing")] };
+    return { title: r.title || shortPath(url), link: url, type: "Live page", words: r.words, metaTitle: r.title || "", metaDesc: r.description || "", h2: r.h2, internal: "–", modified: "", hasSeo: true, live: true, liveOnly: true, issues: liveIssues(r) };
+  }
+
   function renderWpConnect(main) {
     var a = wpAuth() || { site: load("seo-settings", { site: "https://westpiertech.com" }).site, user: "", pass: "" };
     var p = panel("Connect WordPress", "Lets the hub push fixes you approve. The password stays in this browser and is never shared.",
@@ -706,6 +780,7 @@
       }).then(function (idx) {
         var ns = (idx && idx.namespaces) || [];
         next.seo = ns.indexOf("yoast/v1") > -1 ? "yoast" : ns.indexOf("rankmath/v1") > -1 ? "rankmath" : ns.some(function (n) { return n.indexOf("seopress") === 0; }) ? "seopress" : ns.some(function (n) { return n.indexOf("aioseo") === 0; }) ? "aioseo" : "none";
+        next.checker = ns.indexOf("wpt-hub/v1") > -1;
         var k = SEO_KEYS[next.seo];
         if (!k) return null;
         return wpFetch("/wp/v2/pages?context=edit&per_page=1&_fields=id,meta").then(function (rows) {
@@ -744,6 +819,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker ? '<span class="chip good">Page checker ready</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }
@@ -784,6 +860,13 @@
 
   function pushFix(p, text) {
     if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
+    if (p.type !== "new_draft" && p.link && !p._liveChecked && hasChecker()) {
+      return checkUrls([p.link]).then(function (live) {
+        var r = live[norm(p.link)];
+        if (isRedirect(r)) throw new Error("This page redirects to " + r.location + ", so changing it would do nothing. Nothing was changed. Reject this fix.");
+        return pushFix(Object.assign({}, p, { _liveChecked: true }), text);
+      });
+    }
     if (p.type !== "new_draft" && !(p.pageId > 0) && p.link) {
       return resolveId(p).then(function (id) {
         return pushFix(Object.assign({}, p, { pageId: id }), text).then(function (r) { r.pageId = id; return r; });

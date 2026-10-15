@@ -38,6 +38,18 @@ Needed so the hub can change SEO titles and meta descriptions. Content fixes wor
 
 This needs an administrator. If that isn't you, send Matt this file.
 
+## 5. Add the page checker (second snippet)
+
+Lets the audit see what visitors actually get: which old addresses redirect, and the real title, description and word count on pages built with Elementor or set up outside the normal page list.
+
+1. **Snippets > Add New**. Name it `WPT Hub page checker`, type **PHP**.
+2. Paste the code from `docs/wordpress-page-checker.php` (everything after the opening comment).
+3. **Run everywhere**, then **Save and Activate**.
+4. In the hub, click **Save and test**. The Live line should say **Page checker ready**.
+5. Run the audit again.
+
+It only reads pages on your own site and changes nothing.
+
 ## If the test fails
 
 - **"Check the username and application password"**: retype the username exactly as it appears in WordPress, and paste a fresh application password.
