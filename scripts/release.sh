@@ -22,5 +22,7 @@ git tag -a "v${NEW}" -m "v${NEW} released ${HUMAN}. ${SUMMARY}"
 echo "Tagged v${NEW} at ${HUMAN}"
 
 if git remote get-url origin >/dev/null 2>&1; then
-  git push -q origin HEAD --follow-tags && echo "Pushed to GitHub"
+  git push -q origin HEAD && echo "Pushed main to GitHub"
+  git push -q origin "v${NEW}^{commit}:refs/heads/release/v${NEW}" && echo "Pushed release branch release/v${NEW}"
+  git push -q origin "v${NEW}" 2>/dev/null && echo "Pushed tag too" || true
 fi

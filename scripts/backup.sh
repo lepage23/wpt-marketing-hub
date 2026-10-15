@@ -6,7 +6,7 @@
 #   1. Commits anything not yet saved, so nothing is lost.
 #   2. Adds a git tag named backup/v<version>-<date>-<time>, pointing at that exact state.
 #   3. Writes a zip of the hub into backups/ (kept on this machine, not pushed).
-# Tags are pushed to GitHub, so every backup can be restored from there.
+# A branch of the same name is pushed to GitHub, so every backup can be restored from there.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -29,6 +29,9 @@ git archive --format=zip -o "backups/${TAG#backup/}.zip" "$TAG"
 
 echo "Backup tag: $TAG"
 echo "Zip:        backups/${TAG#backup/}.zip"
+# GitHub copy: a branch with the same name as the tag. Branches always push;
+# tags are also tried, but some setups refuse them.
 if git remote get-url origin >/dev/null 2>&1; then
-  git push -q origin "$TAG" && echo "Pushed backup tag to GitHub"
+  git push -q origin "${TAG}^{commit}:refs/heads/${TAG}" && echo "Pushed backup branch ${TAG} to GitHub"
+  git push -q origin "$TAG" 2>/dev/null && echo "Pushed backup tag too" || true
 fi

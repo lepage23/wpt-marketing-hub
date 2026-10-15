@@ -2,8 +2,17 @@
 
 Every version and every backup, newest first. Times are UK time.
 
-To roll back to any point, find its tag below and run `git checkout <tag>`.
-Backup tags are named `backup/v<version>-<date>-<time>`.
+To roll back to any point, open its branch on GitHub or run `git checkout <branch>`.
+Backups are branches named `backup/v<version>-<date>-<time>`.
+Finished versions are branches named `release/v<version>`.
+
+## v0.1.1 · 2026-10-15 11:07 BST
+
+- Backups and releases now go to GitHub as dated branches. GitHub refused tags from this setup, so branches do the same job.
+
+Backups taken:
+
+- `backup/v0.1.0-2026-10-15-1106` (v0.1.0 as it was, before this change)
 
 ## v0.1.0 · 2026-10-15 11:05 BST
 

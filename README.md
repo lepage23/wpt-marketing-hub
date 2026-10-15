@@ -22,9 +22,10 @@ Open `index.html` in a browser. No install, no build step.
 
 - The current version is in `VERSION` and shows at the bottom of the page rail.
 - `CHANGELOG.md` lists every version and backup with date and time.
-- Before any major change: `scripts/backup.sh "what is about to change"`. This tags the current state on GitHub and saves a zip in `backups/`.
+- Before any major change: `scripts/backup.sh "what is about to change"`. This saves the current state as a dated `backup/...` branch on GitHub and a zip in `backups/`.
 - After the change: add a CHANGELOG entry, then `scripts/release.sh 0.2.0 "summary"`.
-- To go back to an earlier state: `git checkout <tag>`.
+- Each finished version also gets a `release/v...` branch on GitHub.
+- To go back to an earlier state, open that branch on GitHub or run `git checkout <branch name>`.
 
 ## Where data lives
 
