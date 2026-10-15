@@ -1301,6 +1301,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "b3-job-1",
+  "job": "Check the Healthcare page after the BPF section was removed",
+  "page": "/healthcare/",
+  "details": "The BPF removal also took out a \"Cyber Security\" item and a \"Case Studies\" heading that sat in the same block. Purge the SG cache, open the page and check it still reads well. If you want either of those back, tell Claude and it will put just those back, without the BPF section.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "b1-job-1",
   "job": "Decide what to do with the 8x8 Feature Matrix page",
   "page": "/8x8-feature-matrix-with-engage-voice/",

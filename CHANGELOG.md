@@ -6,6 +6,14 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.8.3 · 2026-10-15 16:47 BST
+
+- New job: check the Healthcare page after the BPF section was removed (Cyber Security and Case Studies went with it).
+
+Backups taken:
+
+- `` (v0.8.2 as it was, before this change)
+
 ## v0.8.2 · 2026-10-15 16:45 BST
 
 - **Removals now show you exactly what will go before anything changes.** The hub asks WordPress for a dry run and lists every option, from the single widget up to the whole outer section, with the text and number of images each would remove. You pick one. Nothing is removed until you've chosen.
