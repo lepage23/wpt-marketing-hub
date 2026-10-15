@@ -6,6 +6,17 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.4.1 · 2026-10-15 14:55 BST
+
+- **Batch 2 in the Fix queue:** 22 shorter SEO titles for pages and posts Google is cutting off, plus a fix for the Healthcare description, which wrongly claims NHS BPF approved supplier status.
+- Removed the NHS BPF page description from batch 1 (WPT isn't on the framework, so the page stays noindexed).
+- Batch 1 descriptions now show what's really on the live page (Rank Math's auto-generated text and its length) instead of "(empty)". The queue is ordered by priority: Healthcare first, then the very short auto descriptions, then titles, then the rest.
+- New jobs: check for other NHS BPF claims, send Matt ready-written titles and descriptions for his three pages, and find out how the Feature Comparison table is built.
+
+Backups taken:
+
+- `backup/v0.4.0-2026-10-15-1454` (v0.4.0 as it was, before this change)
+
 ## v0.4.0 · 2026-10-15 14:42 BST
 
 The audit now checks the live site, not just WordPress's page list.
