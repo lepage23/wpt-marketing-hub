@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.5.0";
-  var BUILT = "2026-10-15 15:10 BST";
+  var VERSION = "0.6.0";
+  var BUILT = "2026-10-15 15:18 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -101,6 +101,9 @@
           return '<option' + (o === v ? " selected" : "") + ">" + esc(o) + "</option>";
         }).join("") + "</select>";
       }
+      if (!c.type || c.type === "text") {
+        return '<textarea id="' + id + '" data-k="' + c.k + '" rows="1" class="cell' + (c.wide ? " wide" : "") + '" aria-label="' + esc(c.label) + '">' + esc(v) + "</textarea>";
+      }
       var t = c.type === "number" ? "number" : c.type === "date" ? "date" : "text";
       return '<input id="' + id + '" data-k="' + c.k + '" type="' + t + '" value="' + esc(v) + '"' + (c.num ? ' style="text-align:right"' : "") + ' aria-label="' + esc(c.label) + '">';
     }
@@ -114,12 +117,13 @@
         rows.forEach(function (r) {
           h += '<tr data-id="' + r._id + '">' + cfg.columns.map(function (c) {
             return '<td class="' + (c.num || c.compute ? "num" : "") + '">' + cellInput(c, r) + "</td>";
-          }).join("") + '<td style="white-space:nowrap">' +
+          }).join("") + '<td class="row-actions">' +
             (r._ex ? '<span class="chip ex" title="Example row. Replace or delete it.">example</span> ' : "") +
             (cfg.actions || []).map(function (a, i) { return '<button type="button" class="btn small" data-act="' + i + '">' + esc(a.label) + "</button> "; }).join("") +
             '<button type="button" class="btn small danger" data-del="1" aria-label="Delete row">Delete</button></td></tr>';
         });
         tableBox.innerHTML = h + "</tbody></table>";
+        requestAnimationFrame(function () { Array.prototype.forEach.call(tableBox.querySelectorAll("textarea.cell"), fitCell); });
       }
       var hasEx = rows.some(function (r) { return r._ex; });
       tools.innerHTML = '<button type="button" class="btn primary">' + esc(cfg.addLabel || "Add row") + "</button>" +
@@ -127,6 +131,7 @@
         '<button type="button" class="btn" data-dl="1">Download CSV</button>' +
         (hasEx ? '<button type="button" class="btn" data-clear="1">Remove example rows</button>' : "");
     }
+    tableBox.addEventListener("input", function (e) { if (e.target.classList.contains("cell")) fitCell(e.target); });
     tableBox.addEventListener("change", function (e) {
       var k = e.target.getAttribute("data-k"); if (!k) return;
       var id = e.target.closest("tr").getAttribute("data-id");
@@ -153,6 +158,7 @@
     render();
     return { node: wrap, get: function () { return rows; }, set: function (r) { rows = r; persist(); render(); }, add: function (r) { r._id = uid(); rows.unshift(r); persist(); render(); } };
   }
+  function fitCell(ta) { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
   function getRows(key) { return load(key, []) || []; }
 
   /* ---------- shared column sets ---------- */
@@ -165,9 +171,9 @@
     { k: "interest", label: "Interested in" },
     { k: "status", label: "Status", type: "select", options: LEAD_STATUS },
     { k: "owner", label: "Owner", type: "select", options: ["Garry", "Connor"] },
-    { k: "next", label: "Next step" },
+    { k: "next", label: "Next step", wide: true },
     { k: "nextDate", label: "Next step by", type: "date" },
-    { k: "notes", label: "Notes" }
+    { k: "notes", label: "Notes", wide: true }
   ];
   var LEAD_SEED = [
     { _ex: true, date: daysAgo(2), company: "Example: Harbour Dental Group", contact: "Practice manager", source: "Website form", interest: "Hosted phones, 4 sites", status: "New", owner: "Garry", next: "Call to book discovery", nextDate: today(), notes: "Came in on the 8x8 page" },
@@ -211,6 +217,7 @@
       stat(leads.length, "Open leads", false) +
       stat(due.length, "Lead actions due today or late", due.length > 0) +
       stat(issues == null ? "–" : issues, issues == null ? "SEO issues (no audit run yet)" : "SEO issues from last audit", issues > 0) +
+      (perfData() && perfData().totals ? stat(fmtNum(perfData().totals.clicks), "Clicks from Google, last " + perfData().days + " days") : "") +
       stat(pendingFixes().length, "Website fixes waiting for approval", pendingFixes().length > 0) +
       stat(jobsToDo(), "Your jobs to do", false) +
       stat(inbox.length, "Inbox items flagged", inbox.length > 0) +
@@ -309,6 +316,7 @@
     main.innerHTML = head("Priority area", "Website & SEO", "Audit westpiertech.com through the WordPress API, track rankings and AI search visibility, and plan content.",
       '<a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a>");
     renderWpConnect(main);
+    renderPerformance(main);
 
     /* Audit panel */
     var p = panel("Page audit", "Reads every page and post live from WordPress. Read-only: nothing on the site is changed.");
@@ -388,7 +396,7 @@
     actions.querySelector("#seo-only").addEventListener("change", function () { drawAudit(load("seo-audit", null)); });
     actions.querySelector("#seo-copy").addEventListener("click", function () {
       var a = load("seo-audit", null); if (!a) return toast("Run an audit first");
-      var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Custom description set", compute: function (r) { return r.customDesc ? "yes" : "no"; } }, { label: "Redirects to", compute: function (r) { return r.redirectTo || ""; } }, { label: "Checked live", compute: function (r) { return r.live ? "yes" : r.redirectTo ? "redirect" : "no"; } }, { label: "H1", compute: function (r) { return (r.h1 || []).join(" / "); } }, { label: "Schema", compute: function (r) { return (r.schema || []).join(" "); } }, { label: "Canonical", compute: function (r) { return r.canonical || ""; } }, { label: "Noindex", compute: function (r) { return r.noindex ? "yes" : ""; } }, { label: "Content links", compute: function (r) { return (r.linksContent || []).length; } }, { label: "Images missing alt", compute: function (r) { return r.imagesNoAlt || 0; } }, { label: "Server ms", compute: function (r) { return r.ms || ""; } }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
+      var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Custom description set", compute: function (r) { return r.customDesc ? "yes" : "no"; } }, { label: "Redirects to", compute: function (r) { return r.redirectTo || ""; } }, { label: "Checked live", compute: function (r) { return r.live ? "yes" : r.redirectTo ? "redirect" : "no"; } }, { label: "H1", compute: function (r) { return (r.h1 || []).join(" / "); } }, { label: "Schema", compute: function (r) { return (r.schema || []).join(" "); } }, { label: "Canonical", compute: function (r) { return r.canonical || ""; } }, { label: "Noindex", compute: function (r) { return r.noindex ? "yes" : ""; } }, { label: "Content links", compute: function (r) { return (r.linksContent || []).length; } }, { label: "Images missing alt", compute: function (r) { return r.imagesNoAlt || 0; } }, { label: "Server ms", compute: function (r) { return r.ms || ""; } }, { label: "Google clicks", compute: function (r) { var x = perfByPage()[norm(r.link)]; return x ? x.clicks : ""; } }, { label: "Google impressions", compute: function (r) { var x = perfByPage()[norm(r.link)]; return x ? x.impressions : ""; } }, { label: "Google position", compute: function (r) { var x = perfByPage()[norm(r.link)]; return x ? x.position.toFixed(1) : ""; } }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
       copyText(toCsv(cols, a.pages), "Audit copied as CSV");
     });
     actions.querySelector("#seo-run").addEventListener("click", function () {
@@ -423,6 +431,7 @@
                 var audit = storeAudit(pages, site, res.site, res.status);
                 var autos = buildAutoFixes(audit);
                 storeAutoFixes(autos, Date.now());
+                fetchPerf(load("perf-days", 28)).catch(function () { /* search data is optional */ });
                 drawAudit(audit); updateNav();
                 var red = pages.filter(function (p) { return p.redirectTo; }).length;
                 status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " addresses checked against the live site (" + red + " redirect elsewhere). " + autos.length + ' technical fixes are in the <a href="#fixes">Fix queue</a>.</div>';
@@ -1105,12 +1114,206 @@
     save("auto-fixes", list);
   }
 
+  /* ---------- Search performance (Search Console and Analytics via Rank Math) ---------- */
+  function perfData() { return load("search-perf", null); }
+  function gscUrl(page, home) { return /^https?:/.test(page) ? page : String(home || "https://westpiertech.com/").replace(/\/$/, "") + "/" + String(page || "").replace(/^\//, ""); }
+  function perfByPage() {
+    var d = perfData(), out = {};
+    if (!d || !d.pages) return out;
+    var prev = {}; (d.pages_prev || []).forEach(function (r) { prev[norm(gscUrl(r.page, d.home))] = r; });
+    var ga = {}; (d.ga || []).forEach(function (r) { ga[norm(gscUrl(r.page, d.home))] = r; });
+    d.pages.forEach(function (r) {
+      var k = norm(gscUrl(r.page, d.home));
+      out[k] = { clicks: +r.clicks || 0, impressions: +r.impressions || 0, position: +r.position || 0, prevClicks: prev[k] ? +prev[k].clicks || 0 : 0, pageviews: ga[k] ? +ga[k].pageviews || 0 : null };
+    });
+    return out;
+  }
+  function perfLine(link) {
+    var d = perfData(); if (!d || !d.pages) return "";
+    var r = perfByPage()[norm(link)];
+    if (!r) return '<p class="mono muted" style="font-size:.78rem">Google, last ' + d.days + " days: no impressions</p>";
+    return '<p class="mono muted" style="font-size:.78rem">Google, last ' + d.days + " days: " + r.clicks + " clicks · " + r.impressions + " impressions · position " + r.position.toFixed(1) + "</p>";
+  }
+  function fetchPerf(days) {
+    return wpFetch("/wpt-hub/v1/analytics?days=" + (days || 28)).then(function (d) {
+      d.fetched = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      save("search-perf", d);
+      save("auto-fixes-gsc", buildSearchFixes(d));
+      updateNav();
+      return d;
+    });
+  }
+  function pctChange(now, before) {
+    now = +now || 0; before = +before || 0;
+    if (!before) return null;
+    return (now - before) / before * 100;
+  }
+  function deltaChip(v, betterUp) {
+    if (v == null || isNaN(v)) return "";
+    var good = betterUp ? v >= 0 : v <= 0;
+    return ' <span class="chip ' + (Math.abs(v) < 1 ? "" : good ? "good" : "bad") + '">' + (v > 0 ? "+" : "") + v.toFixed(Math.abs(v) < 10 ? 1 : 0) + (betterUp ? "%" : "") + "</span>";
+  }
+
+  /* One-series line chart: area fill, faint grid, emphasised end point, hover readout. */
+  function lineChart(rows, label, fmt) {
+    var W = 600, H = 170, L = 44, R = 12, T = 12, B = 26;
+    var vals = rows.map(function (r) { return +r.v || 0; });
+    var max = Math.max.apply(null, vals.concat([1]));
+    var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.ceil(max / step) * step; if (top / step > 5) step *= 2; top = Math.ceil(max / step) * step;
+    var n = rows.length;
+    function x(i) { return L + (n < 2 ? 0 : i * (W - L - R) / (n - 1)); }
+    function y(v) { return T + (H - T - B) * (1 - v / top); }
+    var pts = rows.map(function (r, i) { return x(i).toFixed(1) + "," + y(+r.v || 0).toFixed(1); });
+    var grid = "", ticks = [];
+    for (var g = 0; g <= top; g += step) ticks.push(g);
+    ticks.forEach(function (g) { grid += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(g) + '" y2="' + y(g) + '" class="cg"/><text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" text-anchor="end" class="ct">' + fmt(g) + "</text>"; });
+    var xl = [0, Math.floor((n - 1) / 2), n - 1].filter(function (v, i, a) { return n && a.indexOf(v) === i; }).map(function (i) {
+      return '<text x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="' + (i === 0 ? "start" : i === n - 1 ? "end" : "middle") + '" class="ct">' + esc(shortDate(rows[i].d)) + "</text>";
+    }).join("");
+    var last = n ? '<circle cx="' + x(n - 1) + '" cy="' + y(vals[n - 1]) + '" r="4" class="cdot"/>' : "";
+    var svg = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(label) + ' per day">' + grid +
+      (n ? '<polygon points="' + L + "," + y(0) + " " + pts.join(" ") + " " + x(n - 1) + "," + y(0) + '" class="carea"/><polyline points="' + pts.join(" ") + '" class="cline"/>' : "") +
+      last + xl + '<line class="cx" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" visibility="hidden"/><circle class="chov" r="5" visibility="hidden"/>' +
+      '<rect x="' + L + '" y="' + T + '" width="' + (W - L - R) + '" height="' + (H - T - B) + '" fill="transparent" class="chit"/></svg>';
+    var box = el('<figure class="chart"><figcaption><b>' + esc(label) + '</b> <span class="muted">per day</span></figcaption><div class="chart-svg">' + svg + '<div class="ctip" hidden></div></div></figure>');
+    var s = box.querySelector("svg"), tip = box.querySelector(".ctip"), cx = box.querySelector(".cx"), dot = box.querySelector(".chov");
+    function move(e) {
+      if (!n) return;
+      var r = s.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+      var i = Math.max(0, Math.min(n - 1, Math.round((px - L) / ((W - L - R) / Math.max(1, n - 1)))));
+      cx.setAttribute("x1", x(i)); cx.setAttribute("x2", x(i)); cx.setAttribute("visibility", "visible");
+      dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(vals[i])); dot.setAttribute("visibility", "visible");
+      tip.hidden = false; tip.textContent = shortDate(rows[i].d) + ": " + fmt(vals[i]) + " " + label.toLowerCase();
+      var left = x(i) / W * r.width; tip.style.left = Math.min(Math.max(left, 60), r.width - 60) + "px";
+    }
+    function leave() { tip.hidden = true; cx.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); }
+    s.querySelector(".chit").addEventListener("mousemove", move);
+    s.querySelector(".chit").addEventListener("mouseleave", leave);
+    return box;
+  }
+  function shortDate(d) { var t = new Date(String(d).slice(0, 10) + "T12:00:00"); return isNaN(t) ? d : t.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
+  function fmtNum(v) { v = +v || 0; return v >= 10000 ? (v / 1000).toFixed(0) + "k" : v >= 1000 ? (v / 1000).toFixed(1) + "k" : String(Math.round(v)); }
+
+  function renderPerformance(main) {
+    var p = panel("Search performance", "Clicks and searches from Google Search Console, through Rank Math. Read-only.");
+    var body = el('<div style="display:flex;flex-direction:column;gap:14px"></div>'); p.appendChild(body); main.appendChild(p);
+    var days = load("perf-days", 28);
+    function draw(d) {
+      var a = wpAuth();
+      if (!a || !a.ok) { body.innerHTML = '<div class="empty">Connect WordPress above to see search performance.</div>'; return; }
+      var controls = '<div class="row"><label class="field" for="perf-days" style="flex-direction:row;align-items:center;gap:8px">Period<select id="perf-days">' +
+        [7, 28, 90].map(function (n) { return '<option value="' + n + '"' + (n === days ? " selected" : "") + ">Last " + n + " days</option>"; }).join("") +
+        '</select></label><button type="button" class="btn" id="perf-refresh">Refresh</button>' + (d && d.fetched ? '<span class="muted mono" style="font-size:.78rem">Updated ' + esc(d.fetched) + (d.from ? " · data " + esc(shortDate(d.from)) + " to " + esc(shortDate(d.to)) : "") + "</span>" : "") + "</div>";
+      if (!d) { body.innerHTML = controls + '<div class="empty">No search data loaded yet. Click Refresh.</div>'; return wire(); }
+      if (!d.tables || !d.tables.gsc) {
+        body.innerHTML = controls + '<div class="notice"><b>Rank Math isn\'t connected to Google yet.</b> In WordPress go to Rank Math, then General Settings, then Analytics. Click Connect Google, sign in with the Google account that owns Search Console, pick westpiertech.com as the Search Console property and your GA4 property under Analytics, then Save. Rank Math imports the last 90 days, which can take an hour or two. Then click Refresh here.</div>';
+        return wire();
+      }
+      if (!d.totals || !+d.totals.impressions) { body.innerHTML = controls + '<div class="notice info">Rank Math is connected but hasn\'t imported any Search Console data yet. Give it an hour or two, then click Refresh.</div>'; return wire(); }
+      var t = d.totals, pv = d.prev || {};
+      var ctr = +t.impressions ? t.clicks / t.impressions * 100 : 0, pctr = +pv.impressions ? pv.clicks / pv.impressions * 100 : 0;
+      var gaTotal = d.ga ? d.ga.reduce(function (s, r) { return s + (+r.pageviews || 0); }, 0) : null;
+      body.innerHTML = controls +
+        '<div class="stats">' +
+        '<div class="stat"><span class="n">' + fmtNum(t.clicks) + deltaChip(pctChange(t.clicks, pv.clicks), true) + '</span><span class="l">Clicks from Google</span></div>' +
+        '<div class="stat"><span class="n">' + fmtNum(t.impressions) + deltaChip(pctChange(t.impressions, pv.impressions), true) + '</span><span class="l">Times you appeared in results</span></div>' +
+        '<div class="stat"><span class="n">' + ctr.toFixed(1) + "%" + (pctr ? deltaChip(ctr - pctr, true).replace("%</span>", " pts</span>") : "") + '</span><span class="l">Click rate</span></div>' +
+        '<div class="stat"><span class="n">' + (+t.position || 0).toFixed(1) + (pv.position ? deltaChip(t.position - pv.position, false) : "") + '</span><span class="l">Average position (lower is better)</span></div>' +
+        (gaTotal != null ? '<div class="stat"><span class="n">' + fmtNum(gaTotal) + '</span><span class="l">Page views (Analytics)</span></div>' : "") +
+        "</div>" + '<p class="muted" style="font-size:.8rem">Changes compare with the ' + d.days + " days before. Search Console data runs about 3 days behind.</p>" +
+        '<div class="grid charts"></div><div class="grid tables"></div>';
+      var charts = body.querySelector(".charts");
+      charts.appendChild(lineChart((d.daily || []).map(function (r) { return { d: r.d, v: r.clicks }; }), "Clicks", fmtNum));
+      charts.appendChild(lineChart((d.daily || []).map(function (r) { return { d: r.d, v: r.impressions }; }), "Impressions", fmtNum));
+      if (d.ga_daily && d.ga_daily.length) charts.appendChild(lineChart(d.ga_daily.map(function (r) { return { d: r.d, v: r.pageviews }; }), "Page views", fmtNum));
+      var by = perfByPage();
+      var tables = body.querySelector(".tables");
+      var pages = (d.pages || []).slice().sort(function (a, b) { return (+b.clicks || 0) - (+a.clicks || 0) || (+b.impressions || 0) - (+a.impressions || 0); }).slice(0, 15);
+      tables.appendChild(el('<div><h3 style="margin-bottom:6px">Top pages</h3><div class="table-wrap"><table><thead><tr><th>Page</th><th class="num">Clicks</th><th class="num">Change</th><th class="num">Impr.</th><th class="num">Pos.</th></tr></thead><tbody>' +
+        pages.map(function (r) {
+          var u = gscUrl(r.page, d.home), x = by[norm(u)] || {}, ch = pctChange(r.clicks, x.prevClicks);
+          return '<tr><td><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(shortPath(u)) + '</a></td><td class="num">' + (+r.clicks || 0) + '</td><td class="num">' + (ch == null ? "–" : (ch > 0 ? "+" : "") + ch.toFixed(0) + "%") + '</td><td class="num">' + (+r.impressions || 0) + '</td><td class="num">' + (+r.position || 0).toFixed(1) + "</td></tr>";
+        }).join("") + "</tbody></table></div></div>"));
+      var q = {}; (d.queries || []).forEach(function (r) { var k = r.query; if (!q[k]) q[k] = { query: k, clicks: 0, impressions: 0, wpos: 0, page: r.page, best: 0 }; var o = q[k]; o.clicks += +r.clicks || 0; o.impressions += +r.impressions || 0; o.wpos += (+r.position || 0) * (+r.impressions || 0); if ((+r.impressions || 0) > o.best) { o.best = +r.impressions || 0; o.page = r.page; } });
+      var qs = Object.keys(q).map(function (k) { var o = q[k]; o.position = o.impressions ? o.wpos / o.impressions : 0; return o; }).sort(function (a, b) { return b.impressions - a.impressions; }).slice(0, 20);
+      tables.appendChild(el('<div><h3 style="margin-bottom:6px">Top searches</h3><div class="table-wrap"><table><thead><tr><th>Search</th><th class="num">Clicks</th><th class="num">Impr.</th><th class="num">Pos.</th></tr></thead><tbody>' +
+        qs.map(function (o) { return "<tr><td>" + esc(o.query) + '<div class="muted" style="font-size:.75rem">' + esc(shortPath(gscUrl(o.page, d.home))) + '</div></td><td class="num">' + o.clicks + '</td><td class="num">' + o.impressions + '</td><td class="num">' + o.position.toFixed(1) + "</td></tr>"; }).join("") +
+        "</tbody></table></div></div>"));
+      var gscFixes = load("auto-fixes-gsc", []).length;
+      body.appendChild(el('<div class="row"><button type="button" class="btn" id="perf-copy">Copy search data as CSV</button>' + (gscFixes ? '<a class="btn primary" href="#fixes">' + gscFixes + " search opportunities in the Fix queue</a>" : "") + "</div>"));
+      body.querySelector("#perf-copy").addEventListener("click", function () {
+        copyText(toCsv([{ k: "query", label: "Search" }, { label: "Page", compute: function (r) { return gscUrl(r.page, d.home); } }, { k: "clicks", label: "Clicks" }, { k: "impressions", label: "Impressions" }, { label: "Position", compute: function (r) { return (+r.position || 0).toFixed(1); } }], d.queries || []), "Search data copied");
+      });
+      wire();
+    }
+    function wire() {
+      var sel = body.querySelector("#perf-days"), btn = body.querySelector("#perf-refresh");
+      if (sel) sel.addEventListener("change", function () { days = +sel.value; save("perf-days", days); refresh(); });
+      if (btn) btn.addEventListener("click", refresh);
+    }
+    function refresh() {
+      var btn = body.querySelector("#perf-refresh"); if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+      fetchPerf(days).then(draw, function (err) {
+        draw(perfData());
+        var msg = /no route/i.test(err.message) ? "The page checker snippet needs updating to the latest version (docs/wordpress-page-checker.php) for search data." : err.message;
+        body.insertBefore(el('<div class="notice"><b>Couldn\'t load search data.</b> ' + esc(msg) + "</div>"), body.firstChild);
+      });
+    }
+    draw(perfData());
+  }
+
+  /* Search Console findings become Fix queue items. */
+  function buildSearchFixes(d) {
+    var out = []; if (!d || !d.queries || !d.pages) return out;
+    var today = new Date().toISOString().slice(0, 10), home = d.home;
+    function slug(u) { return norm(u).replace(/\W+/g, "-").slice(0, 80); }
+    function add(o) { o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found in Search Console"; out.push(o); }
+    var byPage = {};
+    d.queries.forEach(function (r) { var u = gscUrl(r.page, home); (byPage[u] = byPage[u] || []).push(r); });
+    Object.keys(byPage).forEach(function (u) {
+      var near = byPage[u].filter(function (r) { var p = +r.position; return p >= 4 && p <= 20 && (+r.impressions || 0) >= 20; }).sort(function (a, b) { return b.impressions - a.impressions; });
+      if (!near.length) return;
+      var imp = near.reduce(function (s, r) { return s + (+r.impressions || 0); }, 0);
+      add({ id: "gsc-near-" + slug(u), priority: imp >= 200 ? "high" : "medium", category: "Content", pageTitle: shortPath(u), link: u,
+        issue: "Close to page one for " + near.length + " search" + (near.length > 1 ? "es" : "") + " (" + imp + " impressions in " + d.days + " days)",
+        pages: near.slice(0, 8).map(function (r) { return { title: "\"" + r.query + "\"", link: u, note: "position " + (+r.position).toFixed(1) + ", " + r.impressions + " impressions, " + r.clicks + " clicks" }; }),
+        why: "Google already thinks this page is relevant for these searches but ranks it on page one's lower half or page two, where hardly anyone clicks. Small improvements here often move it up and turn impressions into leads.",
+        steps: ["Ask Claude to strengthen this page for the searches listed. It will write additions into the Fix queue.", "Make sure the main search phrase appears in the page title, the H1 and the first paragraph.", "Add a short FAQ answering the questions behind these searches.", "Link to this page from two or three related pages using the search phrase as the link text."] });
+    });
+    d.pages.forEach(function (r) {
+      var u = gscUrl(r.page, home), imp = +r.impressions || 0, ctr = imp ? (+r.clicks || 0) / imp * 100 : 0, pos = +r.position || 0;
+      if (imp >= 100 && pos <= 10 && ctr < 2) add({ id: "gsc-ctr-" + slug(u), priority: "high", category: "Content", pageTitle: shortPath(u), link: u,
+        issue: "Seen " + imp + " times on page one but only " + ctr.toFixed(1) + "% click",
+        why: "The page ranks well enough to be seen, but the title and description in the results aren't persuading people to click. That's usually the cheapest traffic win there is.",
+        steps: ["Ask Claude to rewrite this page's title and description for the searches it's appearing for. They'll arrive as pushable fixes.", "Approve them, then check back here in 2 to 3 weeks."] });
+    });
+    var prev = {}; (d.pages_prev || []).forEach(function (r) { prev[norm(gscUrl(r.page, home))] = +r.clicks || 0; });
+    d.pages.forEach(function (r) {
+      var u = gscUrl(r.page, home), b = prev[norm(u)] || 0, c = +r.clicks || 0;
+      if (b >= 10 && c < b * 0.6) add({ id: "gsc-drop-" + slug(u), priority: "high", category: "Content", pageTitle: shortPath(u), link: u,
+        issue: "Clicks down from " + b + " to " + c + " compared with the " + d.days + " days before",
+        why: "A sharp drop usually means a competitor overtook you, the page changed, or Google changed what it shows for the search. Worth catching early.",
+        steps: ["Check the change log for recent edits to this page.", "Search the page's main phrases in Google (logged out) and see who now ranks above you.", "Send Claude the page and what you found. It will suggest what to change."] });
+    });
+    var byQ = {};
+    d.queries.forEach(function (r) { (byQ[r.query] = byQ[r.query] || []).push(r); });
+    Object.keys(byQ).forEach(function (qq) {
+      var rows = byQ[qq], tot = rows.reduce(function (s, r) { return s + (+r.impressions || 0); }, 0);
+      var big = rows.filter(function (r) { return tot && (+r.impressions || 0) / tot >= 0.15; });
+      if (tot >= 30 && big.length >= 2) add({ id: "gsc-split-" + qq.replace(/\W+/g, "-").slice(0, 60), priority: "medium", category: "Content", pageTitle: "\"" + qq + "\"", link: gscUrl(big[0].page, home),
+        issue: big.length + " of your pages compete for \"" + qq + "\"",
+        pages: big.map(function (r) { return { title: shortPath(gscUrl(r.page, home)), link: gscUrl(r.page, home), note: "position " + (+r.position).toFixed(1) + ", " + r.impressions + " impressions" }; }),
+        why: "Google keeps switching between these pages for the same search, so neither builds up a strong position.", steps: ["Decide which page should own this search.", "Make the other page link to it using the search phrase, and take the phrase out of its title.", "If the pages say the same thing, merge them and redirect the weaker one (Rank Math, then Redirections, 301)."] });
+    });
+    return out;
+  }
+
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps" };
   var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
-    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []));
+    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
@@ -1264,7 +1467,7 @@
     var pages = p.pages || [];
     card.innerHTML =
       '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' + headChips(p, st) +
-      "<h2>" + esc(p.issue) + "</h2>" +
+      "<h2>" + esc(p.issue) + "</h2>" + perfLine(p.link) +
       (pages.length ? "" : '<p class="muted" style="font-size:.86rem"><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.pageTitle) + "</a></p>") + "</div>" +
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<p style="font-size:.9rem"><b>Why it matters:</b> ' + esc(p.why) + "</p>" +
@@ -1299,7 +1502,7 @@
       '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' +
       headChips(p, st).replace("</div>", (p.size === "big" ? '<span class="chip flag">Big change</span>' : "") + (st.status === "undone" ? '<span class="chip">Undone</span>' : st.status === "pushed" ? '<span class="chip good">Live</span>' : "") + "</div>") +
       '<h2><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.pageTitle) + "</a></h2>" +
-      '<p class="muted" style="font-size:.86rem">' + esc(p.issue) + "</p></div>" +
+      '<p class="muted" style="font-size:.86rem">' + esc(p.issue) + "</p>" + perfLine(p.link) + "</div>" +
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
@@ -1387,7 +1590,7 @@
     p.appendChild(editableTable({
       key: "jobs", csvName: "your-jobs", addLabel: "Add job", onChange: updateNav,
       columns: [
-        { k: "job", label: "Job" }, { k: "page", label: "Page" }, { k: "details", label: "What's needed" },
+        { k: "job", label: "Job", wide: true }, { k: "page", label: "Page" }, { k: "details", label: "What's needed", wide: true },
         { k: "size", label: "Size or format" }, { k: "alt", label: "Alt text to use" },
         { k: "status", label: "Status", type: "select", options: ["To do", "Doing", "Done"] }
       ],

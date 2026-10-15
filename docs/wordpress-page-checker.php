@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 2).
+ * WPT Marketing Hub: page checker (version 3, adds search performance).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -253,6 +253,61 @@ add_action( 'rest_api_init', function () {
 					}
 					$out['redirections'][] = $row;
 				}
+			}
+			return $out;
+		},
+	) );
+} );
+
+/* Search performance from Rank Math Analytics (version 3).
+ * Reads the Search Console (and, if present, Google Analytics and index status)
+ * data Rank Math has already imported into WordPress. Read-only. */
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'wpt-hub/v1', '/analytics', array(
+		'methods'             => 'GET',
+		'permission_callback' => function () {
+			return current_user_can( 'edit_pages' );
+		},
+		'callback'            => function ( WP_REST_Request $req ) {
+			global $wpdb;
+			$pre    = $wpdb->prefix . 'rank_math_analytics_';
+			$days   = (int) $req->get_param( 'days' );
+			$days   = $days >= 7 && $days <= 90 ? $days : 28;
+			$out    = array( 'version' => 3, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
+			foreach ( $tables as $t ) {
+				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
+			}
+			$has = function ( $name, $cols ) use ( $out ) {
+				return isset( $out['tables'][ $name ] ) && ! array_diff( $cols, $out['tables'][ $name ] );
+			};
+			if ( $has( 'gsc', array( 'created', 'page', 'query', 'clicks', 'impressions', 'position' ) ) ) {
+				$g   = $pre . 'gsc';
+				$max = $wpdb->get_var( "SELECT MAX(created) FROM `{$g}`" );
+				if ( $max ) {
+					$end   = gmdate( 'Y-m-d 23:59:59', strtotime( $max ) );
+					$start = gmdate( 'Y-m-d 00:00:00', strtotime( $max ) - ( $days - 1 ) * DAY_IN_SECONDS );
+					$prev  = gmdate( 'Y-m-d 00:00:00', strtotime( $start ) - $days * DAY_IN_SECONDS );
+					$out['from']   = substr( $start, 0, 10 );
+					$out['to']     = substr( $end, 0, 10 );
+					$sum           = 'SUM(clicks) AS clicks, SUM(impressions) AS impressions, SUM(position*impressions)/NULLIF(SUM(impressions),0) AS position';
+					$out['totals'] = $wpdb->get_row( $wpdb->prepare( "SELECT {$sum} FROM `{$g}` WHERE created BETWEEN %s AND %s", $start, $end ), ARRAY_A );
+					$out['prev']   = $wpdb->get_row( $wpdb->prepare( "SELECT {$sum} FROM `{$g}` WHERE created >= %s AND created < %s", $prev, $start ), ARRAY_A );
+					$out['daily']  = $wpdb->get_results( $wpdb->prepare( "SELECT DATE(created) AS d, SUM(clicks) AS clicks, SUM(impressions) AS impressions FROM `{$g}` WHERE created BETWEEN %s AND %s GROUP BY DATE(created) ORDER BY d", $start, $end ), ARRAY_A );
+					$out['pages']  = $wpdb->get_results( $wpdb->prepare( "SELECT page, {$sum} FROM `{$g}` WHERE created BETWEEN %s AND %s GROUP BY page ORDER BY impressions DESC LIMIT 500", $start, $end ), ARRAY_A );
+					$out['pages_prev'] = $wpdb->get_results( $wpdb->prepare( "SELECT page, SUM(clicks) AS clicks, SUM(impressions) AS impressions FROM `{$g}` WHERE created >= %s AND created < %s GROUP BY page", $prev, $start ), ARRAY_A );
+					$out['queries'] = $wpdb->get_results( $wpdb->prepare( "SELECT query, page, {$sum} FROM `{$g}` WHERE created BETWEEN %s AND %s GROUP BY query, page ORDER BY impressions DESC LIMIT 1500", $start, $end ), ARRAY_A );
+				}
+			}
+			if ( $has( 'ga', array( 'created', 'page', 'pageviews' ) ) && ! empty( $out['from'] ) ) {
+				$a           = $pre . 'ga';
+				$vis         = in_array( 'visitors', $out['tables']['ga'], true ) ? ', SUM(visitors) AS visitors' : '';
+				$out['ga']   = $wpdb->get_results( $wpdb->prepare( "SELECT page, SUM(pageviews) AS pageviews{$vis} FROM `{$a}` WHERE created BETWEEN %s AND %s GROUP BY page ORDER BY pageviews DESC LIMIT 500", $out['from'] . ' 00:00:00', $out['to'] . ' 23:59:59' ), ARRAY_A );
+				$out['ga_daily'] = $wpdb->get_results( $wpdb->prepare( "SELECT DATE(created) AS d, SUM(pageviews) AS pageviews FROM `{$a}` WHERE created BETWEEN %s AND %s GROUP BY DATE(created) ORDER BY d", $out['from'] . ' 00:00:00', $out['to'] . ' 23:59:59' ), ARRAY_A );
+			}
+			if ( isset( $out['tables']['inspections'] ) && in_array( 'page', $out['tables']['inspections'], true ) ) {
+				$i = $pre . 'inspections';
+				$out['inspections'] = $wpdb->get_results( "SELECT * FROM `{$i}` ORDER BY id DESC LIMIT 1000", ARRAY_A );
 			}
 			return $out;
 		},

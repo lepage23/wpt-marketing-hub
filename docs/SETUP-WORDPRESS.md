@@ -50,6 +50,18 @@ Lets the audit see what visitors actually get: which old addresses redirect, and
 
 It only reads pages on your own site and changes nothing.
 
+## 6. Connect Rank Math to Google (for Search performance)
+
+Lets the hub show clicks, searches and positions from Google Search Console, and Google Analytics page views where Rank Math provides them.
+
+1. WordPress: **Rank Math > General Settings > Analytics**.
+2. Click **Connect Google** and sign in with the Google account that owns Search Console for westpiertech.com.
+3. Pick the **Search Console** property for westpiertech.com and your **GA4** property under Analytics. Save.
+4. Rank Math imports the last 90 days. Give it an hour or two.
+5. In the hub, **Website & SEO > Search performance > Refresh**.
+
+This needs the latest page checker snippet (step 5).
+
 ## If the test fails
 
 - **"Check the username and application password"**: retype the username exactly as it appears in WordPress, and paste a fresh application password.

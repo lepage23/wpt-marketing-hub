@@ -6,6 +6,22 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.6.0 · 2026-10-15 15:18 BST
+
+Google Search Console (and Analytics where available) in the hub.
+
+- **Page checker version 3** adds a read-only search performance feed from Rank Math Analytics: clicks, impressions, position per page and per search, the previous period for comparison, daily totals, and Google Analytics page views and index status if Rank Math holds them.
+- **Search performance panel** on the Website & SEO page: clicks, impressions, click rate and average position with change against the previous period, daily trend charts with hover readouts, top pages and top searches, a 7 / 28 / 90 day switch, and Copy search data as CSV.
+- **Found in Search Console** fixes in the Fix queue: pages close to page one (positions 4 to 20) with the searches listed, pages seen on page one that hardly get clicked, pages whose clicks have dropped sharply, and searches where two of your pages compete.
+- Every fix card shows that page's Google clicks, impressions and position, so you can see what's worth doing first.
+- Today page shows clicks from Google. Audit CSV adds Google clicks, impressions and position. Search data refreshes after each audit.
+- **Readability:** text in every table now wraps and the cell grows to fit, instead of being cut off. Columns tightened so Status and Delete stay in view.
+- Setup guide step 6: connecting Rank Math to Google.
+
+Backups taken:
+
+- `backup/v0.5.0-2026-10-15-1513` (v0.5.0 as it was, before this change)
+
 ## v0.5.0 · 2026-10-15 15:10 BST
 
 The Fix queue is now the single list of everything the website needs for Google and AI search.
