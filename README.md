@@ -11,7 +11,9 @@ Open `index.html` in a browser. No install, no build step.
 | Page | What it does |
 | --- | --- |
 | Today | What needs you now, pulled from every other page |
-| Website & SEO | Page audit through the WordPress API, rankings, AI search visibility, content plan |
+| Website & SEO | Page audit through the WordPress API, WordPress connection, rankings, AI search visibility, content plan, change log |
+| Fix queue | Website fixes written by Claude. Nothing goes live until you approve it. Undo on every change |
+| Your jobs | Images and other tasks only you can do |
 | Leads | Every lead with status, owner, next step and notes |
 | Email campaigns | Sends with open, click, bounce and unsubscribe rates. iContact CSV import |
 | Live chat | Chat log, chat to lead rate, send a chat to Leads |
@@ -27,6 +29,10 @@ Open `index.html` in a browser. No install, no build step.
 - Each finished version also gets a `release/v...` branch on GitHub.
 - To go back to an earlier state, open that branch on GitHub or run `git checkout <branch name>`.
 
+## Connecting WordPress
+
+See `docs/SETUP-WORDPRESS.md`. About 10 minutes, once.
+
 ## Where data lives
 
-For now everything you enter is saved in your browser on this machine. Use Copy as CSV on any table to share or keep a copy.
+For now everything you enter, including the WordPress application password, is saved in your browser on this machine. It is never written to this repo. Use Copy as CSV on any table to share or keep a copy.

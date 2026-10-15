@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.1.1";
-  var BUILT = "2026-10-15 11:07 BST";
+  var VERSION = "0.2.0";
+  var BUILT = "2026-10-15 12:48 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -178,6 +178,8 @@
   var PAGES = [
     { id: "today", label: "Today", render: renderToday },
     { id: "seo", label: "Website & SEO", pri: "Priority", render: renderSeo },
+    { id: "fixes", label: "Fix queue", render: renderFixes },
+    { id: "jobs", label: "Your jobs", render: renderJobs },
     { id: "leads", label: "Leads", render: renderLeads },
     { id: "email", label: "Email campaigns", render: renderEmail },
     { id: "chat", label: "Live chat", render: renderChat },
@@ -209,6 +211,8 @@
       stat(leads.length, "Open leads", false) +
       stat(due.length, "Lead actions due today or late", due.length > 0) +
       stat(issues == null ? "–" : issues, issues == null ? "SEO issues (no audit run yet)" : "SEO issues from last audit", issues > 0) +
+      stat(pendingFixes().length, "Website fixes waiting for approval", pendingFixes().length > 0) +
+      stat(jobsToDo(), "Your jobs to do", false) +
       stat(inbox.length, "Inbox items flagged", inbox.length > 0) +
       stat(plan.length, "Content pieces in progress", false) + "</div>"));
 
@@ -289,7 +293,9 @@
 
   function renderSeo(main) {
     var cfg = load("seo-settings", { site: "https://westpiertech.com", types: "pages,posts" });
-    main.innerHTML = head("Priority area", "Website & SEO", "Audit westpiertech.com through the WordPress API, track rankings and AI search visibility, and plan content.");
+    main.innerHTML = head("Priority area", "Website & SEO", "Audit westpiertech.com through the WordPress API, track rankings and AI search visibility, and plan content.",
+      '<a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a>");
+    renderWpConnect(main);
 
     /* Audit panel */
     var p = panel("Page audit", "Reads every page and post live from WordPress. Read-only: nothing on the site is changed.");
@@ -425,7 +431,7 @@
     }).node);
     main.appendChild(plan);
 
-    main.appendChild(el('<div class="notice info"><b>Pushing changes to the site</b> isn\'t switched on yet. The hub only reads from WordPress for now. Writing back needs a WordPress application password, set up by Matt, and we\'ll add it once the audit is working.</div>'));
+    renderChangeLog(main);
   }
 
   /* Leads */
@@ -619,11 +625,335 @@
     main.appendChild(p);
   }
 
+  /* ---------- WordPress connection ----------
+     The application password is saved in this browser only. It is never written
+     to the repo and only used when Connor presses a button. */
+  var SEO_KEYS = {
+    yoast: { title: "_yoast_wpseo_title", desc: "_yoast_wpseo_metadesc", name: "Yoast SEO" },
+    rankmath: { title: "rank_math_title", desc: "rank_math_description", name: "Rank Math" },
+    seopress: { title: "_seopress_titles_title", desc: "_seopress_titles_desc", name: "SEOPress" }
+  };
+  function wpAuth() { return load("wp-auth", null); }
+  function wpBase(a) { return a.site.replace(/\/$/, "") + "/wp-json"; }
+  function wpFetch(path, opts) {
+    var a = wpAuth();
+    if (!a || !a.user || !a.pass) return Promise.reject(new Error("WordPress isn't connected. Add your application password on the Website & SEO page."));
+    opts = opts || {};
+    var token;
+    try { token = btoa(a.user + ":" + a.pass); } catch (e) { return Promise.reject(new Error("The username has characters the connection can't send. Use the plain WordPress username.")); }
+    var headers = { "Authorization": "Basic " + token };
+    if (opts.body) headers["Content-Type"] = "application/json";
+    return fetch(wpBase(a) + path, { method: opts.method || "GET", headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (!r.ok) {
+            var msg = j && j.message ? stripHtml(j.message) : "WordPress answered " + r.status + ".";
+            if (r.status === 401) msg += " Check the username and application password.";
+            if (r.status === 403) msg += " The account may not have permission, or a security plugin is blocking API logins.";
+            throw new Error(msg);
+          }
+          return j;
+        });
+      }, function () { throw new Error("Couldn't reach the site. Check the address and your internet connection. If it keeps failing, a security plugin or the host may be blocking API logins."); });
+  }
+  function metaKey(kind) {
+    var a = wpAuth(); var k = a && SEO_KEYS[a.seo];
+    if (!k) return null;
+    return kind === "meta_title" ? k.title : k.desc;
+  }
+
+  function renderWpConnect(main) {
+    var a = wpAuth() || { site: load("seo-settings", { site: "https://westpiertech.com" }).site, user: "", pass: "" };
+    var p = panel("Connect WordPress", "Lets the hub push fixes you approve. The password stays in this browser and is never shared.",
+      '<span class="chip ' + (a.pass && a.ok ? "good" : "") + '" id="wp-chip">' + (a.pass && a.ok ? "Connected" : a.pass ? "Not tested" : "Not connected") + "</span>");
+    var box = el('<div style="display:flex;flex-direction:column;gap:12px"><div class="form-grid">' +
+      '<label class="field" for="wp-site">Site address<input id="wp-site" value="' + esc(a.site) + '"></label>' +
+      '<label class="field" for="wp-user">WordPress username<input id="wp-user" autocomplete="off" value="' + esc(a.user) + '"></label>' +
+      '<label class="field" for="wp-pass">Application password<input id="wp-pass" type="password" autocomplete="new-password" placeholder="' + (a.pass ? "Saved. Paste a new one to replace it." : "xxxx xxxx xxxx xxxx xxxx xxxx") + '"></label></div>' +
+      '<div class="row"><button type="button" class="btn primary" id="wp-test">Save and test</button>' +
+      '<button type="button" class="btn danger" id="wp-forget"' + (a.pass ? "" : " hidden") + ">Remove password from this browser</button></div>" +
+      '<div id="wp-result"></div>' +
+      '<details><summary class="muted" style="cursor:pointer;font-size:.88rem">Where do I get an application password?</summary>' +
+      '<p class="muted" style="font-size:.86rem;margin-top:8px">In WordPress go to Users, then Profile. Scroll to Application Passwords, type "Marketing Hub" and click Add. Copy the password it shows and paste it above. Never paste it into a chat or email. You can revoke it from the same screen at any time.</p></details></div>');
+    p.appendChild(box); main.appendChild(p);
+    var res = box.querySelector("#wp-result");
+    if (a.ok) res.innerHTML = connectSummary(a);
+
+    box.querySelector("#wp-test").addEventListener("click", function () {
+      var cur = wpAuth() || {};
+      var pass = box.querySelector("#wp-pass").value.trim() || cur.pass || "";
+      var next = { site: box.querySelector("#wp-site").value.trim(), user: box.querySelector("#wp-user").value.trim(), pass: pass };
+      if (!next.user || !next.pass) { res.innerHTML = '<div class="notice">Add the username and the application password first.</div>'; return; }
+      save("wp-auth", next);
+      box.querySelector("#wp-pass").value = "";
+      res.innerHTML = '<div class="notice info">Testing the connection…</div>';
+      wpFetch("/wp/v2/users/me?context=edit&_fields=id,name,roles").then(function (me) {
+        next.name = me.name; next.roles = me.roles || [];
+        return fetch(wpBase(next) + "/").then(function (r) { return r.json(); }).catch(function () { return {}; });
+      }).then(function (idx) {
+        var ns = (idx && idx.namespaces) || [];
+        next.seo = ns.indexOf("yoast/v1") > -1 ? "yoast" : ns.indexOf("rankmath/v1") > -1 ? "rankmath" : ns.some(function (n) { return n.indexOf("seopress") === 0; }) ? "seopress" : ns.some(function (n) { return n.indexOf("aioseo") === 0; }) ? "aioseo" : "none";
+        var k = SEO_KEYS[next.seo];
+        if (!k) return null;
+        return wpFetch("/wp/v2/pages?context=edit&per_page=1&_fields=id,meta").then(function (rows) {
+          var m = rows[0] && rows[0].meta;
+          next.metaReady = !!(m && Object.prototype.hasOwnProperty.call(m, k.title));
+        });
+      }).then(function () {
+        next.ok = true; next.tested = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+        save("wp-auth", next); res.innerHTML = connectSummary(next);
+        p.querySelector("#wp-chip").className = "chip good"; p.querySelector("#wp-chip").textContent = "Connected";
+        box.querySelector("#wp-forget").hidden = false; updateNav();
+      }).catch(function (err) {
+        next.ok = false; save("wp-auth", next);
+        p.querySelector("#wp-chip").className = "chip bad"; p.querySelector("#wp-chip").textContent = "Not working";
+        box.querySelector("#wp-forget").hidden = false;
+        res.innerHTML = '<div class="notice"><b>Connection failed.</b> ' + esc(err.message) + "</div>";
+      });
+    });
+    box.querySelector("#wp-forget").addEventListener("click", function (e) {
+      var b = e.target;
+      if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Click again to remove it"; return; }
+      var cur = wpAuth() || {}; save("wp-auth", { site: cur.site, user: cur.user, pass: "" });
+      b.hidden = true; b.textContent = "Remove password from this browser"; delete b.dataset.sure;
+      res.innerHTML = '<div class="notice info">Password removed from this browser. Revoke it in WordPress too if you won\'t use it again.</div>';
+      p.querySelector("#wp-chip").className = "chip"; p.querySelector("#wp-chip").textContent = "Not connected"; updateNav();
+    });
+  }
+  function connectSummary(a) {
+    var admin = (a.roles || []).indexOf("administrator") > -1;
+    var k = SEO_KEYS[a.seo];
+    var seoLine = k ? (a.metaReady ? '<span class="chip good">' + k.name + " fields ready</span>" : '<span class="chip flag">' + k.name + " found, snippet not added yet</span>")
+      : a.seo === "aioseo" ? '<span class="chip flag">All in One SEO found. Title and description fixes need a different setup, ask Claude</span>'
+      : '<span class="chip flag">No SEO plugin found</span>';
+    return '<div class="list">' +
+      '<div class="list-item"><span class="chip good">Login</span><div><div class="t">Signed in as ' + esc(a.name || a.user) + '</div><div class="s">Role: ' + esc((a.roles || []).join(", ") || "unknown") + " · tested " + esc(a.tested || "") + "</div></div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
+      (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
+      "</div></div><span></span></div>" +
+      (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
+      "</div>";
+  }
+
+  /* ---------- Fix queue ---------- */
+  var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft" };
+  function proposals() { return (window.WPT_PROPOSALS || []).slice(); }
+  function fixState() { return load("fix-state", {}); }
+  function setFix(id, patch) { var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s); }
+  function pendingFixes() {
+    var s = fixState();
+    return proposals().filter(function (p) { return !p.example && !(s[p.id] && s[p.id].status); });
+  }
+  function logChange(entry) { var l = load("change-log", []); l.unshift(entry); save("change-log", l); }
+
+  function countOnce(hay, needle) {
+    if (!needle) return 0; var n = 0, i = hay.indexOf(needle);
+    while (i > -1 && n < 3) { n++; i = hay.indexOf(needle, i + needle.length); }
+    return n;
+  }
+  function pushFix(p, text) {
+    if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
+    var base = "/wp/v2/" + p.postType + "/";
+    if (p.type === "new_draft") {
+      return wpFetch(base, { method: "POST", body: { title: p.pageTitle, content: text, status: "draft" } }).then(function (r) {
+        return { before: "", after: text, draftId: r.id, editLink: wpAuth().site.replace(/\/$/, "") + "/wp-admin/post.php?post=" + r.id + "&action=edit" };
+      });
+    }
+    if (!(p.pageId > 0)) return Promise.reject(new Error("This fix has no page ID. Ask Claude to regenerate it."));
+    if (p.type === "meta_title" || p.type === "meta_description") {
+      var key = metaKey(p.type), a = wpAuth();
+      if (!key) return Promise.reject(new Error("No supported SEO plugin was found when you tested the connection."));
+      if (!a.metaReady) return Promise.reject(new Error("The SEO fields aren't open to the hub yet. Add the snippet in docs/wordpress-snippet.php, then test the connection again."));
+      return wpFetch(base + p.pageId + "?context=edit&_fields=id,meta").then(function (cur) {
+        var before = (cur.meta && cur.meta[key]) || "";
+        var body = { meta: {} }; body.meta[key] = text;
+        return wpFetch(base + p.pageId, { method: "POST", body: body }).then(function (r) {
+          if (!r.meta || r.meta[key] !== text) throw new Error("WordPress accepted the request but the field didn't change. The snippet may not be active.");
+          return { before: before, after: text };
+        });
+      });
+    }
+    if (p.type === "content_replace") {
+      return wpFetch(base + p.pageId + "?context=edit&_fields=id,content").then(function (cur) {
+        var raw = (cur.content && cur.content.raw) || "";
+        var n = countOnce(raw, p.current);
+        if (n === 0) throw new Error("The text being replaced isn't on the page any more, so someone may have edited it. Nothing was changed. Ask Claude for a fresh version of this fix.");
+        if (n > 1) throw new Error("That text appears more than once on the page, so the hub can't tell which one to change. Nothing was changed.");
+        var next = raw.split(p.current).join(text);
+        return wpFetch(base + p.pageId, { method: "POST", body: { content: next } }).then(function () { return { before: p.current, after: text }; });
+      });
+    }
+    return Promise.reject(new Error("Unknown fix type."));
+  }
+  function undoFix(p, st) {
+    var base = "/wp/v2/" + p.postType + "/";
+    if (p.type === "meta_title" || p.type === "meta_description") {
+      var key = metaKey(p.type); var body = { meta: {} }; body.meta[key] = st.before || "";
+      return wpFetch(base + p.pageId, { method: "POST", body: body });
+    }
+    if (p.type === "content_replace") {
+      return wpFetch(base + p.pageId + "?context=edit&_fields=id,content").then(function (cur) {
+        var raw = (cur.content && cur.content.raw) || "";
+        if (countOnce(raw, st.after) !== 1) throw new Error("The page has changed since this fix went live, so it can't be undone automatically. Use Revisions on the page in WordPress to roll it back.");
+        return wpFetch(base + p.pageId, { method: "POST", body: { content: raw.split(st.after).join(st.before) } });
+      });
+    }
+    return Promise.reject(new Error("New drafts aren't undone from here. Move the draft to the bin in WordPress if you don't want it."));
+  }
+
+  function lengthHint(type, text) {
+    var n = text.length;
+    if (type === "meta_title") return n + " characters" + (n > 60 ? " · over 60, Google may cut it off" : "");
+    if (type === "meta_description") return n + " characters" + (n > 160 ? " · over 160, Google may cut it off" : n < 70 ? " · a bit short" : " · good length");
+    return "";
+  }
+
+  function renderFixes(main) {
+    var view = load("fix-view", "waiting");
+    main.innerHTML = head("Website & SEO", "Fix queue", "Fixes Claude has written for the website. Nothing goes live until you approve it.");
+    var a = wpAuth();
+    if (!a || !a.pass || !a.ok) main.appendChild(el('<div class="notice"><b>WordPress isn\'t connected yet.</b> You can read and edit fixes, but pushing needs the connection set up on the <a href="#seo">Website & SEO</a> page.</div>'));
+    var tabs = el('<div class="row" role="tablist"></div>'); main.appendChild(tabs);
+    var list = el('<div style="display:flex;flex-direction:column;gap:14px"></div>'); main.appendChild(list);
+
+    function draw() {
+      var s = fixState(), all = proposals();
+      var groups = {
+        waiting: all.filter(function (p) { return !(s[p.id] && s[p.id].status); }),
+        pushed: all.filter(function (p) { return s[p.id] && (s[p.id].status === "pushed" || s[p.id].status === "undone"); }),
+        rejected: all.filter(function (p) { return s[p.id] && s[p.id].status === "rejected"; })
+      };
+      var names = { waiting: "Waiting for you", pushed: "Pushed", rejected: "Rejected" };
+      tabs.innerHTML = Object.keys(groups).map(function (g) {
+        return '<button type="button" role="tab" class="btn' + (g === view ? " primary" : "") + '" data-view="' + g + '" aria-selected="' + (g === view) + '">' + names[g] + " (" + groups[g].length + ")</button>";
+      }).join("");
+      var items = groups[view];
+      if (!items.length) {
+        list.innerHTML = '<div class="panel"><div class="empty">' + (view === "waiting" ? "No fixes waiting. Send Claude the audit (Copy as CSV on the Website & SEO page) and ask for the next batch." : "Nothing here yet.") + "</div></div>";
+        return;
+      }
+      list.innerHTML = "";
+      items.forEach(function (p) { list.appendChild(fixCard(p, s[p.id] || {}, draw)); });
+    }
+    tabs.addEventListener("click", function (e) { var v = e.target.getAttribute("data-view"); if (v) { view = v; save("fix-view", v); draw(); } });
+    draw();
+    updateNav();
+  }
+
+  function fixCard(p, st, redraw) {
+    var text = st.edited != null ? st.edited : p.proposed;
+    var isMeta = p.type === "meta_title" || p.type === "meta_description";
+    var done = st.status === "pushed" || st.status === "undone";
+    var card = el('<article class="panel fix"></article>');
+    card.innerHTML =
+      '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' +
+      '<div class="row"><span class="chip info">' + esc(TYPE_LABEL[p.type] || p.type) + '</span><span class="chip ' + (p.size === "big" ? "flag" : "") + '">' + (p.size === "big" ? "Big change" : "Small change") + "</span>" +
+      (p.example ? '<span class="chip ex">example</span>' : "") + (st.status === "undone" ? '<span class="chip">Undone</span>' : st.status === "pushed" ? '<span class="chip good">Live</span>' : "") + "</div>" +
+      '<h2><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.pageTitle) + "</a></h2>" +
+      '<p class="muted" style="font-size:.86rem">' + esc(p.issue) + "</p></div>" +
+      '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
+      '<div class="cols2">' +
+      '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
+      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : "Proposed (you can edit this)") +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done ? " readonly" : "") + (p.type === "content_replace" || p.type === "new_draft" ? ' style="min-height:140px"' : "") + ">" + esc(done ? st.after : text) + "</textarea>" +
+      (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
+      '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
+      '<div class="fix-actions row"></div><div class="fix-msg"></div>';
+    var ta = card.querySelector("textarea"), hint = card.querySelector(".hint"), actions = card.querySelector(".fix-actions"), msg = card.querySelector(".fix-msg");
+    function showHint() { if (hint) hint.textContent = lengthHint(p.type, ta.value); }
+    showHint();
+    if (!done) ta.addEventListener("input", function () { showHint(); setFix(p.id, { edited: ta.value }); });
+
+    if (!st.status) {
+      actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
+        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : "Approve and push live") + "</button>" +
+        '<button type="button" class="btn rej">Reject</button>' + (st.edited != null ? '<button type="button" class="btn small reset">Reset to Claude\'s version</button>' : "");
+      actions.querySelector(".go").addEventListener("click", function () {
+        var sure = actions.querySelector(".sure");
+        if (sure && !sure.checked) { msg.innerHTML = '<div class="notice">Tick the box to confirm you\'ve read this change.</div>'; return; }
+        var value = ta.value;
+        if (!value.trim() && p.type !== "meta_description") { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
+        var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
+        pushFix(p, value).then(function (r) {
+          var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+          setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : "Pushed live" });
+          toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
+          redraw(); updateNav();
+        }).catch(function (err) {
+          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : "Approve and push live";
+          msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
+        });
+      });
+      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Rejected"); redraw(); updateNav(); });
+      var rs = actions.querySelector(".reset");
+      if (rs) rs.addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].edited; save("fix-state", s); redraw(); });
+    } else if (st.status === "rejected") {
+      actions.innerHTML = '<button type="button" class="btn">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
+    } else {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "undone" ? "Undone " + esc(st.undoneAt || "") : "Pushed " + esc(st.pushedAt || "")) + "</span>" +
+        (st.editLink ? '<a class="btn small" href="' + esc(st.editLink) + '" target="_blank" rel="noopener">Open draft in WordPress</a>' : "") +
+        (st.status === "pushed" && p.type !== "new_draft" ? '<button type="button" class="btn small danger undo">Undo</button>' : "");
+      var u = actions.querySelector(".undo");
+      if (u) u.addEventListener("click", function () {
+        if (!u.dataset.sure) { u.dataset.sure = "1"; u.textContent = "Click again to undo"; return; }
+        u.disabled = true; u.textContent = "Undoing…";
+        undoFix(p, st).then(function () {
+          var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+          setFix(p.id, { status: "undone", undoneAt: when });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: "Undone" });
+          toast("Change undone"); redraw();
+        }).catch(function (err) { u.disabled = false; u.textContent = "Undo"; delete u.dataset.sure; msg.innerHTML = '<div class="notice"><b>Couldn\'t undo.</b> ' + esc(err.message) + "</div>"; });
+      });
+    }
+    return card;
+  }
+
+  function renderChangeLog(main) {
+    var p = panel("Change log", "Every change the hub has made to the website, newest first.");
+    var l = load("change-log", []);
+    p.appendChild(el(l.length ? '<div class="table-wrap"><table><thead><tr><th>When</th><th>Page</th><th>Change</th><th>What happened</th></tr></thead><tbody>' +
+      l.map(function (x) { return '<tr><td class="mono">' + esc(x.when) + '</td><td><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.page) + "</a></td><td>" + esc(x.type) + "</td><td>" + esc(x.action) + "</td></tr>"; }).join("") +
+      "</tbody></table></div>" : '<div class="empty">No changes made yet.</div>'));
+    main.appendChild(p);
+  }
+
+  /* ---------- Your jobs ---------- */
+  function syncJobs() {
+    var rows = load("jobs", null) || [];
+    var seen = load("jobs-imported", []);
+    (window.WPT_JOBS || []).forEach(function (j) {
+      if (seen.indexOf(j.id) > -1) return;
+      rows.unshift({ _id: uid(), _src: j.id, _ex: !!j.example, job: j.job, page: j.page, details: j.details, size: j.size, alt: j.alt, status: "To do" });
+      seen.push(j.id);
+    });
+    save("jobs", rows); save("jobs-imported", seen);
+  }
+  function jobsToDo() { syncJobs(); return getRows("jobs").filter(function (j) { return j.status !== "Done" && !j._ex; }).length; }
+  function renderJobs(main) {
+    syncJobs();
+    main.innerHTML = head("Things only you can do", "Your jobs", "Images, real quotes, figures to confirm and anything Garry needs to sign off. Claude adds to this list with each batch of fixes.");
+    var p = panel("Job list", "For images: make them in Canva at the size given, upload to WordPress and use the alt text suggested.");
+    p.appendChild(editableTable({
+      key: "jobs", csvName: "your-jobs", addLabel: "Add job", onChange: updateNav,
+      columns: [
+        { k: "job", label: "Job" }, { k: "page", label: "Page" }, { k: "details", label: "What's needed" },
+        { k: "size", label: "Size or format" }, { k: "alt", label: "Alt text to use" },
+        { k: "status", label: "Status", type: "select", options: ["To do", "Doing", "Done"] }
+      ],
+      emptyText: "No jobs. Nice."
+    }).node);
+    main.appendChild(p);
+  }
+
   /* ---------- shell ---------- */
   function updateNav() {
     var counts = {
       leads: openLeads().filter(function (l) { return l.nextDate && l.nextDate <= today(); }).length,
-      inbox: getRows("inbox").filter(function (m) { return m.state === "Needs you"; }).length
+      inbox: getRows("inbox").filter(function (m) { return m.state === "Needs you"; }).length,
+      fixes: pendingFixes().length,
+      jobs: jobsToDo()
     };
     var nav = document.getElementById("nav"); var cur = currentId();
     nav.innerHTML = PAGES.map(function (p) {

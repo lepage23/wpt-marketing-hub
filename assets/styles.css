@@ -148,6 +148,15 @@ td input:hover, td select:hover, td input:focus, td select:focus { border-color:
 .steps b { display: block; font-family: var(--font-mono); font-size: .72rem; color: var(--muted); }
 .bar { height: 6px; background: var(--sunk); border-radius: 99px; overflow: hidden; min-width: 60px; }
 .bar i { display: block; height: 100%; background: var(--accent); }
+.cols2 { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+.cols2 > * { min-width: 0; }
+pre.was { margin: 0; background: var(--sunk); border-radius: var(--radius); padding: 9px 11px; font: .85rem/1.5 var(--font-mono); color: var(--fg); white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; }
+.fix textarea { font-family: var(--font-mono); font-size: .85rem; }
+.fix h2 a { color: var(--fg); text-decoration: none; }
+.fix h2 a:hover { text-decoration: underline; }
+.hint { font-size: .75rem; color: var(--muted); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+@media (max-width: 700px) { .cols2 { grid-template-columns: 1fr; } }
 .toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: var(--radius); font-size: .88rem; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
