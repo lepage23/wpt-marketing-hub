@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.8.0";
-  var BUILT = "2026-10-15 16:13 BST";
+  var VERSION = "0.8.1";
+  var BUILT = "2026-10-15 16:32 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -728,7 +728,8 @@
     var method = opts.method || "GET";
     /* A unique query on reads stops SiteGround or any other cache serving an old answer. */
     var url = wpBase(a) + path + (method === "GET" ? (path.indexOf("?") > -1 ? "&" : "?") + "_wpt=" + Date.now() : "");
-    headers["Cache-Control"] = "no-cache";
+    /* No extra headers here: WordPress only allows Authorization and Content-Type from other pages,
+       and the browser blocks the whole request if anything else is sent. */
     return fetch(url, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined, cache: "no-store" })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
@@ -1706,7 +1707,7 @@
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
-          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : "Approve and push live";
+          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : "Approve and push live";
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
         });
       });

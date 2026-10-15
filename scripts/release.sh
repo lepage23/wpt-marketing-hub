@@ -17,6 +17,7 @@ echo "$NEW" > VERSION
 sed -i.bak -E "s/var VERSION = \"[^\"]+\";/var VERSION = \"${NEW}\";/; s/var BUILT = \"[^\"]+\";/var BUILT = \"${HUMAN}\";/" assets/app.js
 rm -f assets/app.js.bak
 
+./tests/run-all.sh || { echo "Tests failed, release stopped."; exit 1; }
 git add -A
 git commit -q -m "v${NEW}: ${SUMMARY}"
 git tag -a "v${NEW}" -m "v${NEW} released ${HUMAN}. ${SUMMARY}"

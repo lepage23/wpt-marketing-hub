@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.8.1 · 2026-10-15 16:32 BST
+
+- **Fixed: "Couldn't reach the site" on every push.** v0.7.2 added a cache header to every request, and WordPress doesn't allow that header from other pages, so the browser blocked the requests. Removed it. The unique address on each read still stops caches serving old answers.
+- The approve button keeps its proper label (for example "Approve and remove from page") after a failed attempt.
+- **Tests now live in the repo** (`tests/`, 113 checks across the hub and the WordPress snippets) and every release runs them first. A release stops if any fail. A new test checks only WordPress-allowed headers are sent.
+
+Backups taken:
+
+- `backup/v0.8.0-2026-10-15-1631` (v0.8.0 as it was, before this change)
+
 ## v0.8.0 · 2026-10-15 16:13 BST
 
 The hub can now edit the pages themselves, not just their Google titles and descriptions.
