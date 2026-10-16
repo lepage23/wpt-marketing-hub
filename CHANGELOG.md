@@ -6,6 +6,35 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.17.0 · 2026-10-16 16:30 BST
+
+Display check works at every screen size, and catches words breaking.
+
+- Each page now loads once and is checked at **ten screen widths** (1536, 1440, 1366, 1280, 1120, 1024, 900, 768, 600 and 400px) by resizing the preview, not reloading. Problems that only show at some sizes, like a heading word breaking, are caught.
+- **Word broken in the middle** ("Communicati" / "ons"). Push-ready **Text size fix**: works out the largest size that fits at every width checked and sets it per screen type (desktop, tablet, phone). If the heading uses a global font, the font's settings are copied onto it first so only the size changes. Undo restores the global link.
+- **Big gaps between heading lines** (line spacing over 1.42 times the text size). Push-ready: line spacing to 1.2.
+- **Too much empty space in a coloured box** (over 110px desktop, 90px tablet, 64px phone at the top or bottom). Push-ready: brings it to 80, 60 and 40px.
+- One fix per problem, listing the widths where it shows, not one per width.
+- Page checker snippet is **version 10**. Copy it again.
+- User guide updated.
+- 231 tests, all passing. Tested end to end on a copy of the Gamma page hero: "Communications" breaking at 1280px and below found, with the fix, plus the line gaps and empty space.
+
+## v0.16.0 · 2026-10-16 15:30 BST
+
+Display check now finds text and layout slips too, and most become push-ready fixes.
+
+- **Punctuation on its own line** (a lone "." or "?"). Push-ready **Punctuation fix**: removes the space or line break before it, words unchanged.
+- **Same word twice in a short heading**. Push-ready once you've reworded it in the box (it won't push until the wording changes).
+- **Image hanging out of its coloured box**. Push-ready **Layout fix**: caps it at its column width and removes a negative margin if that's the cause.
+- **Button or text not lining up with the text above**. Push-ready when a left margin or padding is the cause: sets it to 0.
+- **Box not centred**. Push-ready for containers (equal margins). Older-style sections are listed with steps, because Elementor doesn't let sections take side margins.
+- **Much more space below the content than above**. Push-ready: matches bottom padding to top.
+- A problem found only on phones changes the phone setting only.
+- **b7-01**: the Unified Communications page's small heading "Unified Communications for Smarter Business Communication" becomes "Unified Communications for Smarter Business" (editable).
+- Page checker snippet is **version 9** (adds the layout and punctuation fixes). Copy it again.
+- User guide updated.
+- 220 tests, all passing. Tested end to end on a copy of the Unified Communications hero: seven of the eight problems found. Not yet caught: one section not lining up with the section above it.
+
 ## v0.15.3 · 2026-10-16 14:25 BST
 
 - Clearer message when a carousel image fix is pushed with an older copy of the page checker code: it says to copy the code again and check it says version 8.

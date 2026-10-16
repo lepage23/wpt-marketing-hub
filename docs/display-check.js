@@ -32,6 +32,13 @@
   }
   async function run() {
     await wait(1500); await scrollAll();
+    await check();
+  }
+  /* The hub resizes the frame to other screen widths and asks for the check again, without reloading. */
+  addEventListener("message", function (e) {
+    if (e.data && e.data.wpt === "display-rerun") { HEADS = null; setTimeout(check, 700); }
+  });
+  async function check() {
     var out = [], seen = {};
     function add(o) { var k = o.kind + "|" + (o.widget.id || "") + "|" + (o.file || o.text || ""); if (seen[k]) return; seen[k] = 1; out.push(o); }
     var W = innerWidth;
@@ -114,6 +121,165 @@
       });
       worst.slice(0, 4).forEach(function (el) { add({ kind: "overflow", text: (el.textContent || el.tagName).trim().slice(0, 50), widget: widgetOf(el), at: where(el), detail: "sticks out " + Math.round(el.getBoundingClientRect().right - W) + "px past the edge" }); });
     }
+
+    /* Punctuation stranded on its own line, like "communications" then "." underneath */
+    Array.prototype.forEach.call(document.querySelectorAll("h1,h2,h3,h4,h5,h6,.elementor-heading-title,p,li,.elementor-button-text"), function (el) {
+      if (!shown(el) || inHiddenSlide(el) || el.querySelector("h1,h2,h3,h4,h5,h6,p,li")) return;
+      var chars = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), tn;
+      while ((tn = tw.nextNode())) for (var ci = 0; ci < tn.data.length; ci++) chars.push({ n: tn, i: ci, c: tn.data[ci] });
+      function rectOf(x) { var rg = document.createRange(); rg.setStart(x.n, x.i); rg.setEnd(x.n, x.i + 1); var rs = rg.getClientRects(); return rs.length ? rs[rs.length - 1] : null; }
+      for (var k = 0; k < chars.length; k++) {
+        if (!/[.,?!:;]/.test(chars[k].c)) continue;
+        var after = chars[k + 1]; if (after && /\S/.test(after.c) && !/[.,?!:;"')\]]/.test(after.c)) continue;
+        var j = k - 1; while (j >= 0 && /\s/.test(chars[j].c)) j--;
+        if (j < 0) continue;
+        var a = rectOf(chars[k]), b = rectOf(chars[j]);
+        if (a && b && a.top > b.top + b.height * 0.6) {
+          add({ kind: "stranded_punct", text: el.textContent.replace(/\s+/g, " ").trim().slice(0, 80), punct: chars[k].c, gap: k - j > 1, widget: widgetOf(el), at: where(el) });
+          break;
+        }
+      }
+    });
+
+    /* Images spilling out of the coloured box they sit in */
+    function panelOf(el) {
+      var n = el.parentElement;
+      while (n && n !== document.body) {
+        var cs = getComputedStyle(n);
+        var bg = cs.backgroundColor, hasBg = (bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg)) || (cs.backgroundImage && cs.backgroundImage !== "none");
+        if (hasBg && n.getBoundingClientRect().width < document.documentElement.clientWidth - 8) return n;
+        n = n.parentElement;
+      }
+      return null;
+    }
+    Array.prototype.forEach.call(document.images, function (img) {
+      if (!img.naturalWidth || !shown(img) || inHiddenSlide(img)) return;
+      var pn = panelOf(img); if (!pn) return;
+      var r = img.getBoundingClientRect(), q = pn.getBoundingClientRect();
+      var out = Math.max(r.right - q.right, q.left - r.left, 0);
+      if (out > 4 && getComputedStyle(pn).overflow === "visible") {
+        var wEl = img.closest(".elementor-element[data-id]");
+        var mL = wEl ? parseFloat(getComputedStyle(wEl).marginLeft) : 0, mR = wEl ? parseFloat(getComputedStyle(wEl).marginRight) : 0;
+        add({ kind: "overflow_box", file: file(img.currentSrc || img.src), widget: widgetOf(img), at: where(img), detail: "hangs " + Math.round(out) + "px outside its box", negMargin: mL < 0 || mR < 0 });
+      }
+    });
+
+    /* The same word twice in a short heading */
+    var STOP = /^(the|and|for|with|your|our|you|are|that|this|from|all|into|more|what|how|why|who|its|it's|a|an|of|to|in|on|is|by|at|or|be|we|us)$/i;
+    Array.prototype.forEach.call(document.querySelectorAll("h1,h2,h3,h4,h5,h6,.elementor-heading-title"), function (el) {
+      if (!shown(el) || inHiddenSlide(el) || el.querySelector("h1,h2,h3,h4,h5,h6")) return;
+      var t = el.textContent.replace(/\s+/g, " ").trim(), words = t.split(" ");
+      if (words.length < 3 || words.length > 16) return;
+      var stems = {};
+      for (var wi = 0; wi < words.length; wi++) {
+        var w = words[wi].toLowerCase().replace(/[^a-z0-9']/g, "");
+        if (w.length < 4 || STOP.test(w)) continue;
+        var st = w.replace(/(ions|ion|ings|ing|ers|er|es|s|ed)$/, "");
+        if (stems[st]) { add({ kind: "repeat_word", text: t, word: words[wi].replace(/[^A-Za-z0-9']/g, ""), widget: widgetOf(el), at: where(el) }); return; }
+        stems[st] = 1;
+      }
+    });
+
+    /* Things in the same column that nearly, but don't quite, line up (a button indented past the text above it) */
+    var cols = {};
+    Array.prototype.forEach.call(document.querySelectorAll(".elementor-widget[data-id]"), function (wEl) {
+      if (!shown(wEl) || inHiddenSlide(wEl)) return;
+      var col = wEl.parentElement && wEl.parentElement.closest(".elementor-column[data-id], .e-con[data-id]");
+      if (!col) return;
+      var target = wEl.querySelector(".elementor-button") || wEl.querySelector(".elementor-heading-title, p, h1, h2, h3, h4");
+      if (!target) return;
+      var cs = getComputedStyle(target);
+      if (cs.textAlign === "center" || getComputedStyle(wEl).textAlign === "center") return;
+      var rg = document.createRange(); rg.selectNodeContents(target);
+      var left = target.classList.contains("elementor-button") ? target.getBoundingClientRect().left : rg.getBoundingClientRect().left;
+      (cols[col.getAttribute("data-id")] = cols[col.getAttribute("data-id")] || []).push({ w: wEl, left: left, btn: target.classList.contains("elementor-button") });
+    });
+    Object.keys(cols).forEach(function (cid) {
+      var list = cols[cid]; if (list.length < 2) return;
+      var counts = {};
+      list.forEach(function (x) { var k = Math.round(x.left); counts[k] = (counts[k] || 0) + 1; });
+      var main = +Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0];
+      list.forEach(function (x) {
+        var d = x.left - main;
+        if (Math.abs(d) >= 6 && Math.abs(d) <= 60) {
+          var ml = parseFloat(getComputedStyle(x.w).marginLeft) || 0;
+          var inner = x.w.querySelector(".elementor-widget-container"), pl = inner ? parseFloat(getComputedStyle(inner).paddingLeft) || 0 : 0;
+          add({ kind: "misaligned", text: x.w.textContent.replace(/\s+/g, " ").trim().slice(0, 40), widget: widgetOf(x.w), at: where(x.w),
+            detail: (d > 0 ? "starts " + Math.round(d) + "px to the right of" : "starts " + Math.round(-d) + "px to the left of") + " the text above it", offset: Math.round(d), marginLeft: Math.round(ml), padLeft: Math.round(pl), isButton: x.btn });
+        }
+      });
+    });
+
+    /* Top-level boxes that aren't centred, or have much more space at the bottom than the top */
+    var CW = document.documentElement.clientWidth;
+    Array.prototype.forEach.call(document.querySelectorAll(".elementor > .elementor-section[data-id], .elementor > .e-con[data-id], .elementor-section-wrap > .elementor-section[data-id]"), function (sec) {
+      if (!shown(sec)) return;
+      var r = sec.getBoundingClientRect(), cs = getComputedStyle(sec);
+      var type = sec.classList.contains("e-con") ? "container" : "section";
+      var info = { id: sec.getAttribute("data-id"), type: type };
+      if (r.width < CW - 30) {
+        var gl = r.left, gr = CW - r.right;
+        if (Math.abs(gl - gr) > 16) add({ kind: "off_centre", text: (sec.querySelector("h1,h2,h3") || sec).textContent.replace(/\s+/g, " ").trim().slice(0, 40), widget: info, at: where(sec),
+          detail: Math.round(gl) + "px gap on the left, " + Math.round(gr) + "px on the right", gapLeft: Math.round(gl), gapRight: Math.round(gr), marginLeft: Math.round(parseFloat(cs.marginLeft) || 0), marginRight: Math.round(parseFloat(cs.marginRight) || 0) });
+      }
+      var pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+      var kids = Array.prototype.filter.call(sec.querySelectorAll(".elementor-widget"), shown);
+      if (kids.length) {
+        var top = Math.min.apply(null, kids.map(function (k) { return k.getBoundingClientRect().top; })) - r.top;
+        var bot = r.bottom - Math.max.apply(null, kids.map(function (k) { return k.getBoundingClientRect().bottom; }));
+        if (bot > 60 && bot > top * 1.8 && pb > pt + 30) add({ kind: "uneven_space", text: (sec.querySelector("h1,h2,h3") || sec).textContent.replace(/\s+/g, " ").trim().slice(0, 40), widget: info, at: where(sec),
+          detail: Math.round(bot) + "px of space below the content, " + Math.round(top) + "px above", padTop: Math.round(pt), padBottom: Math.round(pb) });
+      }
+    });
+
+    /* Words broken in the middle ("Communicati" / "ons") because the box is too narrow for the font size */
+    function measure(word, el) {
+      var sp = document.createElement("span"), cs = getComputedStyle(el);
+      sp.textContent = word;
+      sp.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;top:0;font:" + cs.font + ";letter-spacing:" + cs.letterSpacing + ";text-transform:" + cs.textTransform;
+      document.body.appendChild(sp); var w = sp.getBoundingClientRect().width; sp.remove(); return w;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("h1,h2,h3,h4,h5,h6,.elementor-heading-title,p,li,.elementor-button-text,a.elementor-button"), function (el) {
+      if (!shown(el) || inHiddenSlide(el) || el.querySelector("h1,h2,h3,h4,h5,h6,p,li")) return;
+      var tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), tn, done = false;
+      while (!done && (tn = tw.nextNode())) {
+        var re = /\S{4,}/g, mm;
+        while (!done && (mm = re.exec(tn.data))) {
+          var rg = document.createRange(); rg.setStart(tn, mm.index); rg.setEnd(tn, mm.index + mm[0].length);
+          var rs = Array.prototype.filter.call(rg.getClientRects(), function (q) { return q.width > 0; });
+          if (rs.length > 1 && Math.abs(rs[rs.length - 1].top - rs[0].top) > 4) {
+            var cs = getComputedStyle(el), fs = parseFloat(cs.fontSize) || 16;
+            var box = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+            var word = mm[0].replace(/[^\w'’-]+$/, ""), ww = measure(word, el);
+            var need = ww > 0 ? Math.floor(fs * (box / ww) * 0.96) : Math.floor(fs * 0.8);
+            add({ kind: "broken_word", text: el.textContent.replace(/\s+/g, " ").trim().slice(0, 60), word: word, fontSize: Math.round(fs), fitSize: Math.max(10, need), widget: widgetOf(el), at: where(el),
+              detail: "“" + word + "” splits across two lines at " + W + "px wide" });
+            done = true;
+          }
+        }
+      }
+    });
+
+    /* Big headings with loose line spacing (big gaps between the lines) */
+    Array.prototype.forEach.call(document.querySelectorAll("h1,h2,h3,.elementor-heading-title"), function (el) {
+      if (!shown(el) || inHiddenSlide(el) || el.querySelector("h1,h2,h3")) return;
+      var cs = getComputedStyle(el), fs = parseFloat(cs.fontSize) || 16, lh = parseFloat(cs.lineHeight);
+      if (!lh || fs < 26) return;
+      var lines = Math.round(el.getBoundingClientRect().height / lh);
+      if (lines >= 2 && lh / fs > 1.42) add({ kind: "loose_lines", text: el.textContent.replace(/\s+/g, " ").trim().slice(0, 60), widget: widgetOf(el), at: where(el),
+        ratio: Math.round(lh / fs * 100) / 100, fontSize: Math.round(fs), detail: "line spacing is " + (Math.round(lh / fs * 100) / 100) + " times the text size" });
+    });
+
+    /* Boxes with a lot of empty space at the top or bottom */
+    var PADMAX = W >= 1025 ? 110 : W >= 768 ? 90 : 64, PADTO = W >= 1025 ? 80 : W >= 768 ? 60 : 40;
+    Array.prototype.forEach.call(document.querySelectorAll(".elementor > .elementor-section[data-id], .elementor > .e-con[data-id], .elementor-section-wrap > .elementor-section[data-id]"), function (sec) {
+      if (!shown(sec)) return;
+      var cs = getComputedStyle(sec), pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+      var bg = cs.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor);
+      if ((pt > PADMAX || pb > PADMAX) && bg) add({ kind: "big_padding", text: (sec.querySelector("h1,h2,h3") || sec).textContent.replace(/\s+/g, " ").trim().slice(0, 40),
+        widget: { id: sec.getAttribute("data-id"), type: sec.classList.contains("e-con") ? "container" : "section" }, at: where(sec),
+        padTop: Math.round(pt), padBottom: Math.round(pb), padTo: PADTO, detail: Math.round(pt) + "px empty at the top, " + Math.round(pb) + "px at the bottom" });
+    });
 
     var m = document.body.className.match(/(?:page-id|postid)-(\d+)/);
     var msg = { wpt: "display-check", url: location.href.split("?")[0], width: W, pageId: m ? +m[1] : 0, issues: out };

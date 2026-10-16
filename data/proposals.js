@@ -2,6 +2,9 @@
    Claude adds to this file and pushes it to GitHub. Pull in GitHub Desktop to see new ones.
    Nothing here touches the website until Connor approves it in the Fix queue.
 
+   elementor_tidy: removes the space or line break before punctuation in one element (element: Elementor id).
+   elementor_layout: changes one element's margin, padding or max width (element, set, clearNeg). Sides not named are kept.
+   needsEdit: true on a text fix means Connor must change the wording before it will push.
    elementor_style: changes how one image widget is displayed (find: image file name, set: {object-fit, height...}). Undo restores.
    page_build: copies an existing Elementor page's design into a NEW draft, swaps in new text (edits: [{op: set|swap|remove, find, replace, level}]),
      returns a preview link. Set ready: true once the text is written.
@@ -29,6 +32,24 @@ window.WPT_PROPOSALS = [
    "Check whose certificate number 10570 is, and what it covers. If it's Westcon's (or anyone else's), the UKAS badge must come off.",
    "Tell Claude what you find. Claude will write a fix to replace the image with one showing only the badges you hold, as separate images with proper alt text, which Google and AI tools can read (they can't read badges baked into a photo)."
   ]
+ },
+ {
+  "id": "b7-01",
+  "created": "2026-10-16",
+  "batch": "Batch 7: Unified Communications page",
+  "type": "elementor_set",
+  "size": "small",
+  "priority": "medium",
+  "category": "Content",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "Unified Communications",
+  "link": "https://westpiertech.com/unified-communications/",
+  "issue": "Small heading says “Communication” twice",
+  "find": "Unified Communications for Smarter Business Communication",
+  "current": "Unified Communications for Smarter Business Communication",
+  "proposed": "Unified Communications for Smarter Business",
+  "why": "Saying Communications twice in eight words reads clumsily, and it's the first line people see. This keeps the search phrase (Unified Communications) at the front. Edit the wording in the box if you'd prefer something else."
  },
  {
   "id": "b6-03",

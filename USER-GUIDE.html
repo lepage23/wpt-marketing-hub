@@ -138,7 +138,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
 <table>
   <thead><tr><th>Button</th><th>What happens</th></tr></thead>
   <tbody>
-    <tr><td><span class="btn primary">Approve and push live</span><br><span class="btn primary">Push the fix</span><br><span class="btn primary">Approve and fix the image</span></td><td>Changes the live website. A backup is kept, and Undo puts it back.</td></tr>
+    <tr><td><span class="btn primary">Approve and push live</span><br><span class="btn primary">Push the fix</span><br><span class="btn primary">Approve and fix the image</span><br><span class="btn primary">Approve and fix the layout</span><br><span class="btn primary">Approve and fix the punctuation</span><br><span class="btn primary">Approve and fix the text size</span></td><td>Changes the live website. A backup is kept, and Undo puts it back.</td></tr>
     <tr><td><span class="btn primary">Approve and unpublish</span></td><td>Turns a page into a draft. Nothing is deleted. Undo republishes it.</td></tr>
     <tr><td><span class="btn primary">Push new page build for review</span></td><td>Makes a new <b>draft</b> page. Never live until you publish it in WordPress.</td></tr>
     <tr><td><span class="btn">Run audit now</span>, <span class="btn">Check every page</span>, <span class="btn">Run mobile check on all pages</span>, <span class="btn">Refresh</span>, <span class="btn">Check the look</span></td><td>Read-only. Safe any time.</td></tr>
@@ -168,15 +168,25 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
 <p>Runs Google's own mobile test on every live page: speed, accessibility and SEO scores, plus anything Google flags. Add the free API key (steps on the page) so it can check every page without hitting Google's limit. Takes 15 to 30 seconds a page.</p>
 
 <h3>Display check</h3>
-<p>Looks at every page the way a visitor does, at desktop size and then phone size, in a small preview on the page. It finds:</p>
-<ul>
-  <li>logos and badges cut off by their box or carousel</li>
-  <li>images squashed or stretched out of shape</li>
-  <li>broken images, and images with no alt text</li>
-  <li>button text wrapping onto two lines</li>
-  <li>text cut off by its box, and anything sticking out past a phone screen</li>
-</ul>
-<p>Press <span class="btn primary">Check every page</span> and stay on the hub page while it runs (about 10 seconds a page). Squashed and cut-off images become push-ready fixes. Everything else is listed by page, with the nearest heading so you can find it, and whether it happens on desktop, phones or both.</p>
+<p>Looks at every page the way a visitor does. Each page loads once in a small preview, then gets checked at ten screen widths, from a large monitor (1536px) down to a phone (400px), because some problems only appear at certain sizes. It finds:</p>
+<table>
+  <thead><tr><th>Problem</th><th>Push-ready fix?</th></tr></thead>
+  <tbody>
+    <tr><td>A word breaking in the middle ("Communicati" then "ons" on the next line)</td><td>Yes: makes the text a little smaller on the screen types where it breaks, so the word fits</td></tr>
+    <tr><td>Big gaps between the lines of a heading</td><td>Yes: tightens the line spacing to 1.2</td></tr>
+    <tr><td>Too much empty space at the top or bottom of a box</td><td>Yes: brings it down to 80px on desktop, 60px on tablets, 40px on phones</td></tr>
+    <tr><td>Logo or badge cut off by its box or carousel</td><td>Yes: fits it inside instead of cropping</td></tr>
+    <tr><td>Image squashed or stretched out of shape</td><td>Yes: shows it at its true shape</td></tr>
+    <tr><td>Image hanging out of the coloured box it sits in</td><td>Yes: caps it at its column width and removes any negative margin</td></tr>
+    <tr><td>Punctuation on its own line (a lone "." or "?")</td><td>Yes: removes the space or line break before it</td></tr>
+    <tr><td>The same word twice in a short heading</td><td>Yes, once you've reworded it in the box</td></tr>
+    <tr><td>A button or text that doesn't line up with the text above</td><td>Yes, when a left margin or padding is the cause</td></tr>
+    <tr><td>Much more space below the content than above</td><td>Yes: matches the bottom padding to the top</td></tr>
+    <tr><td>A box that isn't centred</td><td>Yes for containers. Older-style sections are listed with steps</td></tr>
+    <tr><td>Broken images, images with no alt text, wrapped buttons, cut-off text, anything past a phone screen</td><td>Listed with steps</td></tr>
+  </tbody>
+</table>
+<p>Press <span class="btn primary">Check every page</span> and stay on the hub page while it runs (about 15 seconds a page). Fixes go to the Fix queue. Each says where it is (the nearest heading) and whether it happens on desktop, phones or both. Each fix says the screen widths where the problem shows. Elementor has three screen types (desktop, tablet up to 1024px, phone up to 767px), and a fix only changes the screen types where the problem was found. A problem found only on phones changes the phone setting only.</p>
 <div class="note">It finds what it can measure. It won't judge design, such as one logo tile looking different from the others. Keep sending Claude screenshots of anything that looks off.</div>
 
 <h3>Keyword rankings, AI search visibility and Content plan</h3>
@@ -191,6 +201,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
 <h2 id="fixes">Fix queue</h2>
 <p>Everything the website needs, written by Claude or found by the checks. Nothing goes live until you approve it.</p>
 <h3>Reading a fix</h3>
+<p>Some text fixes say <b>Your new wording (change it, then push)</b>. The hub found the problem but the words are yours to choose, so it won't push until you've changed them.</p>
 <p>Each card shows a priority (<span class="chip bad">Critical</span> <span class="chip flag">High</span> <span class="chip info">Medium</span> <span class="chip">Low</span>), the type of fix, the area, and the page it's on. Most show <b>Now on the site</b> next to <b>Proposed</b>, so you can compare them. You can edit the proposed text before approving. <span class="btn">Reset to Claude's version</span> undoes your edits.</p>
 <h3>Types of fix</h3>
 <table>
@@ -201,6 +212,9 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td>Remove from page</td><td>Takes a block off the page. You choose exactly how much goes before it will push.</td></tr>
     <tr><td>Unpublish page</td><td>Turns a page into a draft.</td></tr>
     <tr><td>Image fix</td><td>How an image or carousel displays (fit, cropping, height). Nothing else on the page.</td></tr>
+    <tr><td>Layout fix</td><td>One element's margin, padding or maximum width, to line things up, centre a box or even out spacing. Other sides and settings are kept.</td></tr>
+    <tr><td>Text size fix</td><td>One element's font size or line spacing, per screen type. If it uses one of the site's global fonts, that font's settings are copied onto it first, so only the size or spacing changes.</td></tr>
+    <tr><td>Punctuation fix</td><td>Removes a space or line break before a full stop, question mark or similar. The words don't change.</td></tr>
     <tr><td>New page build</td><td>Copies an existing page's design into a new draft and fills it with new text. Gives you a preview link.</td></tr>
     <tr><td>Steps</td><td>Things the hub can't do itself yet. Follow the steps, then <span class="btn">Mark as done</span>.</td></tr>
   </tbody>
@@ -281,7 +295,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
   <li>In the hub, go to <b>Website &amp; SEO</b> and click <span class="btn">Copy page checker code</span>.</li>
   <li>In WordPress, go to <b>Snippets</b>, then <b>All Snippets</b>, and click <b>WPT Hub page checker</b>.</li>
   <li>Delete everything in the code box, paste, and click <b>Save Changes</b>.</li>
-  <li>Back in the hub, click <span class="btn">Save and test</span>. It shows the new version number.</li>
+  <li>Back in the hub, click <span class="btn">Save and test</span>. It shows the version number, which should be <b>10</b>.</li>
 </ol>
 <p>The page checker only reads your own site. It changes a page only when you approve a fix in the hub.</p>
 
@@ -304,7 +318,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td>"WordPress isn't connected"</td><td>Website &amp; SEO, Connect WordPress: enter the username and application password, then Save and test.</td></tr>
     <tr><td>"Check the username and application password"</td><td>Retype the username exactly as in WordPress, and paste a fresh application password.</td></tr>
     <tr><td>"Couldn't reach the site" or a 403 error</td><td>A security plugin or the host is blocking it. Ask Matt to allow application passwords.</td></tr>
-    <tr><td>"needs version 7" or "needs version 8", or "Pages aren't reporting back"</td><td><a href="#snippet">Update the WordPress code</a>, then try again.</td></tr>
+    <tr><td>"needs version 10" (or an earlier number), "Pages aren't reporting back", or "can only change image size and cropping settings"</td><td><a href="#snippet">Update the WordPress code</a>, then try again.</td></tr>
     <tr><td>"The text this fix looks for isn't on the page any more"</td><td>Someone has already changed that text. If it's sorted, use Mark as done. If not, ask Claude to rewrite the fix.</td></tr>
     <tr><td>"The page has been edited since this fix went live"</td><td>Undo would also remove the later edits. Undo anyway, or roll back with Revisions in Elementor.</td></tr>
     <tr><td>Found it, but "built with a different Elementor widget"</td><td>Send Claude the message. It will rewrite the fix for that widget.</td></tr>
@@ -313,7 +327,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td>Something pushed live looks wrong</td><td>Fix queue, Done tab: click Undo twice. Then tell Claude what happened.</td></tr>
   </tbody>
 </table>
-<p class="eyebrow" style="margin-top:40px">Written for hub version 0.15.1 · 16 October 2026. Open it any time from <b>User guide</b> in the hub's page list.</p>
+<p class="eyebrow" style="margin-top:40px">Written for hub version 0.17.0 · 16 October 2026. Open it any time from <b>User guide</b> in the hub's page list.</p>
 </main>
 </div>
 </body>

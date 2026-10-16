@@ -3,7 +3,7 @@ const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(name){const i=src.indexOf('function '+name+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(name){const i=src.indexOf('var '+name+' =');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+2);}}}
 global.window={WPT_PROPOSALS:[{type:'elementor_style',link:'https://westpiertech.com/',find:'engineer-new-logo-wpt-edit-with-cert-number-underneath'}]};
-eval(['norm','shortPath','buildDisplayFixes'].map(grab).join('\n')+grabVar('DISPLAY_KIND')+grabVar('FIT_SET'));
+eval(['norm','shortPath','modeOf','describeModes','buildDisplayFixes'].map(grab).join('\n')+grabVar('DISPLAY_KIND')+grabVar('FIT_SET')+grabVar('SFX'));
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const rep=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 const phone=rep.issues.filter(i=>i.kind!=='button_wrap');
