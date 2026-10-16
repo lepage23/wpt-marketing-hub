@@ -6,6 +6,10 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.15.3 · 2026-10-16 14:25 BST
+
+- Clearer message when a carousel image fix is pushed with an older copy of the page checker code: it says to copy the code again and check it says version 8.
+
 ## v0.15.2 · 2026-10-16 14:10 BST
 
 - **User guide** is now a page in the hub's page list. It shows the guide inside the hub, with **Open in a new tab** if you want it side by side.
