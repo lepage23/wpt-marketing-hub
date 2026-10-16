@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.12.2";
-  var BUILT = "2026-10-16 11:15 BST";
+  var VERSION = "0.12.3";
+  var BUILT = "2026-10-16 11:35 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2184,7 +2184,76 @@
     return card;
   }
 
+
+  /* The claims check card: one row per page still making a false claim, each with the fix that clears it.
+     Push from here, or check again. No "mark as done": the card goes when the site is clean. */
+  function claimFixFor(page, s) {
+    var all = proposals().filter(function (x) {
+      return x.id !== "auto-claims" && !x.example && x.type !== "manual" && x.type !== "page_build" && norm(x.link) === norm(page.link) && !(s[x.id] && s[x.id].status && s[x.id].status !== "undone");
+    });
+    return all[0] || null;
+  }
+  function claimsCard(p, st, redraw) {
+    var s = fixState(), pages = p.pages || [];
+    var card = el('<article class="panel fix"></article>');
+    card.innerHTML =
+      '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' + headChips(p, st).replace(">Steps<", ">Claims check<") +
+      "<h2>" + esc(p.issue) + "</h2></div>" +
+      '<span class="mono muted" style="font-size:.75rem">Last checked ' + esc(p.created || "") + "</span></div>" +
+      '<p style="font-size:.9rem"><b>Why it matters:</b> ' + esc(p.why) + "</p>" +
+      '<div class="claim-rows"></div>' +
+      '<div class="fix-actions row"><button type="button" class="btn primary recheck">Check the site again now</button><button type="button" class="btn rej">Not doing this</button>' +
+      '<span class="muted" style="font-size:.86rem">Pages that are now clean drop off. The card goes when none are left.</span></div><div class="fix-msg"></div>';
+    var rowsBox = card.querySelector(".claim-rows"), msg = card.querySelector(".fix-msg");
+    pages.forEach(function (pg) {
+      var fix = claimFixFor(pg, s);
+      var row = el('<div class="claim-row"><div class="claim-what"><a href="' + esc(pg.link) + '" target="_blank" rel="noopener"><b>' + esc(pg.title) + '</b></a><div class="muted" style="font-size:.82rem">' + esc(pg.note) + "</div>" +
+        (fix ? '<div style="font-size:.84rem;margin-top:4px"><b>Fix:</b> ' + esc(TYPE_LABEL[fix.type] || fix.type) + (fix.type === "set_status" ? " (saved as a draft, nothing deleted, Undo puts it back)" : fix.proposed ? ": “" + esc(String(fix.proposed).slice(0, 140)) + "”" : "") + "</div>" : "") +
+        '</div><div class="claim-act"></div></div>');
+      var act = row.querySelector(".claim-act");
+      var donePush = proposals().filter(function (x) { return x.id !== "auto-claims" && norm(x.link) === norm(pg.link) && s[x.id] && s[x.id].status === "pushed"; })[0];
+      if (!fix && donePush) {
+        act.innerHTML = '<span class="chip good">Fix pushed ' + esc(s[donePush.id].pushedAt || "") + '</span><div class="muted" style="font-size:.8rem;margin-top:4px">Check again to clear it.</div>';
+      } else if (!fix) {
+        act.innerHTML = '<span class="muted" style="font-size:.84rem">No fix written yet. Ask Claude for one, or add a replacement rule on Website &amp; SEO.</span>';
+      } else if (fix.type === "elementor_remove" && (fixState()[fix.id] || {}).level == null) {
+        act.innerHTML = '<a class="btn small" href="#fixes" data-jump="' + esc(fix.id) + '">Choose what to remove</a>';
+      } else {
+        var label = fix.type === "set_status" ? "Push: unpublish page" : "Push the fix";
+        act.innerHTML = '<button type="button" class="btn small primary">' + label + "</button>";
+        var b = act.querySelector("button");
+        b.addEventListener("click", function () {
+          if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Click again to push"; return; }
+          b.disabled = true; b.textContent = "Pushing…";
+          var cur = fixState()[fix.id] || {};
+          pushFix(fix, cur.edited != null ? cur.edited : fix.proposed).then(function (r) {
+            var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+            setFix(fix.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || fix.pageId, backup: r.backup || "" });
+            logChange({ id: fix.id, when: when, page: fix.pageTitle, link: fix.link, type: TYPE_LABEL[fix.type], action: fix.type === "set_status" ? "Unpublished" : "Pushed live" });
+            act.innerHTML = '<span class="chip good">Done</span>';
+            toast(fix.type === "set_status" ? "Page unpublished. Undo is in Done." : "Live on the site");
+            updateNav();
+          }).catch(function (err) {
+            b.disabled = false; delete b.dataset.sure; b.textContent = label;
+            msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
+          });
+        });
+      }
+      rowsBox.appendChild(row);
+    });
+    card.querySelector(".recheck").addEventListener("click", function () {
+      var b = card.querySelector(".recheck"); b.disabled = true; b.textContent = "Checking every page…";
+      runClaimsCheck().then(function (left) {
+        toast(left.length ? left.length + " page" + (left.length > 1 ? "s" : "") + " still to fix" : "All clear. No false claims found.");
+        redraw(); updateNav();
+      }).catch(function (err) { b.disabled = false; b.textContent = "Check the site again now"; msg.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+    });
+    card.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    return card;
+  }
+
   function fixCard(p, st, redraw) {
+    if (p.id === "auto-claims" && !st.status) return claimsCard(p, st, redraw);
     if (p.type === "manual") return manualCard(p, st, redraw);
     if (p.type === "page_build") return buildCard(p, st, redraw);
     var text = st.edited != null ? st.edited : p.proposed;

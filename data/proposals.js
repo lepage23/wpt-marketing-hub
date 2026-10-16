@@ -136,16 +136,16 @@ window.WPT_PROPOSALS = [
   "type": "set_status",
   "status": "draft",
   "size": "big",
-  "priority": "medium",
+  "priority": "critical",
   "category": "Content",
   "postType": "pages",
   "pageId": 0,
   "pageTitle": "NHS BPF",
   "link": "https://westpiertech.com/nhs-better-purchasing-framework/",
-  "issue": "ON HOLD until the new NHS page is live: then this becomes a redirect",
+  "issue": "Unpublish the NHS BPF page now (redirect it to the new NHS page later)",
   "current": "Published. It's set to noindex, so Google hides it, but anyone with the link can still read it, and the Healthcare page links to it.",
   "proposed": "Unpublished (saved as a draft). Nothing is deleted. Undo puts it straight back.",
-  "why": "Don't approve this yet. The plan is a new, honest NHS page (see the Mitel fix in this queue), then a redirect from this old address to it, so links and any ranking value carry across. The page is already hidden from Google and the Healthcare page no longer links to it."
+  "why": "This page says WPT is one of 30 approved suppliers on the NHS Better Purchasing Framework. That isn't true, and anyone with the link can still read it. Unpublishing saves it as a draft: nothing is deleted and Undo puts it back. Once the new NHS page is live, this old address gets a redirect to it so links carry across."
  },
  {
   "id": "b2-01",

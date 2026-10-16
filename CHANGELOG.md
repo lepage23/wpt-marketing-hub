@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.12.3 · 2026-10-16 11:35 BST
+
+Claims check card pushes fixes.
+
+- The "pages still make claims" card no longer has Mark as done. Each page gets its own row with the fix that clears it and a **Push the fix** button (click twice to confirm). Pages whose fix has already gone live say **Fix pushed** with the date.
+- **Check the site again now** re-runs the claims check straight away. Clean pages drop off, and the card goes when none are left.
+- The NHS BPF Unpublish fix is no longer on hold. It's critical, and the wording now says unpublish now, redirect to the new NHS page later.
+- 185 tests, all passing.
+
 ## v0.12.2 · 2026-10-16 11:15 BST
 
 Lead briefs.

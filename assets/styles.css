@@ -208,3 +208,8 @@ tr.detail td { background: var(--sunk); border-bottom: 1px solid var(--line); }
 tr.detail textarea.detail-box { width: 100%; min-height: 160px; max-height: 520px; resize: vertical; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; font: .88rem/1.5 var(--font-body); color: var(--fg); }
 table.compact td.row-lead .btn.has { border-color: var(--accent); color: var(--accent); }
 tr.open > td { border-bottom-color: transparent; }
+.claim-rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); }
+.claim-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.claim-row:last-child { border-bottom: 0; }
+.claim-what { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .claim-row { grid-template-columns: 1fr; } }
