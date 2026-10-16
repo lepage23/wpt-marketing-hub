@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.15.2 · 2026-10-16 14:10 BST
+
+- **User guide** is now a page in the hub's page list. It shows the guide inside the hub, with **Open in a new tab** if you want it side by side.
+
+## v0.15.1 · 2026-10-16 14:00 BST
+
+- **USER-GUIDE.html** in the main folder: how to use every page, which buttons change the website, saving versions in GitHub Desktop, updating the WordPress code, where data lives and what to do when something goes wrong. Linked as **User guide** at the bottom of the hub's left bar.
+- The WordPress connection box now says when the page checker is older than version 8 (needed for the display check).
+
 ## v0.15.0 · 2026-10-16 13:30 BST
 
 Display check: finds visual problems on every page, not just the ones you spot.

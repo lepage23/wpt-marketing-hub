@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketing Hub User Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #F3F5F7; --surface: #FFFFFF; --sunk: #E8ECF0; --line: #D3DAE1; --fg: #16232E; --muted: #5B6B78;
+  --rail: #12334A; --rail-fg: #DCE7EF; --rail-muted: #8FA9BC; --accent: #1F6F9A; --accent-soft: #DCEBF4;
+  --flag: #B86A00; --flag-soft: #FBEBD2; --good: #2E7D4F; --good-soft: #DDF0E4; --bad: #B23A3A; --bad-soft: #F7DEDE;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E171E; --surface: #15222C; --sunk: #1B2B37; --line: #2A3C4A; --fg: #E3EAF0; --muted: #93A6B5;
+    --rail: #0A1319; --accent: #5BB0DE; --accent-soft: #17364A; --flag: #F0A63C; --flag-soft: #3A2A12;
+    --good: #5CC489; --good-soft: #163626; --bad: #F07A7A; --bad-soft: #3E1C1C; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 16px; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--font-body); }
+.layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+nav.toc { background: var(--rail); color: var(--rail-fg); padding: 24px 18px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+nav.toc b { font-family: var(--font-display); font-size: 1.05rem; display: block; }
+nav.toc .sub { font-size: .78rem; color: var(--rail-muted); display: block; margin-bottom: 18px; }
+nav.toc a { display: block; color: var(--rail-fg); text-decoration: none; padding: 5px 8px; border-radius: var(--radius); font-size: .9rem; }
+nav.toc a:hover { background: rgba(255,255,255,.08); }
+nav.toc .grp { font: 600 .68rem var(--font-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--rail-muted); margin: 16px 8px 4px; }
+main { padding: 40px max(16px, 4vw) 80px; max-width: 900px; min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; }
+h1 { font-size: 2.1rem; margin: 0 0 8px; }
+h2 { font-size: 1.45rem; margin: 52px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+h3 { font-size: 1.08rem; margin: 26px 0 8px; }
+p, li { max-width: 70ch; }
+a { color: var(--accent); }
+.lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 24px; }
+.eyebrow { font: 600 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 14px 0; }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 var(--radius) var(--radius) 0; margin: 14px 0; }
+.warn { border-left: 3px solid var(--flag); background: var(--flag-soft); padding: 10px 14px; border-radius: 0 var(--radius) var(--radius) 0; margin: 14px 0; }
+.btn { display: inline-block; font: 500 .82rem var(--font-body); border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 1px 8px; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.chip { display: inline-block; font: 600 .7rem var(--font-mono); padding: 2px 8px; border-radius: 99px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); } .chip.flag { background: var(--flag-soft); color: var(--flag); }
+.chip.info { background: var(--accent-soft); color: var(--accent); } .chip.good { background: var(--good-soft); color: var(--good); }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; margin: 12px 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--sunk); }
+tr:last-child td { border-bottom: 0; }
+code, kbd { font: .86rem var(--font-mono); background: var(--sunk); padding: 1px 5px; border-radius: 4px; }
+ol.steps { counter-reset: s; list-style: none; padding-left: 0; }
+ol.steps > li { counter-increment: s; position: relative; padding-left: 38px; margin: 10px 0; }
+ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--rail); color: #fff; font: 600 .8rem/26px var(--font-mono); text-align: center; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.grid .card { margin: 0; }
+.grid .card h3 { margin-top: 0; }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; }
+  table { display: block; overflow-x: auto; }
+}
+@media print { nav.toc { display: none; } .layout { display: block; } h2 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <b>Marketing Hub</b><span class="sub">User guide · West Pier Technologies</span>
+  <div class="grp">Start here</div>
+  <a href="#what">What the hub is</a>
+  <a href="#opening">Opening it</a>
+  <a href="#daily">A normal day</a>
+  <a href="#safety">What's safe to click</a>
+  <div class="grp">Pages</div>
+  <a href="#today">Today</a>
+  <a href="#seo">Website &amp; SEO</a>
+  <a href="#fixes">Fix queue</a>
+  <a href="#jobs">Your jobs</a>
+  <a href="#leads">Leads</a>
+  <a href="#email">Email campaigns</a>
+  <a href="#chat">Live chat</a>
+  <a href="#brief">Weekly brief</a>
+  <a href="#inbox">Inbox triage</a>
+  <div class="grp">Working with Claude</div>
+  <a href="#claude">Asking for changes</a>
+  <a href="#github">Saving versions (GitHub)</a>
+  <a href="#snippet">Updating the WordPress code</a>
+  <div class="grp">Help</div>
+  <a href="#data">Where your data lives</a>
+  <a href="#problems">When something goes wrong</a>
+</nav>
+
+<main>
+<span class="eyebrow">User guide</span>
+<h1>WPT Marketing Hub</h1>
+<p class="lede">How to use the hub day to day: what each page does, which buttons change the website, and what to do when something doesn't work.</p>
+
+<h2 id="what">What the hub is</h2>
+<p>The hub is your home page for marketing. With no sales team, the website and email are where new leads come from, so the hub keeps the website in shape, tracks every lead you pass to Garry, and keeps campaigns and the weekly brief in one place.</p>
+<p>It's a page that runs in your browser from a folder on your laptop. There's nothing to install and no login. It talks to the website through WordPress, using a password you set up once.</p>
+<div class="grid">
+  <div class="card"><h3>It can change the website</h3><p>Only when you press a button that says so, such as <span class="btn primary">Approve and push live</span>. Every change keeps a backup and has an Undo.</p></div>
+  <div class="card"><h3>It reads everything else</h3><p>The audit, Search Console, Google Analytics, the mobile check and the display check only look. They never change anything.</p></div>
+</div>
+
+<h2 id="opening">Opening it</h2>
+<ol class="steps">
+  <li>Open the folder <code>Desktop\GitHUB\WPT Marketing HUB\wpt-marketing-hub</code>.</li>
+  <li>Double-click <code>index.html</code>. It opens in your browser.</li>
+  <li>Bookmark it, or set it as your browser's start page so it's the first thing you see.</li>
+</ol>
+<p>The page list is down the left, with this guide at the bottom as <b>User guide</b>. Orange numbers next to a page show how many things are waiting there. The version and build time are at the bottom of the left bar, with a button to switch between light and dark.</p>
+<div class="note">Always use the same browser on the same laptop. Your leads, campaigns and settings are saved in that browser. See <a href="#data">Where your data lives</a>.</div>
+
+<h2 id="daily">A normal day</h2>
+<ol class="steps">
+  <li><b>Today.</b> See which lead actions are due and what's flagged.</li>
+  <li><b>Leads.</b> Paste in any new enquiry with Quick add, so Garry has it. Update the status of anything that's moved on.</li>
+  <li><b>Fix queue.</b> Approve a few website fixes. Critical ones first.</li>
+  <li><b>Your jobs.</b> Pick off anything only you can do, like an image or a fact to confirm.</li>
+</ol>
+<p>Once a week:</p>
+<ul>
+  <li><b>Monday:</b> run the weekly brief, save it, and pick a blog idea.</li>
+  <li><b>Website &amp; SEO:</b> run the page audit, the mobile check and the display check, then deal with what they put in the Fix queue.</li>
+  <li><b>Email campaigns:</b> import results from any send that's had three days to settle.</li>
+</ul>
+
+<h2 id="safety">What's safe to click</h2>
+<table>
+  <thead><tr><th>Button</th><th>What happens</th></tr></thead>
+  <tbody>
+    <tr><td><span class="btn primary">Approve and push live</span><br><span class="btn primary">Push the fix</span><br><span class="btn primary">Approve and fix the image</span></td><td>Changes the live website. A backup is kept, and Undo puts it back.</td></tr>
+    <tr><td><span class="btn primary">Approve and unpublish</span></td><td>Turns a page into a draft. Nothing is deleted. Undo republishes it.</td></tr>
+    <tr><td><span class="btn primary">Push new page build for review</span></td><td>Makes a new <b>draft</b> page. Never live until you publish it in WordPress.</td></tr>
+    <tr><td><span class="btn">Run audit now</span>, <span class="btn">Check every page</span>, <span class="btn">Run mobile check on all pages</span>, <span class="btn">Refresh</span>, <span class="btn">Check the look</span></td><td>Read-only. Safe any time.</td></tr>
+    <tr><td><span class="btn">Mark as done</span>, <span class="btn">Not doing this</span>, <span class="btn">Reject</span></td><td>Only tidies the hub. Nothing on the website changes. <span class="btn">Put back in the queue</span> reverses it.</td></tr>
+    <tr><td><span class="btn">Remove</span> (Leads)</td><td>Deletes that lead from the hub after you confirm. Use Download CSV first if you want a copy.</td></tr>
+  </tbody>
+</table>
+<p>Fixes marked <span class="chip flag">Big change</span> ask you to tick a box confirming you've read them before they'll push.</p>
+
+<h2 id="today">Today</h2>
+<p>Pulls together what needs you from the other pages: lead next steps that are due or overdue, flagged emails, and how many fixes and jobs are waiting. Click through to deal with each one.</p>
+
+<h2 id="seo">Website &amp; SEO</h2>
+<p>The biggest page. Everything on it reads the live site. Fixes it finds go to the Fix queue rather than being made here.</p>
+
+<h3>Connect WordPress</h3>
+<p>Set up once, using an application password from WordPress. Full steps are in <code>docs\SETUP-WORDPRESS.md</code>. When it's working, the box shows who you're signed in as and a green <span class="chip good">Page checker ready</span>, with the version number. If it says the page checker is out of date, follow <a href="#snippet">Updating the WordPress code</a>.</p>
+
+<h3>Page audit</h3>
+<p>Press <span class="btn">Run audit now</span>. It reads every page and post and checks SEO titles, meta descriptions, headings, redirects, word count, schema and more. Problems become fixes in the Fix queue. Run it weekly, and again after a batch of fixes to confirm they've cleared.</p>
+<p>The audit also runs the <b>claims check</b>: it searches every page for claims you've said aren't true (BPF, for example). You can change that list on this page. You can also add <b>automatic replacements</b> such as <code>wrong phrase =&gt; right phrase</code>, and every page using the wrong phrase becomes a push-ready fix.</p>
+
+<h3>Search performance and Website traffic</h3>
+<p>Clicks, searches and positions from Google Search Console (through Rank Math), and visits and leads from Google Analytics 4. Press <span class="btn">Refresh</span> to update. Pages that get seen but not clicked, and pages sitting just off page one, become fixes.</p>
+
+<h3>Mobile and speed</h3>
+<p>Runs Google's own mobile test on every live page: speed, accessibility and SEO scores, plus anything Google flags. Add the free API key (steps on the page) so it can check every page without hitting Google's limit. Takes 15 to 30 seconds a page.</p>
+
+<h3>Display check</h3>
+<p>Looks at every page the way a visitor does, at desktop size and then phone size, in a small preview on the page. It finds:</p>
+<ul>
+  <li>logos and badges cut off by their box or carousel</li>
+  <li>images squashed or stretched out of shape</li>
+  <li>broken images, and images with no alt text</li>
+  <li>button text wrapping onto two lines</li>
+  <li>text cut off by its box, and anything sticking out past a phone screen</li>
+</ul>
+<p>Press <span class="btn primary">Check every page</span> and stay on the hub page while it runs (about 10 seconds a page). Squashed and cut-off images become push-ready fixes. Everything else is listed by page, with the nearest heading so you can find it, and whether it happens on desktop, phones or both.</p>
+<div class="note">It finds what it can measure. It won't judge design, such as one logo tile looking different from the others. Keep sending Claude screenshots of anything that looks off.</div>
+
+<h3>Keyword rankings, AI search visibility and Content plan</h3>
+<p>Tables you fill in. Rankings: the searches you want to win and where you sit. AI search visibility: questions buyers ask ChatGPT, Google AI Overviews and the rest, and whether WPT gets named. Content plan: new pages, rewrites and blog posts, including blog ideas approved from the weekly brief.</p>
+
+<h3>Find text on the site</h3>
+<p>Searches every published page and post, including Elementor pages, for any words. Handy for checking where a claim, a product name or an old phone number appears.</p>
+
+<h3>Change log</h3>
+<p>Every change the hub has made to the website, newest first: what, where and when, including undos.</p>
+
+<h2 id="fixes">Fix queue</h2>
+<p>Everything the website needs, written by Claude or found by the checks. Nothing goes live until you approve it.</p>
+<h3>Reading a fix</h3>
+<p>Each card shows a priority (<span class="chip bad">Critical</span> <span class="chip flag">High</span> <span class="chip info">Medium</span> <span class="chip">Low</span>), the type of fix, the area, and the page it's on. Most show <b>Now on the site</b> next to <b>Proposed</b>, so you can compare them. You can edit the proposed text before approving. <span class="btn">Reset to Claude's version</span> undoes your edits.</p>
+<h3>Types of fix</h3>
+<table>
+  <thead><tr><th>Type</th><th>What it changes</th></tr></thead>
+  <tbody>
+    <tr><td>SEO title, Meta description</td><td>What shows in Google's results for that page.</td></tr>
+    <tr><td>Page text change, Phrase change</td><td>Words on the page. A phrase change swaps only the words named and leaves the rest of the paragraph alone.</td></tr>
+    <tr><td>Remove from page</td><td>Takes a block off the page. You choose exactly how much goes before it will push.</td></tr>
+    <tr><td>Unpublish page</td><td>Turns a page into a draft.</td></tr>
+    <tr><td>Image fix</td><td>How an image or carousel displays (fit, cropping, height). Nothing else on the page.</td></tr>
+    <tr><td>New page build</td><td>Copies an existing page's design into a new draft and fills it with new text. Gives you a preview link.</td></tr>
+    <tr><td>Steps</td><td>Things the hub can't do itself yet. Follow the steps, then <span class="btn">Mark as done</span>.</td></tr>
+  </tbody>
+</table>
+<h3>Tabs and filter</h3>
+<p><b>Waiting for you</b> is what's left to do. <b>Done</b> holds pushed fixes, each with its Undo. <b>Not doing</b> holds what you've rejected, and any of them can go back in the queue. The area filter (Content, Mobile, Structure and so on) narrows the list.</p>
+<h3>The claims card</h3>
+<p>Lists every page still making a false claim, each with its own <span class="btn primary">Push the fix</span>. Pages already fixed say <span class="chip good">Fix pushed</span>. <span class="btn primary">Check the site again now</span> re-runs the check, and the card disappears once the site is clean.</p>
+<h3>New page builds</h3>
+<p>Press <span class="btn">Check the look</span> to see the fonts, sizes and colours the new page will copy. When Claude has written the page, <span class="btn primary">Push new page build for review</span> makes the draft and gives you <span class="btn">Preview the draft</span> and <span class="btn">Edit in Elementor</span>. You need to be logged in to WordPress in the same browser to see the preview. <span class="btn">Bin this draft</span> moves it to the WordPress bin.</p>
+<h3>Undo</h3>
+<p>On any pushed fix, click <span class="btn">Undo</span> twice. If the page has been edited since, the hub warns you, because undoing would also remove those later edits. You can still go ahead, or use Revisions in Elementor instead.</p>
+
+<h2 id="jobs">Your jobs</h2>
+<p>Things only you can do: make an image in Canva at the size given, confirm a fact, get a sign-off from Garry. Claude adds to this list with each batch of fixes. Set each one to Doing or Done as you go.</p>
+
+<h2 id="leads">Leads</h2>
+<p>Every lead you pass to Garry, so you both know where each one stands.</p>
+<h3>Quick add</h3>
+<ol class="steps">
+  <li>Paste a lead into the box. Any of these work: a website form email, an ordinary email or a whole email thread, a call brief, or a rough note like <code>Michael Smith - Guitartech shop - London - 07432345434 - wants 3CX - 14 users</code>.</li>
+  <li>Click <span class="btn primary">Add lead</span>, or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>.</li>
+  <li>Check the new row. Fix any cell by clicking into it.</li>
+</ol>
+<p>It fills in the date, company, contact, phone and email, source and what they want. It sets the owner to Garry, the status to New and the chase date to the next working day. It skips WPT's own people, phone numbers and signatures. If the lead's already in (same email or company), it warns you rather than adding it twice.</p>
+<h3>The tracker</h3>
+<p>Each row is a short summary. Press <span class="btn">Brief</span> at the start of a row to open the <b>Lead brief</b>: the full story pasted in, which you can edit. <span class="btn">Hide</span> closes it. <span class="btn">Remove</span> deletes the lead after you click again to confirm.</p>
+<p>The counts across the top show how many leads are at each status. Keep the status, next step and next step date up to date and the Today page will remind you when things are due.</p>
+<div class="warn"><b>Garry can't see this list yet.</b> It's saved in your browser only. Use <span class="btn">Copy as CSV</span> or <span class="btn">Download CSV</span> to send it to him. Both include the lead briefs.</div>
+
+<h2 id="email">Email campaigns</h2>
+<p>One row per send, with opens, clicks, bounces and unsubscribes. The rates work themselves out. Contact lists come out of Quistor as spreadsheets and go into iContact:</p>
+<ol class="steps">
+  <li>Export the list from Quistor.</li>
+  <li>Clean it: duplicates, role addresses (info@, sales@) and opt-outs.</li>
+  <li>Upload to iContact and send.</li>
+  <li>After three days, export the results from iContact and import the CSV here, under <b>Import an iContact results export</b>.</li>
+  <li>Anyone who clicked is worth passing to Leads for Garry.</li>
+</ol>
+
+<h2 id="chat">Live chat</h2>
+<p>A log of website chats, ready for the 8x8 AI chatbot replacing the current one. Mark a chat's outcome, and for a real enquiry press <span class="btn">Send to Leads</span> to put it straight into the lead tracker for Garry. The page shows how many chats turned into leads.</p>
+
+<h2 id="brief">Weekly brief</h2>
+<ol class="steps">
+  <li>Every Monday, copy the brief prompt from this page into Claude or ChatGPT.</li>
+  <li>Paste the finished brief into <b>This week's brief</b> and click <span class="btn primary">Save brief</span>. Past briefs stay listed underneath.</li>
+  <li>Add the strongest items as <b>Blog ideas</b>, with the search each post should win. Press <span class="btn">Approve</span> on one and it moves to the Content plan on Website &amp; SEO.</li>
+</ol>
+
+<h2 id="inbox">Inbox triage</h2>
+<p>For the emails that need you, in order: leads, then partners (8x8, Gamma, 3CX, Zoom Phone), then complaints, then important updates. It will only ever have read-only access. It will never send, reply, delete or move an email.</p>
+<div class="note">Outlook isn't connected yet. It needs a Microsoft 365 connection with read-only mail permission, which Matt will need to approve. Until then, log anything you want tracked in the Flagged emails table.</div>
+
+<h2 id="claude">Asking Claude for changes</h2>
+<p>New fixes, features and fixes to the hub itself come from Claude. The quickest way:</p>
+<ul>
+  <li>Say what you want in plain words. Screenshots help a lot, especially of the website.</li>
+  <li>For a fix card that only has steps, ask Claude to make it push-ready.</li>
+  <li>If something in the hub looks wrong, copy the card or the error message into the chat.</li>
+</ul>
+<p>Claude writes changes straight into the hub folder. Refresh the hub page to see them. The version number at the bottom of the left bar goes up each time.</p>
+
+<h2 id="github">Saving versions (GitHub)</h2>
+<p>Changes are on your laptop as soon as Claude makes them. GitHub keeps restore points and an online copy, in case something breaks or the laptop dies.</p>
+<ol class="steps">
+  <li>Open <b>GitHub Desktop</b>. The changed files are listed on the left.</li>
+  <li>If there are changes, type a short label in <b>Summary</b>. Claude gives you one at the end of each change, for example <code>v0.15.0 display check on every page</code>.</li>
+  <li>Click <span class="btn primary">Commit to main</span>.</li>
+  <li>Click <span class="btn">Push origin</span> at the top.</li>
+</ol>
+<p>If Claude worked in a session running on your laptop, the commit is already done and you only need to Push. The yellow warning about LF and CRLF line endings is harmless.</p>
+<p>Every version is listed in <code>CHANGELOG.md</code> in this folder, with the date and time and what changed.</p>
+
+<h2 id="snippet">Updating the WordPress code</h2>
+<p>Some features need a small piece of code in WordPress, called the <b>page checker</b>. When Claude says it needs updating, or the hub says <span class="chip bad">Page checker out of date</span>:</p>
+<ol class="steps">
+  <li>In the hub, go to <b>Website &amp; SEO</b> and click <span class="btn">Copy page checker code</span>.</li>
+  <li>In WordPress, go to <b>Snippets</b>, then <b>All Snippets</b>, and click <b>WPT Hub page checker</b>.</li>
+  <li>Delete everything in the code box, paste, and click <b>Save Changes</b>.</li>
+  <li>Back in the hub, click <span class="btn">Save and test</span>. It shows the new version number.</li>
+</ol>
+<p>The page checker only reads your own site. It changes a page only when you approve a fix in the hub.</p>
+
+<h2 id="data">Where your data lives</h2>
+<table>
+  <thead><tr><th>What</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>The hub itself, and fixes Claude writes</td><td>The folder on your laptop, backed up to GitHub when you push.</td></tr>
+    <tr><td>Leads, campaigns, chats, briefs, tables you fill in, which fixes you've pushed</td><td>Your browser on this laptop only. Not on GitHub.</td></tr>
+    <tr><td>WordPress application password, API keys</td><td>Your browser on this laptop only. Never in the folder or on GitHub.</td></tr>
+    <tr><td>Website changes</td><td>WordPress, with a backup of the page kept before each change.</td></tr>
+  </tbody>
+</table>
+<div class="warn">Clearing your browser's history and site data, or switching browser, wipes the browser part. Use <span class="btn">Download CSV</span> on the Leads page regularly as a backup.</div>
+
+<h2 id="problems">When something goes wrong</h2>
+<table>
+  <thead><tr><th>You see</th><th>Do this</th></tr></thead>
+  <tbody>
+    <tr><td>"WordPress isn't connected"</td><td>Website &amp; SEO, Connect WordPress: enter the username and application password, then Save and test.</td></tr>
+    <tr><td>"Check the username and application password"</td><td>Retype the username exactly as in WordPress, and paste a fresh application password.</td></tr>
+    <tr><td>"Couldn't reach the site" or a 403 error</td><td>A security plugin or the host is blocking it. Ask Matt to allow application passwords.</td></tr>
+    <tr><td>"needs version 7" or "needs version 8", or "Pages aren't reporting back"</td><td><a href="#snippet">Update the WordPress code</a>, then try again.</td></tr>
+    <tr><td>"The text this fix looks for isn't on the page any more"</td><td>Someone has already changed that text. If it's sorted, use Mark as done. If not, ask Claude to rewrite the fix.</td></tr>
+    <tr><td>"The page has been edited since this fix went live"</td><td>Undo would also remove the later edits. Undo anyway, or roll back with Revisions in Elementor.</td></tr>
+    <tr><td>Found it, but "built with a different Elementor widget"</td><td>Send Claude the message. It will rewrite the fix for that widget.</td></tr>
+    <tr><td>A lead comes in with the wrong name or company</td><td>Edit the cell. If it keeps happening with a certain kind of email, paste that email to Claude.</td></tr>
+    <tr><td>A new feature doesn't appear</td><td>Refresh the hub page. Check the version number at the bottom of the left bar.</td></tr>
+    <tr><td>Something pushed live looks wrong</td><td>Fix queue, Done tab: click Undo twice. Then tell Claude what happened.</td></tr>
+  </tbody>
+</table>
+<p class="eyebrow" style="margin-top:40px">Written for hub version 0.15.1 · 16 October 2026. Open it any time from <b>User guide</b> in the hub's page list.</p>
+</main>
+</div>
+</body>
+</html>

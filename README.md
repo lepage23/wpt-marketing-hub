@@ -6,6 +6,8 @@ Connor's daily home page for West Pier Technologies marketing. Website and SEO a
 
 Open `index.html` in a browser. No install, no build step.
 
+New to the hub? Read `USER-GUIDE.html` (also the User guide page in the hub).
+
 ## Pages
 
 | Page | What it does |

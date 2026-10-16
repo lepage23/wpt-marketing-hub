@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.15.0";
-  var BUILT = "2026-10-16 13:30 BST";
+  var VERSION = "0.15.2";
+  var BUILT = "2026-10-16 14:10 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -207,8 +207,17 @@
     { id: "email", label: "Email campaigns", render: renderEmail },
     { id: "chat", label: "Live chat", render: renderChat },
     { id: "brief", label: "Weekly brief", render: renderBrief },
-    { id: "inbox", label: "Inbox triage", render: renderInbox }
+    { id: "inbox", label: "Inbox triage", render: renderInbox },
+    { id: "guide", label: "User guide", render: renderGuide }
   ];
+
+  /* The user guide (USER-GUIDE.html in this folder), shown inside the hub. */
+  function renderGuide(main) {
+    main.innerHTML = head("How to use the hub", "User guide", "Every page, which buttons change the website, and what to do when something goes wrong.",
+      '<a class="btn" href="USER-GUIDE.html" target="_blank" rel="noopener">Open in a new tab</a>');
+    var frame = el('<iframe class="guide-frame" src="USER-GUIDE.html" title="User guide"></iframe>');
+    main.appendChild(frame);
+  }
 
   function head(eyebrow, title, sub, right) {
     return '<div class="page-head"><div><div class="eyebrow">' + esc(eyebrow) + "</div><h1>" + esc(title) + "</h1>" +
@@ -1141,7 +1150,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
-      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion >= 5 && a.checkerVersion < 7 ? '<span class="chip flag">Page checker version ' + a.checkerVersion + ' (7 adds page builds and image fixes)</span><div class="s" style="margin-top:4px">Everything else works. To use Push new page build and image fixes, replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion >= 5 && a.checkerVersion < 8 ? '<span class="chip flag">Page checker version ' + a.checkerVersion + ' (8 adds the display check, image fixes and page builds)</span><div class="s" style="margin-top:4px">Everything else works. To use the display check, image fixes and Push new page build, replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }
