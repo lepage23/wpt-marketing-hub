@@ -3,7 +3,7 @@ const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(name){const i=src.indexOf('function '+name+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(name){const i=src.indexOf('var '+name+' =');return src.slice(i,src.indexOf(';\n',i)+1);}
 const today=()=>'2026-10-16';
-eval(['FORM_LABELS','PRODUCTS','PLACES','OWN','SIGNOFF'].map(grabVar).join('\n')+['isoDate','addWorkDays','findProducts','titleCase','tidyMsg','nameFromEmail','companyFromEmail','clip','parseLead','sameLead'].map(grab).join('\n'));
+eval(['FORM_LABELS','PRODUCTS','PLACES','OWN','SIGNOFF'].map(grabVar).join('\n')+['cleanPaste','section','isoDate','addWorkDays','findProducts','titleCase','tidyMsg','nameFromEmail','companyFromEmail','clip','parseLead','sameLead'].map(grab).join('\n'));
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const email=`Fw: Website lead: Avaya Partner - UK
 Connor Le Page
@@ -123,4 +123,28 @@ for (const t of [thread, thread.replace('Tom Snell <tom@standard8.com>','From: T
  ok(d.interest.length<=61&&/Gamma|SIP|Avaya|8x8/.test(d.interest),'thread: short interest from the products discussed');
  ok(/talk through/.test(d.notes)&&!/Apologies|Manor Hall|newsletter/.test(d.notes)&&d.notes.length<350,'thread: notes are Tom\'s latest message only');
 }
+const y=parseLead(`Callback for Garry: Yakub at Reliant
+Call: Yakub, 07885 624052 (email: [yakub.p@reliant.co.uk](mailto:yakub.p@reliant.co.uk))
+Company: Reliant, Blackpool
+Why it's hot: Business is picking up and they want 3CX in ASAP.
+Who they are
+
+* Electrical retailer selling TVs, soundbars and home appliances. [reliant](https://www.reliant.co.uk/)
+* One third-party data site puts turnover at around £34M with 34 employees. [endole](https://open.endole.co.uk/insight/brand/129344-reliant)
+
+What they want
+
+* 3CX, starting with a 15-user pilot
+* Must work with Teams (they use it already)
+* IVR: option 1 to customer service, option 2 to the showroom/physical side (confirm)
+* Currently on 13 SIP trunks
+
+Questions to ask on the call
+
+* Who provides the SIP trunks now, and do they want to port numbers?`,'2026-10-16');
+console.log(JSON.stringify(y,null,1));
+ok(y.contact==='Yakub'&&y.company==='Reliant, Blackpool'&&y.reach==='07885 624052 · yakub.p@reliant.co.uk','brief: Yakub, Reliant, phone and email');
+ok(/3CX/.test(y.interest)&&/15-user pilot/.test(y.interest)&&!/34 employees/.test(y.interest),'brief: interest from What they want');
+ok(/picking up/.test(y.notes),'brief: why it\'s hot in notes');
+ok(/Questions to ask/.test(y.brief)&&/13 SIP trunks/.test(y.brief)&&!/endole|https/.test(y.brief),'brief: full story kept, citation links stripped');
 ok(sameLead(a,{company:'the gorse academies trust'})&&!sameLead(a,b),'duplicates spotted by email or company');

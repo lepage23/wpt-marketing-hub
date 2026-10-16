@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.12.1";
-  var BUILT = "2026-10-16 10:55 BST";
+  var VERSION = "0.12.2";
+  var BUILT = "2026-10-16 11:15 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -91,6 +91,7 @@
     var tableBox = el('<div class="table-wrap"></div>');
     wrap.appendChild(tableBox); wrap.appendChild(tools);
 
+    var openRows = {};
     function persist() { save(cfg.key, rows); if (cfg.onChange) cfg.onChange(rows); }
     function cellInput(c, r) {
       var v = r[c.k] == null ? "" : r[c.k];
@@ -115,12 +116,17 @@
           return '<th class="' + (c.num || c.compute ? "num" : "") + '">' + esc(c.label) + "</th>";
         }).join("") + "<th></th></tr></thead><tbody>";
         rows.forEach(function (r) {
-          h += '<tr data-id="' + r._id + '">' + (cfg.compact ? '<td class="row-lead"><button type="button" class="btn small danger" data-del="1" aria-label="Remove this row">Remove</button><button type="button" class="btn small" data-more="1">More</button></td>' : "") + cfg.columns.map(function (c) {
+          h += '<tr data-id="' + r._id + '"' + (openRows[r._id] ? ' class="open"' : "") + ">" + (cfg.compact ? '<td class="row-lead"><button type="button" class="btn small danger" data-del="1" aria-label="Remove this row">Remove</button><button type="button" class="btn small' + (cfg.detail && r[cfg.detail.k] ? " has" : "") + '" data-more="1">' + (openRows[r._id] ? "Hide" : cfg.detail ? "Brief" : "More") + "</button></td>" : "") + cfg.columns.map(function (c) {
             return '<td class="' + (c.num || c.compute ? "num" : "") + '">' + cellInput(c, r) + "</td>";
           }).join("") + '<td class="row-actions">' +
             (r._ex ? '<span class="chip ex" title="Example row. Replace or delete it.">example</span> ' : "") +
             (cfg.actions || []).map(function (a, i) { return '<button type="button" class="btn small" data-act="' + i + '">' + esc(a.label) + "</button> "; }).join("") +
             (cfg.compact ? "" : '<button type="button" class="btn small danger" data-del="1" aria-label="Delete row">Delete</button>') + "</td></tr>";
+          if (cfg.detail) {
+            var dv = r[cfg.detail.k] || "";
+            h += '<tr class="detail" data-id="' + r._id + '"' + (openRows[r._id] ? "" : " hidden") + '><td></td><td colspan="' + (cfg.columns.length + 1) + '"><label class="field" for="' + cfg.key + "-" + r._id + '-detail">' + esc(cfg.detail.label) +
+              '<textarea id="' + cfg.key + "-" + r._id + '-detail" data-k="' + cfg.detail.k + '" class="detail-box" placeholder="' + esc(cfg.detail.placeholder || "") + '">' + esc(dv) + "</textarea></label></td></tr>";
+          }
         });
         tableBox.innerHTML = h + "</tbody></table>";
         requestAnimationFrame(function () { Array.prototype.forEach.call(tableBox.querySelectorAll("textarea.cell"), fitCell); });
@@ -141,7 +147,13 @@
     tableBox.addEventListener("click", function (e) {
       var tr = e.target.closest("tr"); if (!tr) return;
       var id = tr.getAttribute("data-id");
-      if (e.target.hasAttribute("data-more")) { var open = tr.classList.toggle("open"); e.target.textContent = open ? "Less" : "More"; Array.prototype.forEach.call(tr.querySelectorAll("textarea.cell"), fitCell); return; }
+      if (e.target.hasAttribute("data-more")) {
+        var open = tr.classList.toggle("open"); openRows[id] = open;
+        e.target.textContent = open ? "Hide" : cfg.detail ? "Brief" : "More";
+        var det = tr.nextElementSibling;
+        if (det && det.classList.contains("detail")) { det.hidden = !open; var db = det.querySelector("textarea"); if (open && db) { db.style.height = "auto"; db.style.height = Math.min(db.scrollHeight + 4, 520) + "px"; } }
+        Array.prototype.forEach.call(tr.querySelectorAll("textarea.cell"), fitCell); return;
+      }
       if (e.target.hasAttribute("data-del")) {
         if (cfg.compact && !e.target.dataset.sure) { e.target.dataset.sure = "1"; e.target.textContent = "Sure?"; setTimeout(function () { if (e.target.isConnected) { delete e.target.dataset.sure; e.target.textContent = "Remove"; } }, 4000); return; }
         rows = rows.filter(function (x) { return x._id !== id; }); persist(); render(); toast(cfg.compact ? "Removed" : "Row deleted");
@@ -155,8 +167,8 @@
         if (cfg.newRow) cfg.newRow(r);
         rows.unshift(r); persist(); render();
       }
-      if (e.target.hasAttribute("data-copy")) copyText(toCsv(cfg.columns, rows), "CSV copied");
-      if (e.target.hasAttribute("data-dl")) download((cfg.csvName || cfg.key) + "-" + today() + ".csv", toCsv(cfg.columns, rows));
+      if (e.target.hasAttribute("data-copy")) copyText(toCsv(cfg.detail ? cfg.columns.concat([{ k: cfg.detail.k, label: "Lead brief" }]) : cfg.columns, rows), "CSV copied");
+      if (e.target.hasAttribute("data-dl")) download((cfg.csvName || cfg.key) + "-" + today() + ".csv", toCsv(cfg.detail ? cfg.columns.concat([{ k: cfg.detail.k, label: "Lead brief" }]) : cfg.columns, rows));
       if (e.target.hasAttribute("data-clear")) { rows = rows.filter(function (r) { return !r._ex; }); persist(); render(); toast("Example rows removed"); }
     });
     render();
@@ -525,7 +537,7 @@
 
 
   /* ---------- Quick add: turn a pasted lead email or a rough note into a lead row ---------- */
-  var FORM_LABELS = { "name": "name", "full name": "name", "your name": "name", "contact name": "name", "first name": "first", "last name": "last", "surname": "last", "your email": "email", "work email": "email", "mobile": "phone", "company / organisation": "company", "business name": "company", "comments": "message", "how can we help?": "message", "how can we help": "message", "details": "message", "email": "email", "email address": "email", "phone": "phone", "telephone": "phone", "phone number": "phone",
+  var FORM_LABELS = { "call": "call", "callback": "call", "contact": "name", "why it's hot": "why", "why its hot": "why", "why": "why", "name": "name", "full name": "name", "your name": "name", "contact name": "name", "first name": "first", "last name": "last", "surname": "last", "your email": "email", "work email": "email", "mobile": "phone", "company / organisation": "company", "business name": "company", "comments": "message", "how can we help?": "message", "how can we help": "message", "details": "message", "email": "email", "email address": "email", "phone": "phone", "telephone": "phone", "phone number": "phone",
     "company": "company", "company name": "company", "organisation": "company", "organization": "company", "product/service": "product", "product": "product", "service": "product",
     "location": "location", "source page": "page", "message": "message", "enquiry": "message", "submitted": "submitted", "ip address": "_skip", "user agent": "_skip" };
   var PRODUCTS = ["8x8", "3CX", "Gamma", "Horizon", "Zoom Phone", "Zoom", "Teams", "Avaya", "Mitel", "Xima", "SIP", "SoGEA", "FTTP", "Leased line", "Broadband", "Mobile", "Contact centre", "Call recording", "Cyber"];
@@ -558,14 +570,35 @@
   }
   var SIGNOFF = /^(thanks( (in advance|again|all))?|thank you|many thanks|kind regards|best regards|best wishes|regards|best|cheers)[,.!]?$/i;
   var OWN = /westpierte(ch|le)|connor le ?page|garry bloomfield|mark james/i;
+  /* Pasted text from ChatGPT, Outlook or a web page: turn [text](mailto:x) into x, drop citation links. */
+  function cleanPaste(raw) {
+    return String(raw || "").replace(/\r/g, "")
+      .replace(/\[([^\]]+)\]\(mailto:[^)]+\)/g, "$1")
+      .replace(/\s*\[([a-z0-9.-]{2,30})\]\(https?:[^)]+\)/g, "")
+      .replace(/\[([^\]]+)\]\(https?:[^)]+\)/g, "$1")
+      .replace(/^[ \t]*[*•·][ \t]+/gm, "- ").trim();
+  }
+  /* "Section heading" followed by "- bullet" lines. Returns the bullets under the first heading that matches. */
+  function section(lines, re) {
+    var i = lines.findIndex(function (l) { return re.test(l) && !/^-\s/.test(l); });
+    if (i < 0) return [];
+    var out = [];
+    for (var j = i + 1; j < lines.length; j++) {
+      var l = lines[j];
+      if (!l) { if (out.length) break; continue; }
+      if (/^-\s/.test(l)) out.push(l.replace(/^-\s+/, ""));
+      else if (out.length) break;
+    }
+    return out;
+  }
   function parseLead(raw, todayIso) {
     todayIso = todayIso || today();
-    var text = String(raw || "").replace(/\r/g, "").trim();
+    var text = cleanPaste(raw);
     var lines = text.split("\n").map(function (l) { return l.trim(); });
     var f = {}, cur = null;
     lines.forEach(function (l) {
       var key = FORM_LABELS[l.toLowerCase().replace(/:$/, "")];
-      var inline = l.match(/^([A-Za-z\/ ]{3,20}):\s*(.+)$/);
+      var inline = l.match(/^([A-Za-z\/' ]{3,20}):\s*(.+)$/);
       if (key) { cur = key; if (!f[cur]) f[cur] = []; return; }
       if (inline && FORM_LABELS[inline[1].toLowerCase()] && OWN.test(inline[2])) { cur = null; return; }
       if (inline && FORM_LABELS[inline[1].toLowerCase()] && !/^(sent|from|to|cc|subject)$/i.test(inline[1])) {
@@ -576,6 +609,12 @@
     });
     Object.keys(f).forEach(function (k) { f[k] = f[k].join(k === "message" ? "\n" : " ").trim(); });
     if (!f.name && (f.first || f.last)) f.name = [f.first, f.last].filter(Boolean).join(" ");
+    /* "Call: Yakub, 07885 624052" and "Callback for Garry: Yakub at Reliant" */
+    if (!f.name && f.call) { var cm = f.call.match(/^([A-Z][\w'’-]+(?:\s+[A-Z][\w'’-]+){0,2})\s*[,(-]/); if (cm) f.name = cm[1]; }
+    var headline = (text.match(/^(?:call ?back|follow ?up|lead)[^:\n]{0,30}:\s*([A-Z][\w'’-]+(?:\s+[A-Z][\w'’-]+)?)\s+(?:at|from)\s+(.+)$/im) || []);
+    if (!f.name && headline[1]) f.name = headline[1];
+    if (!f.company && headline[2]) f.company = headline[2].trim();
+    var wants = section(lines, /^what (they|he|she) want|^requirements?\b|^what they need/i);
 
     /* Who's who. Skip anything that's WPT's own. */
     var emails = (text.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || []).filter(function (e) { return !OWN.test(e); });
@@ -588,7 +627,7 @@
     phones = phones.filter(function (ph) { return !ours(ph); });
     var email = f.email || (froms[0] && froms[0].email) || emails[0] || "";
     var phone = (phones[0] || "").trim();
-    var users = (text.match(/(\d{1,5})\s*(users|seats|staff|people|employees|handsets|extensions|sites|lines)\b/i) || [""])[0];
+    var users = (text.match(/\b(\d{1,5})[ -]?(users?|seats?|handsets|extensions)\b/i) || text.match(/\b(\d{1,5}) (staff|people|employees|sites|lines)\b/i) || [""])[0];
 
     var isForm = !!(f.name || f.email || f.company);
     var isEmail = !isForm && (froms.length > 0 || /^(subject|sent|to):/im.test(text) || /^(hi|hello|dear|good (morning|afternoon))\b/im.test(text));
@@ -602,8 +641,9 @@
       lead.source = /website lead|enquiry form|website form|source page/i.test(text) ? "Website form" : "Other";
       var sub = (f.submitted || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       lead.date = sub ? sub[3] + "-" + ("0" + sub[2]).slice(-2) + "-" + ("0" + sub[1]).slice(-2) : sentDate || todayIso;
-      lead.interest = [f.product || findProducts(f.message || "").join(", "), users, f.location].filter(Boolean).join(", ");
-      lead.notes = [clip(tidyMsg(f.message), 220), f.page ? "Came in on: " + clip(f.page.replace(/^https?:\/\/(www\.)?[^\/]+/, ""), 60) : ""].filter(Boolean).join("\n");
+      lead.interest = wants.length ? wants.map(function (w) { return clip(w.replace(/,?\s*starting with\s*(an?\s+)?/i, ", ").replace(/^must (work|integrate) with\s*/i, "works with ").replace(/\s*\(.*?\)/g, ""), 40); }).slice(0, 2).join("; ")
+        : [f.product || findProducts(f.message || "").join(", "), users, f.location].filter(Boolean).join(", ");
+      lead.notes = [f.why ? clip(f.why, 160) : "", clip(tidyMsg(f.message), 220), f.page ? "Came in on: " + clip(f.page.replace(/^https?:\/\/(www\.)?[^\/]+/, ""), 60) : ""].filter(Boolean).join("\n");
       if (/\b(3|three)\s+quotes?\b/i.test(f.message || "")) lead.next = "Garry to make first contact. Competitive: they need 3 quotes";
     } else if (isEmail) {
       /* A normal email or a whole thread. Newest message is on top, so only the top one decides
@@ -675,7 +715,9 @@
       lead.notes = clip(rest.join(". "), 300);
       lead.source = /website|form/i.test(text) ? "Website form" : /chat/i.test(text) ? "Live chat" : /referr/i.test(text) ? "Referral" : /called|rang|phone call/i.test(text) ? "Phone" : "Other";
     }
-    lead.interest = clip(lead.interest, 60);
+    lead.interest = clip(lead.interest, 70);
+    var briefFrom = isForm && f.name && !f.call ? lines.findIndex(function (l) { return FORM_LABELS[l.toLowerCase().replace(/:$/, "")] === "name"; }) : -1;
+    lead.brief = (briefFrom > 0 ? lines.slice(briefFrom).join("\n") : text).replace(/^\s*(ip address|user agent):.*$/gim, "").replace(/\n{3,}/g, "\n\n").trim();
     lead.reach = [phone, email].filter(Boolean).join(" · ");
     lead.nextDate = addWorkDays(todayIso, 1);
     return lead;
@@ -725,7 +767,8 @@
       updateNav();
     }
     var p = panel("Lead tracker", "Edit any cell. Changes save as you go.");
-    var t = editableTable({ key: "leads", csvName: "wpt-leads", addLabel: "Add blank row", compact: true, columns: LEAD_COLS, seed: LEAD_SEED, onChange: drawCounts,
+    var t = editableTable({ key: "leads", csvName: "wpt-leads", addLabel: "Add blank row", compact: true,
+      detail: { k: "brief", label: "Lead brief (the full story: who they are, what they want, questions for the call)", placeholder: "Paste or write the full lead details here." }, columns: LEAD_COLS, seed: LEAD_SEED, onChange: drawCounts,
       emptyText: "No leads yet. Add one, or send a chat across from the Live chat page.", newRow: function (r) { r.owner = "Garry"; } });
     main.appendChild(quickAddPanel(function (lead) { t.set(t.get().filter(function (r) { return !r._ex; })); t.add(lead); }));
     p.appendChild(t.node); main.appendChild(p);

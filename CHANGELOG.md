@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.12.2 · 2026-10-16 11:15 BST
+
+Lead briefs.
+
+- Every lead now has a **Lead brief**: the full story, kept in full. Press **Brief** at the start of a row to open it under the row, and **Hide** to close it. You can edit it or paste into it. The Brief button is highlighted when a lead has one.
+- Quick add saves the whole paste as the brief, so the table stays short and nothing is lost. Website form leads keep just the form part, without the forwarding headers.
+- Handles call briefs like "Callback for Garry: Yakub at Reliant" and "Call: Yakub, 07885 624052". First names on their own now count as the contact. "Company:" and "Why it's hot:" lines are picked up, and Interested in comes from the "What they want" list.
+- Citation links from ChatGPT ([reliant](https://...)) are stripped. Email links become plain addresses.
+- Copy as CSV and Download CSV include the brief, so Garry gets the full story.
+- Fixed: an IP address followed by "User agent" was read as a user count.
+- 185 tests, all passing.
+
 ## v0.12.1 · 2026-10-16 10:55 BST
 
 Leads tidy-up.
