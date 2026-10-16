@@ -19,6 +19,7 @@ out=$( {
   php tests/ga4.test.php docs/wordpress-ga4.php /dev/null
   php tests/elementor.test.php docs/wordpress-page-checker.php
   php tests/page-build.test.php docs/wordpress-page-checker.php
+  php tests/image-style.test.php docs/wordpress-page-checker.php
 } 2>&1 )
 pass=$(echo "$out" | grep -c "^PASS"); fail=$(echo "$out" | grep -c -E "^FAIL|Error")
 echo "$out" | grep -E "^FAIL|Error"

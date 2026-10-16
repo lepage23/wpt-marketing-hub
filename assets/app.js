@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.12.3";
-  var BUILT = "2026-10-16 11:35 BST";
+  var VERSION = "0.13.0";
+  var BUILT = "2026-10-16 12:05 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1140,7 +1140,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
-      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion === 5 ? '<span class="chip flag">Page checker version 5 (6 adds page builds)</span><div class="s" style="margin-top:4px">Everything else works. To use Push new page build, replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion >= 5 && a.checkerVersion < 7 ? '<span class="chip flag">Page checker version ' + a.checkerVersion + ' (7 adds page builds and image fixes)</span><div class="s" style="margin-top:4px">Everything else works. To use Push new page build and image fixes, replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }
@@ -1757,10 +1757,20 @@
     function add(o) { o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found by mobile check"; o.category = "Mobile"; o.pageTitle = o.pageTitle || "Mobile"; o.link = o.link || "https://westpiertech.com/"; out.push(o); }
     function pagesWith(fn) { return rows.filter(function (x) { return fn(x.r); }).map(function (x) { return { title: shortPath(x.url), link: x.url, note: fn(x.r) === true ? "" : String(fn(x.r)) }; }); }
     var squash = [];
-    rows.forEach(function (x) { var f = failOf(x.r, "image-aspect-ratio"); if (f) f.items.forEach(function (it) { squash.push({ title: fileName(it.url), link: x.url, note: "on " + shortPath(x.url) + (it.displayed ? " · shown " + it.displayed + ", really " + it.actual : "") }); }); });
-    if (squash.length) add({ id: "mob-squashed", priority: "high", issue: squash.length + " images are squashed or stretched", pages: squash,
-      why: "An image forced into the wrong shape looks broken, especially on a phone, and Google counts it against the page's quality. It's often the first thing a visitor sees.",
-      steps: ["Open the page in Elementor and click the image listed.", "Go to the Style tab. Set Height to Default (or auto), or keep the height and set Object Fit to Cover so it crops instead of squashing.", "Check it in Elementor's mobile view (the phone icon at the bottom left) before you update.", "Run the mobile check again."] });
+    rows.forEach(function (x) { var f = failOf(x.r, "image-aspect-ratio"); if (f) f.items.forEach(function (it) { squash.push({ img: it.url, link: x.url, shape: it.displayed ? "shown " + it.displayed + " but really " + it.actual : "" }); }); });
+    /* Each squashed image becomes its own push-ready image fix (fit inside the box, nothing cropped). */
+    var claudeImg = {}; (window.WPT_PROPOSALS || []).forEach(function (f) { if (f.type === "elementor_style") claudeImg[norm(f.link) + "|" + f.find] = 1; });
+    squash.forEach(function (sq) {
+      var stem = fileName(sq.img).replace(/\.[a-z0-9]+$/i, "").replace(/-\d+x\d+$/, "").replace(/-scaled$/, "").toLowerCase();
+      if (!stem || claudeImg[norm(sq.link) + "|" + stem]) return;
+      out.push({ id: "mob-img-" + (shortPath(sq.link) + "-" + stem).replace(/\W+/g, "-").slice(0, 90), auto: true, created: today, batch: "Found by mobile check", category: "Mobile",
+        type: "elementor_style", size: "small", priority: "high", postType: "pages", pageId: 0, pageTitle: shortPath(sq.link), link: sq.link, find: stem,
+        set: { "object-fit": "contain", "object-fit_tablet": "contain", "object-fit_mobile": "contain", "object-position": "center center" },
+        issue: "Squashed image: " + fileName(sq.img),
+        current: fileName(sq.img) + (sq.shape ? " is " + sq.shape : " is shown at the wrong shape") + ", so it looks pinched or stretched.",
+        proposed: "Same image, same box. Set to fit inside the box at its true shape (centred) on desktop, tablet and phone. Nothing is cropped. Nothing else on the page changes. Undo puts it back.",
+        why: "An image forced into the wrong shape looks broken, especially on a phone, and Google counts it against the page's quality." });
+    });
     var vp = pagesWith(function (r) { return !!failOf(r, "viewport-insight") || !!failOf(r, "viewport"); });
     if (vp.length) add({ id: "mob-viewport", priority: "critical", issue: vp.length + " pages aren't set up for phones (viewport)", pages: vp,
       why: "Without the mobile viewport setting, phones show a shrunk desktop page. Google treats that as not mobile-friendly.", steps: ["Ask Matt to check the theme (Blocksy) outputs the viewport meta tag on these pages.", "Run the mobile check again."] });
@@ -1854,7 +1864,11 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix" };
+  function needsV7(err) {
+    if (/no route|unknown edit type|which image or what to change/i.test(err.message)) throw new Error("Image fixes need version 7 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
+    throw err;
+  }
   function needsV4(err) {
     if (/no route|unknown edit type/i.test(err.message)) throw new Error("Page editing needs the latest page checker snippet. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
     throw err;
@@ -1932,6 +1946,10 @@
         });
       });
     }
+    if (p.type === "elementor_style") {
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "style", find: p.find, set: p.set } })
+        .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV7);
+    }
     if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap") {
       if (p.type === "elementor_remove" && p.level == null) return Promise.reject(new Error("Choose exactly what to remove first (the options above), so nothing else on the page goes with it."));
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_set" ? "set" : p.type === "elementor_swap" ? "swap" : "remove", find: p.find, replace: text, level: p.level, scope: p.scope || "" } })
@@ -1970,7 +1988,7 @@
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     var base = "/wp/v2/" + p.postType + "/";
-    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap") {
+    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
     }
     if (p.type === "set_status") return wpFetch(base + p.pageId, { method: "POST", body: { status: st.before || "publish" } });
@@ -2268,8 +2286,8 @@
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
-      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status/.test(p.type) ? "What will happen" : "Proposed (you can edit this)") +
-      '<textarea id="fix-' + esc(p.id) + '"' + (done || p.type === "elementor_remove" || p.type === "set_status" ? " readonly" : "") + (/content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
+      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status|elementor_style/.test(p.type) ? "What will happen" : "Proposed (you can edit this)") +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done || /elementor_remove|set_status|elementor_style/.test(p.type) ? " readonly" : "") + (/content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
       (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
       '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
       '<div class="fix-actions row"></div><div class="fix-msg"></div>';
@@ -2301,23 +2319,23 @@
     }
     if (!st.status) {
       actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
-        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : "Approve and push live") + "</button>" +
+        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : "Approve and push live") + "</button>" +
         '<button type="button" class="btn rej">Reject</button>' + (st.edited != null ? '<button type="button" class="btn small reset">Reset to Claude\'s version</button>' : "");
       actions.querySelector(".go").addEventListener("click", function () {
         var sure = actions.querySelector(".sure");
         if (sure && !sure.checked) { msg.innerHTML = '<div class="notice">Tick the box to confirm you\'ve read this change.</div>'; return; }
         var value = ta.value;
-        if (!value.trim() && !/^(meta_description|elementor_remove|set_status)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
+        if (!value.trim() && !/^(meta_description|elementor_remove|set_status|elementor_style)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
         var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
         var lv = fixState()[p.id] && fixState()[p.id].level;
         pushFix(p.type === "elementor_remove" ? Object.assign({}, p, { level: lv == null ? null : lv, scope: "" }) : p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : "Pushed live" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
-          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : "Approve and push live";
+          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : "Approve and push live";
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
           if (/isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
         });

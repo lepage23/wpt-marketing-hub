@@ -2,6 +2,7 @@
    Claude adds to this file and pushes it to GitHub. Pull in GitHub Desktop to see new ones.
    Nothing here touches the website until Connor approves it in the Fix queue.
 
+   elementor_style: changes how one image widget is displayed (find: image file name, set: {object-fit, height...}). Undo restores.
    page_build: copies an existing Elementor page's design into a NEW draft, swaps in new text (edits: [{op: set|swap|remove, find, replace, level}]),
      returns a preview link. Set ready: true once the text is written.
    Fix types: page_build, meta_title, meta_description, content_replace, new_draft, elementor_set, elementor_swap, elementor_remove,
@@ -33,20 +34,25 @@ window.WPT_PROPOSALS = [
   "id": "b6-02",
   "created": "2026-10-15",
   "batch": "Batch 6: home page image",
-  "type": "manual",
+  "type": "elementor_style",
+  "size": "small",
   "priority": "high",
   "category": "Mobile",
+  "postType": "pages",
+  "pageId": 0,
   "pageTitle": "Home",
   "link": "https://westpiertech.com/",
   "issue": "The engineer photo on the home page is squashed",
-  "why": "It's been forced into a tall, narrow box without cropping, so it's pinched sideways. On a phone it will look worse. It's one of the first things a visitor sees, and Google's mobile check marks squashed images as a quality problem.",
-  "steps": [
-   "Open the Home page in Elementor and click the photo of the engineer by the van.",
-   "In the Style tab, set Height to Default. If the design needs that height, keep it and set Object Fit to Cover so the photo crops rather than squashes.",
-   "Click the phone icon at the bottom left of Elementor to check the mobile view, then Update.",
-   "Run the mobile check on the Website & SEO page to confirm it's cleared.",
-   "If the badges in this photo change after the certification check (fix b6-01), Claude will write the replacement at the same time."
-  ]
+  "find": "engineer-new-logo-wpt-edit-with-cert-number-underneath",
+  "set": {
+   "object-fit": "contain",
+   "object-fit_tablet": "contain",
+   "object-fit_mobile": "contain",
+   "object-position": "center center"
+  },
+  "current": "Engineer photo (Engineer-new-logo-WPT-edit-with-cert-number-Underneath.png) is forced into a tall box at its full width, so it's pinched sideways.",
+  "proposed": "Same photo, same box, same height. Set to fit inside the box at its true shape (Object Fit: Contain, centred) on desktop, tablet and phone. Nothing is cropped, so the badges and cert number stay fully visible. There may be a little empty space above and below it. Nothing else on the page changes. Undo puts it straight back.",
+  "why": "It's one of the first things a visitor sees, and Google's mobile check marks squashed images as a quality problem. This keeps your layout as it is and shows the whole photo, so the certification badges can't be cut off. If you'd rather it filled the box edge to edge, tell Claude and it'll switch to cropping instead."
  },
  {
   "id": "b4-01",

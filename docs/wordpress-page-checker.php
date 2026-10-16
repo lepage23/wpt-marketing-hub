@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 6, adds page builds: new draft pages that copy an existing page's design).
+ * WPT Marketing Hub: page checker (version 7, adds image style fixes such as unsquashing photos).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -273,7 +273,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 6, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 7, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -454,6 +454,57 @@ add_action( 'rest_api_init', function () {
 			$data = $load( $id );
 			if ( ! $data ) {
 				return new WP_Error( 'wpt_edit', 'This page isn\'t built with Elementor, so this kind of fix can\'t be used on it.', array( 'status' => 400 ) );
+			}
+			if ( 'style' === $op ) {
+				/* Change how one image widget is displayed (version 7). Finds it by its image file name.
+				 * Only these display settings can be changed, nothing else. */
+				$file    = strtolower( (string) $r->get_param( 'find' ) );
+				$allowed = array( 'object-fit', 'object-fit_tablet', 'object-fit_mobile', 'object-position', 'object-position_tablet', 'object-position_mobile', 'height', 'height_tablet', 'height_mobile' );
+				$set     = (array) $r->get_param( 'set' );
+				if ( strlen( $file ) < 5 || ! $set ) {
+					return new WP_Error( 'wpt_edit', 'The fix doesn\'t say which image or what to change.', array( 'status' => 400 ) );
+				}
+				foreach ( $set as $k => $v ) {
+					if ( ! in_array( $k, $allowed, true ) ) {
+						return new WP_Error( 'wpt_edit', 'The hub can only change image size and cropping settings. Nothing was changed.', array( 'status' => 400 ) );
+					}
+				}
+				$hits = array();
+				$walk = function ( $els, $path ) use ( &$walk, &$hits, $file ) {
+					foreach ( $els as $i => $el ) {
+						$p = array_merge( $path, array( $i ) );
+						if ( isset( $el['widgetType'] ) && 'image' === $el['widgetType'] && isset( $el['settings']['image']['url'] ) && false !== strpos( strtolower( $el['settings']['image']['url'] ), $file ) ) {
+							$hits[] = $p;
+						}
+						if ( ! empty( $el['elements'] ) ) {
+							$walk( $el['elements'], array_merge( $p, array( 'elements' ) ) );
+						}
+					}
+				};
+				$walk( $data, array() );
+				if ( 1 !== count( $hits ) ) {
+					return new WP_Error( 'wpt_edit', $hits ? 'That image is used ' . count( $hits ) . ' times on the page, so the hub won\'t guess which one. Nothing was changed.' : 'That image isn\'t on the page any more, so someone may have changed it. Nothing was changed.', array( 'status' => 409 ) );
+				}
+				$before = wp_json_encode( $data );
+				$node   = &$data;
+				foreach ( $hits[0] as $k ) {
+					$node = &$node[ $k ];
+				}
+				$was = array();
+				foreach ( $set as $k => $v ) {
+					$was[ $k ] = isset( $node['settings'][ $k ] ) ? $node['settings'][ $k ] : '';
+					if ( '' === $v || null === $v ) {
+						unset( $node['settings'][ $k ] );
+					} else {
+						$node['settings'][ $k ] = $v;
+					}
+				}
+				$eid = isset( $node['id'] ) ? $node['id'] : '';
+				unset( $node );
+				$bid = 'b' . time() . wp_rand( 100, 999 );
+				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				$save( $id, $data );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => $eid, 'widget' => 'image', 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
 			}
 			if ( strlen( $find ) < 3 ) {
 				return new WP_Error( 'wpt_edit', 'The fix doesn\'t say which text to look for.', array( 'status' => 400 ) );

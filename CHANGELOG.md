@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.13.0 · 2026-10-16 12:05 BST
+
+Image fixes push from the hub.
+
+- New **Image fix** type. The hub changes how one image is displayed on an Elementor page (fit, cropping, height) without you opening Elementor. It keeps a full backup first, and Undo puts the page back exactly. It can only touch size and cropping settings, nothing else.
+- The squashed engineer photo on the home page (b6-02) is now push-ready: **Approve and fix the image**. It fits the photo inside its box at its true shape, so nothing is cropped and the badges stay visible.
+- The mobile check now turns every squashed or stretched image it finds into its own push-ready image fix, instead of a list of steps.
+- Page checker snippet is version 7 (adds image fixes and page builds). Update it with Copy page checker code.
+- 190 tests, all passing.
+
 ## v0.12.3 · 2026-10-16 11:35 BST
 
 Claims check card pushes fixes.
