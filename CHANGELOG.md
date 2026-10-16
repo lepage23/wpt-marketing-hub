@@ -6,6 +6,31 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.12.0 · 2026-10-16 10:20 BST
+
+Quick add on the Leads page.
+
+- **Quick add** box above the tracker. Paste a forwarded website lead email, or type a rough note like "Michael Smith - Guitartech shop - London - 07432345434 - wants 3CX - 14 users", then click **Add lead**. It goes in as a new row: date, company, contact, phone or email, source, what they want, owner Garry, status New, and a chase date of the next working day.
+- Website form emails: picks out name, email, phone, company, product, location and the page they came from. Keeps the message in Notes and drops the forwarding headers, your signature, WPT's own numbers, IP address and browser details. Flags it when they say they're getting 3 quotes.
+- Warns if the lead is already in (same email or company), with **Add anyway**.
+- New **Phone / email** column. The table's own button is now **Add blank row**.
+- Ctrl+Enter in the box adds the lead too.
+- 167 tests, all passing.
+
+## v0.11.0 · 2026-10-16 10:05 BST
+
+New pages built in the site's own design.
+
+- **New page build** fix type. Claude writes the page, then **Push new page build for review** copies an existing page's design (sections, fonts, text sizes, colours, spacing, page template) into a NEW draft, swaps in the new text and removes blocks that aren't needed. It never publishes and never touches the page it copies from. You get **Preview the draft** and **Edit in Elementor** links, and **Bin this draft** if you don't want it.
+- **Check the look** on a build card reads the design it will copy from WordPress: the site's global fonts and colours, then every block on the page in order with its font, size, weight, colour and current text. Read-only.
+- The NHS page fix (b5-01) is now a page build that copies the Healthcare page. The button is greyed out until the Mitel meeting facts are in and Claude has written the page.
+- Page checker snippet is version 6 (adds page-style and page-build). Update it with Copy page checker code. Everything else still works on version 5.
+- 158 tests, all passing.
+
+Backups taken:
+
+- None from this session (it couldn't run git on your laptop). Your last backup is `backup/v0.9.1-2026-10-15-1718`.
+
 ## v0.10.0 · 2026-10-15 17:23 BST
 
 Mobile check across every page.

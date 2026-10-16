@@ -2,7 +2,9 @@
    Claude adds to this file and pushes it to GitHub. Pull in GitHub Desktop to see new ones.
    Nothing here touches the website until Connor approves it in the Fix queue.
 
-   Fix types: meta_title, meta_description, content_replace, new_draft, elementor_set, elementor_swap, elementor_remove,
+   page_build: copies an existing Elementor page's design into a NEW draft, swaps in new text (edits: [{op: set|swap|remove, find, replace, level}]),
+     returns a preview link. Set ready: true once the text is written.
+   Fix types: page_build, meta_title, meta_description, content_replace, new_draft, elementor_set, elementor_swap, elementor_remove,
    set_status (the hub pushes these)
    and manual (step-by-step fixes you tick off). priority: critical, high, medium, low.
    category: Content, Structure, Indexing, AI search.
@@ -105,18 +107,26 @@ window.WPT_PROPOSALS = [
   "id": "b5-01",
   "created": "2026-10-15",
   "batch": "Batch 5: NHS page",
-  "type": "manual",
+  "type": "page_build",
   "priority": "high",
   "category": "Content",
   "pageTitle": "New NHS page",
   "link": "https://westpiertech.com/healthcare/",
-  "issue": "Build an honest NHS page to replace the BPF one (needs facts from the Mitel meeting)",
+  "issue": "Build an honest NHS page to replace the BPF one",
   "why": "A page explaining how NHS trusts can buy from WPT through Mitel's framework route is worth ranking for, and it's exactly what AI tools look for when someone asks who can supply NHS telephony. It replaces the BPF page, which made a claim WPT can't stand behind.",
-  "steps": [
-   "At the Mitel meeting, ask: which NHS or public sector frameworks Mitel is on (exact names and numbers), whether WPT can deliver through them as a Mitel partner, how a trust actually buys that way, and what wording you're allowed to use publicly.",
-   "Also note WPT's Mitel partner level, any approved logos, and any NHS customers you can name (or rough numbers: sites, users).",
-   "Send it all to Claude. The new page (/healthcare/nhs-telephony/) arrives in this queue as a draft for you to approve.",
-   "Once it's live, the old BPF page's Unpublish fix becomes a redirect to the new page."
+  "newTitle": "NHS telephony",
+  "slug": "nhs-telephony",
+  "parent": "https://westpiertech.com/healthcare/",
+  "address": "westpiertech.com/healthcare/nhs-telephony/",
+  "template": "https://westpiertech.com/healthcare/",
+  "templateTitle": "Healthcare page",
+  "ready": false,
+  "edits": [],
+  "waitingOn": [
+   "The Mitel meeting. Ask which NHS or public sector frameworks Mitel is on (exact names and numbers), whether WPT can deliver through them as a Mitel partner, how a trust actually buys that way, and what wording you're allowed to use publicly.",
+   "WPT's Mitel partner level, any approved logos, and any NHS customers you can name (or rough numbers: sites, users).",
+   "Send it all to Claude. Claude writes the page to fit the Healthcare page's layout and this button switches on.",
+   "Once the new page is live, the old BPF page's Unpublish fix becomes a redirect to it."
   ]
  },
  {

@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 5, adds search performance and Elementor page editing).
+ * WPT Marketing Hub: page checker (version 6, adds page builds: new draft pages that copy an existing page's design).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -273,7 +273,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 5, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 6, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -587,6 +587,308 @@ add_action( 'rest_api_init', function () {
 			$save( $id, json_decode( $bk['data'], true ) );
 			delete_post_meta( $id, '_wpt_hub_bk_' . $bid );
 			return array( 'ok' => true );
+		},
+	) );
+} );
+
+
+/* New page builds (version 6).
+ * /wpt-hub/v1/page-style GET  ?template_id=  Read-only. The site's global fonts and colours (Elementor kit)
+ *                             and the layout of one page: each block in order, its font, size, weight,
+ *                             colour and a preview of its text.
+ * /wpt-hub/v1/page-build POST Make a NEW page as a DRAFT by copying an existing page's design
+ *                             (sections, widgets, fonts, colours, page settings), then swapping in the
+ *                             new text and removing blocks that aren't needed. Never publishes. Never
+ *                             touches the page it copies from. Returns preview and edit links. */
+add_action( 'rest_api_init', function () {
+	$plain = function ( $s ) {
+		$s = html_entity_decode( wp_strip_all_tags( (string) $s ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$s = str_replace( array( "\xE2\x80\x98", "\xE2\x80\x99", "\xE2\x80\x9C", "\xE2\x80\x9D", "\xC2\xA0" ), array( "'", "'", '"', '"', ' ' ), $s );
+		return trim( preg_replace( '/\s+/u', ' ', $s ) );
+	};
+	$load = function ( $id ) {
+		$raw = get_post_meta( $id, '_elementor_data', true );
+		if ( ! $raw ) {
+			return null;
+		}
+		$d = is_array( $raw ) ? $raw : json_decode( $raw, true );
+		return is_array( $d ) ? $d : null;
+	};
+	/* Global fonts and colours from the active Elementor kit, keyed by their id. */
+	$kit = function () {
+		$out = array( 'colors' => array(), 'fonts' => array() );
+		$id  = (int) get_option( 'elementor_active_kit' );
+		$s   = $id ? get_post_meta( $id, '_elementor_page_settings', true ) : array();
+		if ( ! is_array( $s ) ) {
+			return $out;
+		}
+		foreach ( array( 'system_colors', 'custom_colors' ) as $k ) {
+			foreach ( isset( $s[ $k ] ) ? (array) $s[ $k ] : array() as $c ) {
+				if ( ! empty( $c['_id'] ) ) {
+					$out['colors'][ $c['_id'] ] = array( 'name' => isset( $c['title'] ) ? $c['title'] : $c['_id'], 'color' => isset( $c['color'] ) ? $c['color'] : '' );
+				}
+			}
+		}
+		foreach ( array( 'system_typography', 'custom_typography' ) as $k ) {
+			foreach ( isset( $s[ $k ] ) ? (array) $s[ $k ] : array() as $t ) {
+				if ( ! empty( $t['_id'] ) ) {
+					$out['fonts'][ $t['_id'] ] = array(
+						'name'   => isset( $t['title'] ) ? $t['title'] : $t['_id'],
+						'family' => isset( $t['typography_font_family'] ) ? $t['typography_font_family'] : '',
+						'size'   => isset( $t['typography_font_size']['size'] ) && '' !== $t['typography_font_size']['size'] ? $t['typography_font_size']['size'] . ( isset( $t['typography_font_size']['unit'] ) ? $t['typography_font_size']['unit'] : 'px' ) : '',
+						'weight' => isset( $t['typography_font_weight'] ) ? $t['typography_font_weight'] : '',
+					);
+				}
+			}
+		}
+		return $out;
+	};
+	$gid = function ( $ref ) {
+		return preg_match( '/[?&]id=([a-z0-9_-]+)/i', (string) $ref, $m ) ? $m[1] : '';
+	};
+	/* One row per widget: what it is, how it looks, what it says. */
+	$outline = function ( $elements, $k ) use ( $plain, $gid ) {
+		$rows = array();
+		$walk = function ( $els, $depth ) use ( &$walk, &$rows, $plain, $gid, $k ) {
+			foreach ( $els as $el ) {
+				$s = isset( $el['settings'] ) && is_array( $el['settings'] ) ? $el['settings'] : array();
+				$g = isset( $s['__globals__'] ) && is_array( $s['__globals__'] ) ? $s['__globals__'] : array();
+				if ( isset( $el['widgetType'] ) ) {
+					$font = array( 'family' => '', 'size' => '', 'weight' => '', 'global' => '' );
+					foreach ( $s as $key => $v ) {
+						if ( preg_match( '/typography_font_family$/', $key ) && $v ) {
+							$font['family'] = $v;
+						} elseif ( preg_match( '/typography_font_size$/', $key ) && is_array( $v ) && isset( $v['size'] ) && '' !== $v['size'] ) {
+							$font['size'] = $v['size'] . ( isset( $v['unit'] ) ? $v['unit'] : 'px' );
+						} elseif ( preg_match( '/typography_font_weight$/', $key ) && $v ) {
+							$font['weight'] = $v;
+						}
+					}
+					foreach ( $g as $key => $ref ) {
+						if ( preg_match( '/typography_typography$/', $key ) ) {
+							$id = $gid( $ref );
+							if ( isset( $k['fonts'][ $id ] ) ) {
+								$font['global'] = $k['fonts'][ $id ]['name'];
+								foreach ( array( 'family', 'size', 'weight' ) as $f ) {
+									if ( ! $font[ $f ] ) {
+										$font[ $f ] = $k['fonts'][ $id ][ $f ];
+									}
+								}
+							}
+						}
+					}
+					$color = '';
+					foreach ( array( 'title_color', 'text_color', 'button_text_color', 'color' ) as $ck ) {
+						if ( ! empty( $s[ $ck ] ) ) {
+							$color = $s[ $ck ];
+							break;
+						}
+						if ( ! empty( $g[ $ck ] ) && isset( $k['colors'][ $gid( $g[ $ck ] ) ] ) ) {
+							$c     = $k['colors'][ $gid( $g[ $ck ] ) ];
+							$color = $c['color'] . ' (' . $c['name'] . ')';
+							break;
+						}
+					}
+					$text = '';
+					foreach ( array( 'title', 'editor', 'text', 'description_text', 'title_text', 'testimonial_content' ) as $tk ) {
+						if ( ! empty( $s[ $tk ] ) && is_string( $s[ $tk ] ) ) {
+							$text = $plain( $s[ $tk ] );
+							break;
+						}
+					}
+					$rows[] = array(
+						'depth'  => $depth,
+						'widget' => $el['widgetType'],
+						'tag'    => isset( $s['header_size'] ) ? $s['header_size'] : '',
+						'font'   => $font,
+						'color'  => $color,
+						'text'   => substr( $text, 0, 160 ),
+						'image'  => isset( $s['image']['url'] ) ? $s['image']['url'] : '',
+					);
+				} elseif ( isset( $el['elType'] ) && ( 'section' === $el['elType'] || ( 'container' === $el['elType'] && 0 === $depth ) ) ) {
+					$bg = '';
+					if ( ! empty( $s['background_color'] ) ) {
+						$bg = $s['background_color'];
+					} elseif ( ! empty( $g['background_color'] ) && isset( $k['colors'][ $gid( $g['background_color'] ) ] ) ) {
+						$bg = $k['colors'][ $gid( $g['background_color'] ) ]['color'];
+					}
+					$rows[] = array( 'depth' => $depth, 'widget' => 'section', 'background' => $bg, 'bg_image' => ! empty( $s['background_image']['url'] ) );
+				}
+				if ( ! empty( $el['elements'] ) ) {
+					$walk( $el['elements'], $depth + 1 );
+				}
+			}
+		};
+		$walk( $elements, 0 );
+		return $rows;
+	};
+	/* Every text setting: element path, widget type, setting path, value (same as the page editor). */
+	$texts = function ( $elements ) {
+		$out  = array();
+		$walk = function ( $els, $path ) use ( &$walk, &$out ) {
+			foreach ( $els as $i => $el ) {
+				$p    = array_merge( $path, array( $i ) );
+				$scan = function ( $v, $keys ) use ( &$scan, &$out, $p, $el ) {
+					if ( is_string( $v ) ) {
+						if ( preg_match( '/[a-z]{3}/i', wp_strip_all_tags( $v ) ) && ! preg_match( '#^(https?:|\#|[a-z_-]+$)#i', trim( $v ) ) ) {
+							$out[] = array( 'path' => $p, 'keys' => $keys, 'value' => $v, 'widget' => isset( $el['widgetType'] ) ? $el['widgetType'] : '' );
+						}
+					} elseif ( is_array( $v ) ) {
+						foreach ( $v as $k => $vv ) {
+							if ( '__globals__' !== $k && '__dynamic__' !== $k ) {
+								$scan( $vv, array_merge( $keys, array( $k ) ) );
+							}
+						}
+					}
+				};
+				if ( isset( $el['settings'] ) && is_array( $el['settings'] ) ) {
+					$scan( $el['settings'], array() );
+				}
+				if ( ! empty( $el['elements'] ) ) {
+					$walk( $el['elements'], array_merge( $p, array( 'elements' ) ) );
+				}
+			}
+		};
+		$walk( $elements, array() );
+		return $out;
+	};
+	$fresh_ids = function ( &$els ) use ( &$fresh_ids ) {
+		foreach ( $els as &$el ) {
+			if ( isset( $el['id'] ) ) {
+				$el['id'] = substr( md5( uniqid( '', true ) . wp_rand( 0, 999999 ) ), 0, 7 );
+			}
+			if ( ! empty( $el['elements'] ) ) {
+				$fresh_ids( $el['elements'] );
+			}
+		}
+	};
+
+	register_rest_route( 'wpt-hub/v1', '/page-style', array(
+		'methods'             => 'GET',
+		'permission_callback' => function () {
+			return current_user_can( 'edit_pages' );
+		},
+		'callback'            => function ( WP_REST_Request $r ) use ( $load, $kit, $outline ) {
+			$id   = (int) $r->get_param( 'template_id' );
+			$data = $id ? $load( $id ) : null;
+			if ( ! $data ) {
+				return new WP_Error( 'wpt_style', 'That page isn\'t built with Elementor, so its design can\'t be read or copied.', array( 'status' => 400 ) );
+			}
+			$k = $kit();
+			return array(
+				'ok'     => true,
+				'title'  => get_the_title( $id ),
+				'link'   => get_permalink( $id ),
+				'colors' => array_values( $k['colors'] ),
+				'fonts'  => array_values( $k['fonts'] ),
+				'layout' => $outline( $data, $k ),
+			);
+		},
+	) );
+
+	register_rest_route( 'wpt-hub/v1', '/page-build', array(
+		'methods'             => 'POST',
+		'permission_callback' => function ( WP_REST_Request $r ) {
+			$id = (int) $r->get_param( 'template_id' );
+			return $id > 0 && current_user_can( 'edit_pages' ) && current_user_can( 'edit_post', $id );
+		},
+		'callback'            => function ( WP_REST_Request $r ) use ( $plain, $load, $texts, $fresh_ids ) {
+			$tid   = (int) $r->get_param( 'template_id' );
+			$title = sanitize_text_field( (string) $r->get_param( 'title' ) );
+			$slug  = sanitize_title( (string) $r->get_param( 'slug' ) );
+			$data  = $load( $tid );
+			if ( ! $data ) {
+				return new WP_Error( 'wpt_build', 'The page to copy the design from isn\'t built with Elementor. Nothing was made.', array( 'status' => 400 ) );
+			}
+			if ( strlen( $title ) < 3 ) {
+				return new WP_Error( 'wpt_build', 'The new page needs a title. Nothing was made.', array( 'status' => 400 ) );
+			}
+			$report = array();
+			foreach ( (array) $r->get_param( 'edits' ) as $n => $e ) {
+				$op    = isset( $e['op'] ) ? (string) $e['op'] : 'set';
+				$find  = $plain( isset( $e['find'] ) ? $e['find'] : '' );
+				$label = 'Change ' . ( $n + 1 ) . ' ("' . substr( $find, 0, 50 ) . '")';
+				if ( strlen( $find ) < 3 ) {
+					return new WP_Error( 'wpt_build', $label . ' doesn\'t say which text to look for. Nothing was made.', array( 'status' => 400 ) );
+				}
+				$hits = array();
+				foreach ( $texts( $data ) as $t ) {
+					if ( false !== stripos( $plain( $t['value'] ), $find ) ) {
+						$hits[] = $t;
+					}
+				}
+				if ( 1 !== count( $hits ) ) {
+					return new WP_Error( 'wpt_build', $label . ( $hits ? ' matches ' . count( $hits ) . ' places on the page being copied, so the hub won\'t guess.' : ' isn\'t on the page being copied any more. It may have been edited.' ) . ' Nothing was made. Ask Claude to update the build.', array( 'status' => 409 ) );
+				}
+				$m = $hits[0];
+				if ( 'remove' === $op ) {
+					$lv   = max( 0, isset( $e['level'] ) ? (int) $e['level'] : 0 );
+					$path = array_slice( $m['path'], 0, max( 1, count( $m['path'] ) - 2 * $lv ) );
+					$last = array_pop( $path );
+					$node = &$data;
+					foreach ( $path as $k ) {
+						$node = &$node[ $k ];
+					}
+					array_splice( $node, $last, 1 );
+					unset( $node );
+					$report[] = array( 'op' => 'remove', 'find' => $find );
+				} else {
+					$node = &$data;
+					foreach ( $m['path'] as $k ) {
+						$node = &$node[ $k ];
+					}
+					$cell = &$node['settings'];
+					foreach ( $m['keys'] as $k ) {
+						$cell = &$cell[ $k ];
+					}
+					$cell = 'swap' === $op ? str_replace( (string) $e['find'], (string) $e['replace'], str_replace( array( '&nbsp;', "\xC2\xA0" ), ' ', (string) $cell ) ) : (string) $e['replace'];
+					unset( $cell, $node );
+					$report[] = array( 'op' => $op, 'find' => $find, 'widget' => $m['widget'] );
+				}
+			}
+			$fresh_ids( $data );
+			$new = wp_insert_post( wp_slash( array(
+				'post_type'    => 'page',
+				'post_status'  => 'draft',
+				'post_title'   => $title,
+				'post_name'    => $slug,
+				'post_parent'  => (int) $r->get_param( 'parent_id' ),
+				'post_content' => '',
+			) ), true );
+			if ( is_wp_error( $new ) ) {
+				return $new;
+			}
+			foreach ( array( '_elementor_edit_mode', '_elementor_template_type', '_elementor_version', '_elementor_pro_version', '_elementor_page_settings', '_wp_page_template' ) as $mk ) {
+				$v = get_post_meta( $tid, $mk, true );
+				if ( '' !== $v && null !== $v ) {
+					update_post_meta( $new, $mk, wp_slash( $v ) );
+				}
+			}
+			update_post_meta( $new, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
+			if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->documents ) ) {
+				$doc = \Elementor\Plugin::$instance->documents->get( $new, false );
+				if ( $doc ) {
+					$doc->save( array( 'elements' => $data ) );
+				}
+			}
+			$seo_t = sanitize_text_field( (string) $r->get_param( 'seo_title' ) );
+			$seo_d = sanitize_text_field( (string) $r->get_param( 'seo_description' ) );
+			if ( $seo_t ) {
+				update_post_meta( $new, 'rank_math_title', $seo_t );
+			}
+			if ( $seo_d ) {
+				update_post_meta( $new, 'rank_math_description', $seo_d );
+			}
+			update_post_meta( $new, '_wpt_hub_build', array( 'from' => $tid, 'time' => time() ) );
+			return array(
+				'ok'      => true,
+				'id'      => $new,
+				'status'  => get_post_status( $new ),
+				'preview' => get_preview_post_link( $new ),
+				'edit'    => admin_url( 'post.php?post=' . $new . '&action=elementor' ),
+				'from'    => get_the_title( $tid ),
+				'changes' => $report,
+			);
 		},
 	) );
 } );

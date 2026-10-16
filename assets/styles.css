@@ -195,3 +195,6 @@ ul.where, ol.steps-list { margin: 6px 0 0; padding-left: 20px; font-size: .88rem
   .nav .pri, .rail-foot { display: none; }
   .grid-2 { grid-template-columns: 1fr; }
 }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: -2px; flex: none; }
+tr.sec td { background: var(--sunk); font-size: .8rem; }
+.look-box:empty { display: none; }

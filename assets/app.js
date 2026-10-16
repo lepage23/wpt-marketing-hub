@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.10.0";
-  var BUILT = "2026-10-15 17:23 BST";
+  var VERSION = "0.12.0";
+  var BUILT = "2026-10-16 10:20 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -167,6 +167,7 @@
     { k: "date", label: "Date in", type: "date" },
     { k: "company", label: "Company" },
     { k: "contact", label: "Contact" },
+    { k: "reach", label: "Phone / email" },
     { k: "source", label: "Source", type: "select", options: ["Website form", "Live chat", "Email campaign", "Phone", "Tender", "Referral", "Partner", "Other"] },
     { k: "interest", label: "Interested in" },
     { k: "status", label: "Status", type: "select", options: LEAD_STATUS },
@@ -518,6 +519,115 @@
     renderChangeLog(main);
   }
 
+
+  /* ---------- Quick add: turn a pasted lead email or a rough note into a lead row ---------- */
+  var FORM_LABELS = { "name": "name", "full name": "name", "email": "email", "email address": "email", "phone": "phone", "telephone": "phone", "phone number": "phone",
+    "company": "company", "company name": "company", "organisation": "company", "organization": "company", "product/service": "product", "product": "product", "service": "product",
+    "location": "location", "source page": "page", "message": "message", "enquiry": "message", "submitted": "submitted", "ip address": "_skip", "user agent": "_skip" };
+  var PRODUCTS = ["8x8", "3CX", "Gamma", "Horizon", "Zoom Phone", "Zoom", "Teams", "Avaya", "Mitel", "Xima", "SIP", "SoGEA", "FTTP", "Leased line", "Broadband", "Mobile", "Contact centre", "Call recording", "Cyber"];
+  var PLACES = ["London", "Brighton", "Hove", "Manchester", "Birmingham", "Leeds", "Liverpool", "Bristol", "Sheffield", "Newcastle", "Nottingham", "Leicester", "Southampton", "Portsmouth", "Glasgow", "Edinburgh", "Cardiff", "Belfast", "Oxford", "Cambridge", "Reading", "Crawley", "Worthing", "Eastbourne", "Croydon", "Kent", "Surrey", "Sussex", "Essex", "Yorkshire", "Wales", "Scotland", "UK"];
+  function isoDate(d) { return isNaN(d) ? "" : d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function addWorkDays(iso, n) { var d = new Date(iso + "T12:00:00"); while (n > 0) { d.setDate(d.getDate() + 1); if (d.getDay() % 6) n--; } return isoDate(d); }
+  function findProducts(t) {
+    var hit = [];
+    PRODUCTS.forEach(function (p) { if (new RegExp("(^|[^a-z0-9])" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)", "i").test(t) && !hit.some(function (h) { return h.toLowerCase().indexOf(p.toLowerCase()) > -1; })) hit.push(p); });
+    return hit;
+  }
+  function parseLead(raw, todayIso) {
+    todayIso = todayIso || today();
+    var text = String(raw || "").replace(/\r/g, "").trim();
+    var f = {}, lines = text.split("\n").map(function (l) { return l.trim(); });
+    var cur = null;
+    lines.forEach(function (l) {
+      var key = FORM_LABELS[l.toLowerCase().replace(/:$/, "")];
+      var inline = l.match(/^([A-Za-z\/ ]{3,20}):\s*(.+)$/);
+      if (key) { cur = key; if (!f[cur]) f[cur] = []; return; }
+      if (inline && FORM_LABELS[inline[1].toLowerCase()] && !/^(sent|from|to|subject)$/i.test(inline[1])) {
+        cur = FORM_LABELS[inline[1].toLowerCase()]; f[cur] = (f[cur] || []).concat(inline[2]); if (cur !== "message") cur = null; return;
+      }
+      if (cur && l) f[cur].push(l);
+      else if (cur && !l && cur !== "message") cur = null;
+    });
+    Object.keys(f).forEach(function (k) { f[k] = f[k].join(k === "message" ? "\n" : " ").trim(); });
+    var isForm = !!(f.name || f.email || f.company);
+    var lead = { date: todayIso, company: "", contact: "", reach: "", source: "Other", interest: "", status: "New", owner: "Garry", next: "Garry to make first contact", nextDate: "", notes: "" };
+    var emailM = text.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || [];
+    var ownEmail = /@westpierte(ch|le)\.com$/i;
+    var email = f.email || emailM.filter(function (e) { return !ownEmail.test(e); })[0] || "";
+    var phoneRe = /(\+44\s?\(?0?\)?|\b0)\d[\d\s]{8,11}\d\b/g;
+    var phones = (f.phone || text).match(phoneRe) || [];
+    var ours = function (ph) { return /3442645522|1273391200/.test(String(ph).replace(/\D/g, "")); };
+    phones = phones.filter(function (ph) { return !ours(ph); });
+    var phone = (f.phone && !ours(f.phone) ? f.phone : (phones[0] || "")).trim();
+    var users = (text.match(/(\d{1,5})\s*(users|seats|staff|people|employees|handsets|extensions|sites)\b/i) || []);
+    var prods = findProducts([f.product, f.message, isForm ? "" : text].join(" "));
+
+    if (isForm) {
+      lead.contact = f.name || "";
+      lead.company = f.company || (email ? email.split("@")[1].split(".")[0] : "");
+      lead.source = /website lead|enquiry form|website form|source page/i.test(text) ? "Website form" : "Other";
+      var sub = (f.submitted || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      var sent = text.match(/^Sent:\s*(.+)$/mi);
+      lead.date = sub ? sub[3] + "-" + ("0" + sub[2]).slice(-2) + "-" + ("0" + sub[1]).slice(-2) : sent ? (isoDate(new Date(sent[1].replace(/^[A-Za-z]+,\s*/, ""))) || todayIso) : todayIso;
+      var bits = [f.product, users[0], f.location].filter(Boolean);
+      lead.interest = bits.join(", ") || prods.join(", ");
+      var msg = (f.message || "").replace(/\n{2,}/g, "\n");
+      lead.notes = [msg.length > 900 ? msg.slice(0, 900) + "…" : msg, f.page ? "Came in on: " + f.page : ""].filter(Boolean).join("\n");
+      if (/\b(3|three)\s+quotes?\b/i.test(msg)) lead.next = "Garry to make first contact. Competitive: they need 3 quotes";
+    } else {
+      var chunks = text.split(/\s+[-–|]\s+|\n|;|,(?!\d{3})/).map(function (c) { return c.trim().replace(/^[-–]\s*|\s*[-–]$/g, ""); }).filter(Boolean);
+      var used = {};
+      chunks.forEach(function (c, i) {
+        if (c.indexOf("@") > -1 || phoneRe.test(c)) { used[i] = 1; } phoneRe.lastIndex = 0;
+      });
+      var place = "";
+      chunks.forEach(function (c, i) { if (!used[i] && !place && PLACES.some(function (pl) { return pl.toLowerCase() === c.toLowerCase(); })) { place = c; used[i] = 1; } });
+      var interestBits = [];
+      chunks.forEach(function (c, i) { if (!used[i] && (findProducts(c).length || /\b\d+\s*(users|seats|staff|people|handsets|extensions|sites)\b|^wants?\b|^needs?\b|^looking\b/i.test(c))) { interestBits.push(c.replace(/^(wants?|needs?|looking for)\s+/i, "")); used[i] = 1; } });
+      var rest = chunks.filter(function (c, i) { return !used[i]; });
+      var nameIdx = rest.findIndex(function (c) { return /^[A-Z][a-z'’-]+(\s+[A-Z][a-z'’-]+){1,2}$/.test(c) && !/\b(ltd|limited|shop|group|trust|plc|council|school|academy|services|solutions)\b/i.test(c); });
+      if (nameIdx > -1) { lead.contact = rest[nameIdx]; rest.splice(nameIdx, 1); }
+      if (rest.length) lead.company = rest.shift();
+      lead.interest = interestBits.join(", ") + (place ? (interestBits.length ? ", " : "") + place : "");
+      lead.notes = rest.join(". ");
+      lead.source = /website|form/i.test(text) ? "Website form" : /chat/i.test(text) ? "Live chat" : /referr/i.test(text) ? "Referral" : /called|rang|phone call/i.test(text) ? "Phone" : "Other";
+    }
+    lead.reach = [phone, email].filter(Boolean).join(" · ");
+    lead.nextDate = addWorkDays(todayIso, 1);
+    return lead;
+  }
+  function sameLead(a, b) {
+    var em = function (x) { return ((x.reach || "").match(/[\w.+-]+@[\w.-]+/) || [""])[0].toLowerCase(); };
+    var co = function (x) { return String(x.company || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
+    return (em(a) && em(a) === em(b)) || (co(a).length > 3 && co(a) === co(b));
+  }
+  function quickAddPanel(onAdd) {
+    var box = panel("Quick add", "Paste a lead email, or type a rough note like “Michael Smith - Guitartech shop - London - 07432 345434 - wants 3CX - 14 users”. It goes in as a new row for Garry. Check it and tweak any cell after.");
+    var form = el('<div style="display:flex;flex-direction:column;gap:10px">' +
+      '<label class="field" for="lead-drop">Lead details<textarea id="lead-drop" style="min-height:120px" placeholder="Paste the email or type the details here"></textarea></label>' +
+      '<div class="row"><button type="button" class="btn primary" id="lead-add">Add lead</button><span class="muted" id="lead-msg" style="font-size:.86rem"></span></div></div>');
+    box.appendChild(form);
+    var ta = form.querySelector("#lead-drop"), msg = form.querySelector("#lead-msg");
+    function add(force) {
+      var raw = ta.value.trim();
+      if (!raw) { msg.textContent = "Paste or type the lead first."; return; }
+      var lead = parseLead(raw);
+      if (!lead.company && !lead.contact && !lead.reach) { msg.textContent = "Couldn't pick out a name, company or contact details. Add one and try again."; return; }
+      var dup = getRows("leads").filter(function (r) { return !r._ex && sameLead(r, lead); })[0];
+      if (dup && !force) {
+        msg.innerHTML = "Looks like this is already in: <b>" + esc(dup.company || dup.contact) + "</b> (" + esc(dup.status) + '). <button type="button" class="btn small" id="lead-force">Add anyway</button>';
+        msg.querySelector("#lead-force").addEventListener("click", function () { add(true); });
+        return;
+      }
+      onAdd(lead);
+      ta.value = ""; msg.innerHTML = "Added <b>" + esc(lead.company || lead.contact) + "</b> for Garry, chase by " + esc(new Date(lead.nextDate + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })) + ".";
+      toast("Lead added");
+    }
+    form.querySelector("#lead-add").addEventListener("click", function () { add(false); });
+    ta.addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) add(false); });
+    return box;
+  }
+
   /* Leads */
   function renderLeads(main) {
     main.innerHTML = head("Every lead in one place", "Leads", "Garry chases, you both update. Each lead has a status, an owner, a next step and notes.");
@@ -531,8 +641,9 @@
       updateNav();
     }
     var p = panel("Lead tracker", "Edit any cell. Changes save as you go.");
-    var t = editableTable({ key: "leads", csvName: "wpt-leads", addLabel: "Add lead", columns: LEAD_COLS, seed: LEAD_SEED, onChange: drawCounts,
+    var t = editableTable({ key: "leads", csvName: "wpt-leads", addLabel: "Add blank row", columns: LEAD_COLS, seed: LEAD_SEED, onChange: drawCounts,
       emptyText: "No leads yet. Add one, or send a chat across from the Live chat page.", newRow: function (r) { r.owner = "Garry"; } });
+    main.appendChild(quickAddPanel(function (lead) { t.set(t.get().filter(function (r) { return !r._ex; })); t.add(lead); }));
     p.appendChild(t.node); main.appendChild(p);
     drawCounts(t.get());
     main.appendChild(el('<div class="notice"><b>Garry can\'t see this yet.</b> Leads are saved in this browser only. Next step is shared storage so you both work from the same list. Until then, use Copy as CSV to send him the list.</div>'));
@@ -902,7 +1013,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
-      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion === 5 ? '<span class="chip flag">Page checker version 5 (6 adds page builds)</span><div class="s" style="margin-top:4px">Everything else works. To use Push new page build, replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }
@@ -1616,7 +1727,7 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build" };
   function needsV4(err) {
     if (/no route|unknown edit type/i.test(err.message)) throw new Error("Page editing needs the latest page checker snippet. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
     throw err;
@@ -1840,8 +1951,115 @@
     return card;
   }
 
+
+  /* ---------- New page builds ----------
+     Claude writes the page; the hub copies an existing page's design (sections, fonts, sizes, colours)
+     into a NEW draft, swaps in the new text and hands back a preview link. Never publishes. */
+  function pageStyle(p) {
+    return resolveId({ link: p.template, postType: "pages" }).then(function (id) {
+      return wpFetch("/wpt-hub/v1/page-style?template_id=" + id).then(function (r) { r.templateId = id; return r; }, needsV6);
+    });
+  }
+  function needsV6(err) {
+    if (/no route/i.test(err.message)) throw new Error("Page builds need version 6 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
+    throw err;
+  }
+  function buildPage(p) {
+    if (p.example) return Promise.reject(new Error("This is an example. It can't be built."));
+    if (!p.ready || !(p.edits || []).length) return Promise.reject(new Error("The page text isn't written yet. Send Claude the facts and the build will arrive here."));
+    var parent = p.parent ? resolveId({ link: p.parent, postType: "pages" }) : Promise.resolve(0);
+    return Promise.all([resolveId({ link: p.template, postType: "pages" }), parent]).then(function (ids) {
+      return wpFetch("/wpt-hub/v1/page-build", { method: "POST", body: { template_id: ids[0], parent_id: ids[1], title: p.newTitle, slug: p.slug, edits: p.edits, seo_title: p.seoTitle || "", seo_description: p.seoDescription || "" } });
+    }).then(function (r) {
+      if (r.status !== "draft") throw new Error("WordPress made the page but it isn't a draft. Check it in WordPress now.");
+      return r;
+    }, needsV6);
+  }
+  function binDraft(id) { return wpFetch("/wp/v2/pages/" + id, { method: "DELETE" }); }
+  function styleHtml(s) {
+    var sw = function (c) { return '<span class="swatch" style="background:' + esc(String(c).split(" ")[0]) + '"></span>'; };
+    var fonts = (s.fonts || []).map(function (f) { return "<li><b>" + esc(f.name) + ":</b> " + esc([f.family, f.size, f.weight].filter(Boolean).join(", ") || "theme default") + "</li>"; }).join("");
+    var cols = (s.colors || []).map(function (c) { return '<li class="row" style="gap:6px">' + sw(c.color) + esc(c.name) + ' <span class="mono muted">' + esc(c.color) + "</span></li>"; }).join("");
+    var rows = (s.layout || []).map(function (r) {
+      if (r.widget === "section") return '<tr class="sec"><td colspan="4"><b>Section</b>' + (r.background ? " " + sw(r.background) + ' <span class="mono muted">' + esc(r.background) + "</span>" : "") + (r.bg_image ? ' <span class="muted">· background image</span>' : "") + "</td></tr>";
+      var f = r.font || {};
+      return "<tr><td class=\"mono\">" + esc(r.widget + (r.tag ? " " + r.tag : "")) + "</td><td>" + esc([f.family, f.size, f.weight].filter(Boolean).join(", ") || "default") + (f.global ? '<div class="muted" style="font-size:.75rem">' + esc(f.global) + "</div>" : "") + "</td><td>" + (r.color ? sw(r.color) + ' <span class="mono" style="font-size:.75rem">' + esc(r.color) + "</span>" : "") + "</td><td>" + esc(r.text || (r.image ? "(image)" : "")) + "</td></tr>";
+    }).join("");
+    return '<div class="cols2"><div><b style="font-size:.88rem">Site fonts</b><ul class="where">' + (fonts || "<li class=\"muted\">None set in Elementor</li>") + '</ul></div><div><b style="font-size:.88rem">Site colours</b><ul class="where" style="list-style:none;padding-left:0">' + (cols || "<li class=\"muted\">None set in Elementor</li>") + "</ul></div></div>" +
+      '<div class="table-wrap" style="max-height:360px;overflow:auto"><table><thead><tr><th>Block</th><th>Font, size, weight</th><th>Colour</th><th>Text now</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+  }
+  function buildCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>');
+    var built = st.status === "built", binned = st.status === "binned";
+    var edits = p.edits || [];
+    card.innerHTML =
+      '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' +
+      headChips(p, st).replace("</div>", (built ? '<span class="chip good">Draft ready for review</span>' : !p.ready ? '<span class="chip flag">Waiting on facts</span>' : "") + "</div>") +
+      "<h2>" + esc(p.issue) + "</h2></div>" +
+      '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
+      '<p style="font-size:.9rem"><b>Why it matters:</b> ' + esc(p.why) + "</p>" +
+      '<div class="list">' +
+        '<div class="list-item"><span class="chip">Page</span><div><div class="t">' + esc(p.newTitle || "") + '</div><div class="s mono">' + esc(p.address || "") + "</div></div><span></span></div>" +
+        '<div class="list-item"><span class="chip">Design</span><div><div class="t">Copies the look of <a href="' + esc(p.template) + '" target="_blank" rel="noopener">' + esc(p.templateTitle || p.template) + "</a></div>" +
+          '<div class="s">Same sections, fonts, text sizes, colours and spacing. That page itself isn\'t touched.</div></div><button type="button" class="btn small look">Check the look</button></div>' +
+      "</div>" +
+      '<div class="look-box"></div>' +
+      (p.ready ? '<details><summary style="cursor:pointer;font-size:.88rem"><b>What the build changes (' + edits.length + ")</b></summary><ol class=\"steps-list\">" + edits.map(function (e) {
+        return "<li>" + (e.op === "remove" ? "Remove the block with “" + esc(e.find) + "”" : "“" + esc(e.find) + "” becomes:<pre class=\"was\">" + esc(e.replace) + "</pre>") + "</li>"; }).join("") + "</ol></details>"
+        : '<div><b style="font-size:.9rem">Waiting on</b><ol class="steps-list">' + (p.waitingOn || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div>") +
+      '<div class="fix-actions row"></div><div class="fix-msg"></div>';
+    var actions = card.querySelector(".fix-actions"), msg = card.querySelector(".fix-msg"), look = card.querySelector(".look-box");
+    var lookBtn = card.querySelector(".look");
+    lookBtn.addEventListener("click", function () {
+      if (look.innerHTML) { look.innerHTML = ""; lookBtn.textContent = "Check the look"; return; }
+      look.innerHTML = '<div class="notice info">Reading the page design from WordPress. Nothing changes…</div>';
+      pageStyle(p).then(function (s) { look.innerHTML = styleHtml(s); lookBtn.textContent = "Hide the look"; })
+        .catch(function (err) { look.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+    });
+    var LABEL = "Push new page build for review";
+    if (built) {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">Built ' + esc(st.builtAt || "") + ". Not live. Only people logged in to WordPress can see it.</span>" +
+        '<a class="btn primary" href="' + esc(st.preview) + '" target="_blank" rel="noopener">Preview the draft</a>' +
+        '<a class="btn small" href="' + esc(st.editLink) + '" target="_blank" rel="noopener">Edit in Elementor</a>' +
+        '<button type="button" class="btn small danger bin">Bin this draft</button>';
+      var bin = actions.querySelector(".bin");
+      bin.addEventListener("click", function () {
+        if (!bin.dataset.sure) { bin.dataset.sure = "1"; bin.textContent = "Click again to bin it"; return; }
+        bin.disabled = true;
+        binDraft(st.draftId).then(function () {
+          var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+          setFix(p.id, { status: "binned", binnedAt: when });
+          logChange({ id: p.id, when: when, page: p.newTitle, link: p.address, type: TYPE_LABEL[p.type], action: "Draft binned" });
+          toast("Draft moved to the bin in WordPress"); redraw(); updateNav();
+        }).catch(function (err) { bin.disabled = false; msg.innerHTML = '<div class="notice"><b>Couldn\'t bin it.</b> ' + esc(err.message) + "</div>"; });
+      });
+    } else if (binned || st.status === "rejected") {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (binned ? "Draft binned " + esc(st.binnedAt || "") : "Not doing this") + '</span><button type="button" class="btn small">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
+    } else {
+      actions.innerHTML = '<button type="button" class="btn primary go"' + (p.ready && !p.example ? "" : " disabled") + ">" + LABEL + "</button>" +
+        '<button type="button" class="btn rej">Not doing this</button>' +
+        (p.ready ? "" : '<span class="muted" style="font-size:.86rem">Switches on once Claude has written the page.</span>');
+      actions.querySelector(".go").addEventListener("click", function () {
+        var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Building the draft…";
+        buildPage(p).then(function (r) {
+          var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+          setFix(p.id, { status: "built", builtAt: when, draftId: r.id, preview: r.preview, editLink: r.edit });
+          logChange({ id: p.id, when: when, page: p.newTitle, link: r.preview, type: TYPE_LABEL[p.type], action: "Draft built for review" });
+          toast("Draft built. Nothing is live."); redraw(); updateNav();
+        }).catch(function (err) {
+          btn.disabled = false; btn.textContent = LABEL;
+          msg.innerHTML = '<div class="notice"><b>Not built.</b> ' + esc(err.message) + "</div>";
+        });
+      });
+      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    }
+    return card;
+  }
+
   function fixCard(p, st, redraw) {
     if (p.type === "manual") return manualCard(p, st, redraw);
+    if (p.type === "page_build") return buildCard(p, st, redraw);
     var text = st.edited != null ? st.edited : p.proposed;
     var isMeta = p.type === "meta_title" || p.type === "meta_description";
     var done = st.status === "pushed" || st.status === "undone";
