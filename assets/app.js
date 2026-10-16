@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.12.0";
-  var BUILT = "2026-10-16 10:20 BST";
+  var VERSION = "0.12.1";
+  var BUILT = "2026-10-16 10:55 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -102,7 +102,7 @@
         }).join("") + "</select>";
       }
       if (!c.type || c.type === "text") {
-        return '<textarea id="' + id + '" data-k="' + c.k + '" rows="1" class="cell' + (c.wide ? " wide" : "") + '" aria-label="' + esc(c.label) + '">' + esc(v) + "</textarea>";
+        return '<textarea id="' + id + '" data-k="' + c.k + '" rows="1" class="cell' + (c.wide ? " wide" : "") + (cfg.compact ? " clamp" : "") + '" aria-label="' + esc(c.label) + '">' + esc(v) + "</textarea>";
       }
       var t = c.type === "number" ? "number" : c.type === "date" ? "date" : "text";
       return '<input id="' + id + '" data-k="' + c.k + '" type="' + t + '" value="' + esc(v) + '"' + (c.num ? ' style="text-align:right"' : "") + ' aria-label="' + esc(c.label) + '">';
@@ -111,16 +111,16 @@
       if (!rows.length) {
         tableBox.innerHTML = '<div class="empty">' + esc(cfg.emptyText || "Nothing here yet.") + "</div>";
       } else {
-        var h = "<table><thead><tr>" + cfg.columns.map(function (c) {
+        var h = "<table" + (cfg.compact ? ' class="compact"' : "") + "><thead><tr>" + (cfg.compact ? "<th></th>" : "") + cfg.columns.map(function (c) {
           return '<th class="' + (c.num || c.compute ? "num" : "") + '">' + esc(c.label) + "</th>";
         }).join("") + "<th></th></tr></thead><tbody>";
         rows.forEach(function (r) {
-          h += '<tr data-id="' + r._id + '">' + cfg.columns.map(function (c) {
+          h += '<tr data-id="' + r._id + '">' + (cfg.compact ? '<td class="row-lead"><button type="button" class="btn small danger" data-del="1" aria-label="Remove this row">Remove</button><button type="button" class="btn small" data-more="1">More</button></td>' : "") + cfg.columns.map(function (c) {
             return '<td class="' + (c.num || c.compute ? "num" : "") + '">' + cellInput(c, r) + "</td>";
           }).join("") + '<td class="row-actions">' +
             (r._ex ? '<span class="chip ex" title="Example row. Replace or delete it.">example</span> ' : "") +
             (cfg.actions || []).map(function (a, i) { return '<button type="button" class="btn small" data-act="' + i + '">' + esc(a.label) + "</button> "; }).join("") +
-            '<button type="button" class="btn small danger" data-del="1" aria-label="Delete row">Delete</button></td></tr>';
+            (cfg.compact ? "" : '<button type="button" class="btn small danger" data-del="1" aria-label="Delete row">Delete</button>') + "</td></tr>";
         });
         tableBox.innerHTML = h + "</tbody></table>";
         requestAnimationFrame(function () { Array.prototype.forEach.call(tableBox.querySelectorAll("textarea.cell"), fitCell); });
@@ -141,7 +141,11 @@
     tableBox.addEventListener("click", function (e) {
       var tr = e.target.closest("tr"); if (!tr) return;
       var id = tr.getAttribute("data-id");
-      if (e.target.hasAttribute("data-del")) { rows = rows.filter(function (x) { return x._id !== id; }); persist(); render(); toast("Row deleted"); }
+      if (e.target.hasAttribute("data-more")) { var open = tr.classList.toggle("open"); e.target.textContent = open ? "Less" : "More"; Array.prototype.forEach.call(tr.querySelectorAll("textarea.cell"), fitCell); return; }
+      if (e.target.hasAttribute("data-del")) {
+        if (cfg.compact && !e.target.dataset.sure) { e.target.dataset.sure = "1"; e.target.textContent = "Sure?"; setTimeout(function () { if (e.target.isConnected) { delete e.target.dataset.sure; e.target.textContent = "Remove"; } }, 4000); return; }
+        rows = rows.filter(function (x) { return x._id !== id; }); persist(); render(); toast(cfg.compact ? "Removed" : "Row deleted");
+      }
       var a = e.target.getAttribute("data-act");
       if (a != null) cfg.actions[a].run(rows.find(function (x) { return x._id === id; }));
     });
@@ -521,7 +525,7 @@
 
 
   /* ---------- Quick add: turn a pasted lead email or a rough note into a lead row ---------- */
-  var FORM_LABELS = { "name": "name", "full name": "name", "email": "email", "email address": "email", "phone": "phone", "telephone": "phone", "phone number": "phone",
+  var FORM_LABELS = { "name": "name", "full name": "name", "your name": "name", "contact name": "name", "first name": "first", "last name": "last", "surname": "last", "your email": "email", "work email": "email", "mobile": "phone", "company / organisation": "company", "business name": "company", "comments": "message", "how can we help?": "message", "how can we help": "message", "details": "message", "email": "email", "email address": "email", "phone": "phone", "telephone": "phone", "phone number": "phone",
     "company": "company", "company name": "company", "organisation": "company", "organization": "company", "product/service": "product", "product": "product", "service": "product",
     "location": "location", "source page": "page", "message": "message", "enquiry": "message", "submitted": "submitted", "ip address": "_skip", "user agent": "_skip" };
   var PRODUCTS = ["8x8", "3CX", "Gamma", "Horizon", "Zoom Phone", "Zoom", "Teams", "Avaya", "Mitel", "Xima", "SIP", "SoGEA", "FTTP", "Leased line", "Broadband", "Mobile", "Contact centre", "Call recording", "Cyber"];
@@ -533,65 +537,145 @@
     PRODUCTS.forEach(function (p) { if (new RegExp("(^|[^a-z0-9])" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)", "i").test(t) && !hit.some(function (h) { return h.toLowerCase().indexOf(p.toLowerCase()) > -1; })) hit.push(p); });
     return hit;
   }
+  function titleCase(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }
+  /* tom.snell@acme.co.uk -> Tom Snell. Only when the address looks like first.last. */
+  function nameFromEmail(e) {
+    var m = String(e || "").split("@")[0].match(/^([a-z]{2,})[._-]([a-z]{2,})$/i);
+    return m ? titleCase(m[1]) + " " + titleCase(m[2]) : "";
+  }
+  /* acme-group.co.uk -> Acme Group. Skips webmail. */
+  function companyFromEmail(e) {
+    var d = String(e || "").split("@")[1] || "";
+    if (!d || /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|btinternet|sky|virginmedia|talktalk|protonmail)\./i.test(d)) return "";
+    return d.split(".")[0].split(/[-_]/).map(titleCase).join(" ");
+  }
+  function clip(t, n) { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n).replace(/\s+\S*$/, "") + "…" : t; }
+  /* Drop greetings and sign-offs so Notes is just the ask. */
+  function tidyMsg(m) {
+    return String(m || "").replace(/^\s*(hi|hello|dear|good (morning|afternoon|evening))\b[^\n.!,]{0,30}[,.!]?\s*/i, "")
+      .replace(/\b(hope (you('| a)re|you are|all is) (well|good)[^.!]*[.!]\s*)/i, "")
+      .replace(/\s*\b(thanks( (in advance|again|all))?|thank you|many thanks|kind regards|best regards|regards|cheers)[,.!]?(\s+[A-Z][\w'’-]+){0,3}\s*$/i, "").trim();
+  }
+  var SIGNOFF = /^(thanks( (in advance|again|all))?|thank you|many thanks|kind regards|best regards|best wishes|regards|best|cheers)[,.!]?$/i;
+  var OWN = /westpierte(ch|le)|connor le ?page|garry bloomfield|mark james/i;
   function parseLead(raw, todayIso) {
     todayIso = todayIso || today();
     var text = String(raw || "").replace(/\r/g, "").trim();
-    var f = {}, lines = text.split("\n").map(function (l) { return l.trim(); });
-    var cur = null;
+    var lines = text.split("\n").map(function (l) { return l.trim(); });
+    var f = {}, cur = null;
     lines.forEach(function (l) {
       var key = FORM_LABELS[l.toLowerCase().replace(/:$/, "")];
       var inline = l.match(/^([A-Za-z\/ ]{3,20}):\s*(.+)$/);
       if (key) { cur = key; if (!f[cur]) f[cur] = []; return; }
-      if (inline && FORM_LABELS[inline[1].toLowerCase()] && !/^(sent|from|to|subject)$/i.test(inline[1])) {
+      if (inline && FORM_LABELS[inline[1].toLowerCase()] && OWN.test(inline[2])) { cur = null; return; }
+      if (inline && FORM_LABELS[inline[1].toLowerCase()] && !/^(sent|from|to|cc|subject)$/i.test(inline[1])) {
         cur = FORM_LABELS[inline[1].toLowerCase()]; f[cur] = (f[cur] || []).concat(inline[2]); if (cur !== "message") cur = null; return;
       }
       if (cur && l) f[cur].push(l);
       else if (cur && !l && cur !== "message") cur = null;
     });
     Object.keys(f).forEach(function (k) { f[k] = f[k].join(k === "message" ? "\n" : " ").trim(); });
-    var isForm = !!(f.name || f.email || f.company);
-    var lead = { date: todayIso, company: "", contact: "", reach: "", source: "Other", interest: "", status: "New", owner: "Garry", next: "Garry to make first contact", nextDate: "", notes: "" };
-    var emailM = text.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || [];
-    var ownEmail = /@westpierte(ch|le)\.com$/i;
-    var email = f.email || emailM.filter(function (e) { return !ownEmail.test(e); })[0] || "";
-    var phoneRe = /(\+44\s?\(?0?\)?|\b0)\d[\d\s]{8,11}\d\b/g;
-    var phones = (f.phone || text).match(phoneRe) || [];
+    if (!f.name && (f.first || f.last)) f.name = [f.first, f.last].filter(Boolean).join(" ");
+
+    /* Who's who. Skip anything that's WPT's own. */
+    var emails = (text.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || []).filter(function (e) { return !OWN.test(e); });
+    var froms = lines.map(function (l) { return l.match(/^From:\s*(.*?)\s*<?([\w.+-]+@[\w.-]+)>?\s*$/i) || l.match(/^From:\s*(.+)$/i); }).filter(Boolean)
+      .map(function (m) { return { name: (m[1] || "").replace(/["']/g, "").trim(), email: m[2] || "" }; })
+      .filter(function (x) { return !OWN.test(x.name + " " + x.email); });
     var ours = function (ph) { return /3442645522|1273391200/.test(String(ph).replace(/\D/g, "")); };
+    var phoneRe = /(\+44\s?\(?0?\)?\s?|\b0)\d[\d ]{8,11}\d\b/g;
+    var phones = ((f.phone || "") + "\n" + text).match(phoneRe) || [];
     phones = phones.filter(function (ph) { return !ours(ph); });
-    var phone = (f.phone && !ours(f.phone) ? f.phone : (phones[0] || "")).trim();
-    var users = (text.match(/(\d{1,5})\s*(users|seats|staff|people|employees|handsets|extensions|sites)\b/i) || []);
-    var prods = findProducts([f.product, f.message, isForm ? "" : text].join(" "));
+    var email = f.email || (froms[0] && froms[0].email) || emails[0] || "";
+    var phone = (phones[0] || "").trim();
+    var users = (text.match(/(\d{1,5})\s*(users|seats|staff|people|employees|handsets|extensions|sites|lines)\b/i) || [""])[0];
+
+    var isForm = !!(f.name || f.email || f.company);
+    var isEmail = !isForm && (froms.length > 0 || /^(subject|sent|to):/im.test(text) || /^(hi|hello|dear|good (morning|afternoon))\b/im.test(text));
+    var lead = { date: todayIso, company: "", contact: "", reach: "", source: "Other", interest: "", status: "New", owner: "Garry", next: "Garry to make first contact", nextDate: "", notes: "" };
+    var sent = text.match(/^Sent:\s*(.+)$/mi);
+    var sentDate = sent ? isoDate(new Date(sent[1].replace(/^[A-Za-z]+,\s*/, ""))) : "";
 
     if (isForm) {
-      lead.contact = f.name || "";
-      lead.company = f.company || (email ? email.split("@")[1].split(".")[0] : "");
+      lead.contact = f.name || nameFromEmail(email);
+      lead.company = f.company || companyFromEmail(email);
       lead.source = /website lead|enquiry form|website form|source page/i.test(text) ? "Website form" : "Other";
       var sub = (f.submitted || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      var sent = text.match(/^Sent:\s*(.+)$/mi);
-      lead.date = sub ? sub[3] + "-" + ("0" + sub[2]).slice(-2) + "-" + ("0" + sub[1]).slice(-2) : sent ? (isoDate(new Date(sent[1].replace(/^[A-Za-z]+,\s*/, ""))) || todayIso) : todayIso;
-      var bits = [f.product, users[0], f.location].filter(Boolean);
-      lead.interest = bits.join(", ") || prods.join(", ");
-      var msg = (f.message || "").replace(/\n{2,}/g, "\n");
-      lead.notes = [msg.length > 900 ? msg.slice(0, 900) + "…" : msg, f.page ? "Came in on: " + f.page : ""].filter(Boolean).join("\n");
+      lead.date = sub ? sub[3] + "-" + ("0" + sub[2]).slice(-2) + "-" + ("0" + sub[1]).slice(-2) : sentDate || todayIso;
+      lead.interest = [f.product || findProducts(f.message || "").join(", "), users, f.location].filter(Boolean).join(", ");
+      lead.notes = [clip(tidyMsg(f.message), 220), f.page ? "Came in on: " + clip(f.page.replace(/^https?:\/\/(www\.)?[^\/]+/, ""), 60) : ""].filter(Boolean).join("\n");
+      if (/\b(3|three)\s+quotes?\b/i.test(f.message || "")) lead.next = "Garry to make first contact. Competitive: they need 3 quotes";
+    } else if (isEmail) {
+      /* A normal email or a whole thread. Newest message is on top, so only the top one decides
+         who it's from and what the notes say. Older quoted messages are only used for products. */
+      var seenBody = false, cut = lines.length;
+      for (var i = 0; i < lines.length; i++) {
+        var l = lines[i];
+        if (!l) continue;
+        var quote = /^On .{4,90}(wrote:?)?$/i.test(l) && /\d/.test(l) || /^-{2,}\s*(original|forwarded)/i.test(l) || /^>/.test(l) || /^_{5,}$/.test(l);
+        if (seenBody && (quote || /^(from|sent):/i.test(l))) { cut = i; break; }
+        if (/^(hi|hello|dear|good (morning|afternoon|evening))\b/i.test(l)) seenBody = true;
+        else if (seenBody === false && !/^(from|to|cc|bcc|sent|date|subject):/i.test(l) && !/^(re|fw|fwd):/i.test(l) && !/<[^>]+@[^>]+>/.test(l) && !OWN.test(l) && /[a-z]{3}.*[.?!]$/i.test(l)) seenBody = true;
+      }
+      var top = lines.slice(0, cut);
+      var topText = top.join("\n");
+      /* Sender: "From: Name <email>", or a bare "Name <email>" line as Outlook copies it. */
+      var sender = null;
+      top.forEach(function (l) {
+        if (sender) return;
+        var m = l.match(/^(?:From:\s*)?["']?([^<>"@\n]{3,60}?)["']?\s*<([\w.+-]+@[\w.-]+)>/i);
+        if (m && !OWN.test(m[1] + m[2])) sender = { name: m[1].replace(/^From:\s*/i, "").trim(), email: m[2] };
+      });
+      if (!sender && froms[0]) sender = froms[0];
+      var bodyStart = top.findIndex(function (l) { return /^(hi|hello|dear|good (morning|afternoon|evening))\b/i.test(l); });
+      var body = top.slice(bodyStart > -1 ? bodyStart : 0).filter(function (l) {
+        return l && !/^(from|to|cc|bcc|sent|date|subject|phone|tel|mob|mobile|website|web|email|e):/i.test(l) && !/^(re|fw|fwd):/i.test(l) && !(OWN.test(l) && l.length < 40);
+      });
+      var signIdx = body.findIndex(function (l) { return SIGNOFF.test(l); });
+      var sig = signIdx > -1 ? body.slice(signIdx + 1, signIdx + 6) : [];
+      var msg = (signIdx > -1 ? body.slice(0, signIdx) : body).filter(function (l) { return !/^(hi|hello|dear|good (morning|afternoon|evening))\b.{0,30}$/i.test(l); }).join(" ");
+      var NAME = /^[A-Z][a-z'’-]+(\s+[A-Z][a-z'’-]+){1,2}$/;
+      var sigName = "", sigCo = "";
+      sig.forEach(function (l) {
+        var split = l.split(/\s+[\/|–-]\s+/);   /* "Tom Snell / Standard8" */
+        if (!sigName && NAME.test(split[0]) && !OWN.test(l)) { sigName = split[0]; if (split[1]) sigCo = split[1]; }
+      });
+      if (!sigCo) sigCo = sig.filter(function (l) { return l !== sigName && /\b(ltd|limited|plc|llp|group|trust|council|school|academy|college|university|nhs|hospital|services|solutions|partners|associates|& co)\b/i.test(l); })[0] || "";
+      var senderName = sender && sender.name && !/@/.test(sender.name) ? sender.name.replace(/^(.+),\s*(.+)$/, "$2 $1").replace(/\s*[\/|].*$/, "") : "";
+      var topEmail = sender && sender.email || ((topText.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || []).filter(function (e) { return !OWN.test(e); })[0]) || email;
+      email = topEmail;
+      lead.contact = senderName || sigName || nameFromEmail(email);
+      lead.company = sigCo || companyFromEmail(email);
+      var subj = (text.match(/^Subject:\s*(?:(?:re|fw|fwd):\s*)*(.+)$/mi) || text.match(/^(?:(?:re|fw|fwd):\s*)+(.+)$/mi) || [])[1] || "";
+      var prods = findProducts(subj + " " + msg);
+      if (!prods.length) prods = findProducts(text);
+      lead.interest = [prods.slice(0, 4).join(", "), users].filter(Boolean).join(", ") || clip(subj, 60);
+      lead.notes = [clip(tidyMsg(msg), 220) || (subj ? "Re: " + clip(subj, 60) : ""), cut < lines.length ? "(Part of an email thread.)" : ""].filter(Boolean).join("\n");
+      var topSent = topText.match(/^Sent:\s*(.+)$/mi);
+      lead.date = (topSent && isoDate(new Date(topSent[1].replace(/^[A-Za-z]+,\s*/, "")))) || todayIso;
+      lead.source = /website|enquiry form/i.test(subj) ? "Website form" : /referr/i.test(text) ? "Referral" : "Other";
       if (/\b(3|three)\s+quotes?\b/i.test(msg)) lead.next = "Garry to make first contact. Competitive: they need 3 quotes";
+      else if (cut < lines.length && /\bquote/i.test(text)) lead.next = "Garry to follow up the quotes";
     } else {
+      /* A rough note: "Name - Company - Place - phone - wants X - 14 users" */
       var chunks = text.split(/\s+[-–|]\s+|\n|;|,(?!\d{3})/).map(function (c) { return c.trim().replace(/^[-–]\s*|\s*[-–]$/g, ""); }).filter(Boolean);
       var used = {};
-      chunks.forEach(function (c, i) {
-        if (c.indexOf("@") > -1 || phoneRe.test(c)) { used[i] = 1; } phoneRe.lastIndex = 0;
-      });
+      chunks.forEach(function (c, i) { if (c.indexOf("@") > -1 || new RegExp(phoneRe.source).test(c)) used[i] = 1; });
       var place = "";
       chunks.forEach(function (c, i) { if (!used[i] && !place && PLACES.some(function (pl) { return pl.toLowerCase() === c.toLowerCase(); })) { place = c; used[i] = 1; } });
       var interestBits = [];
-      chunks.forEach(function (c, i) { if (!used[i] && (findProducts(c).length || /\b\d+\s*(users|seats|staff|people|handsets|extensions|sites)\b|^wants?\b|^needs?\b|^looking\b/i.test(c))) { interestBits.push(c.replace(/^(wants?|needs?|looking for)\s+/i, "")); used[i] = 1; } });
+      chunks.forEach(function (c, i) { if (!used[i] && c.length < 60 && (findProducts(c).length || /\b\d+\s*(users|seats|staff|people|handsets|extensions|sites|lines)\b|^wants?\b|^needs?\b|^looking\b/i.test(c))) { interestBits.push(c.replace(/^(wants?|needs?|looking for)\s+/i, "")); used[i] = 1; } });
       var rest = chunks.filter(function (c, i) { return !used[i]; });
       var nameIdx = rest.findIndex(function (c) { return /^[A-Z][a-z'’-]+(\s+[A-Z][a-z'’-]+){1,2}$/.test(c) && !/\b(ltd|limited|shop|group|trust|plc|council|school|academy|services|solutions)\b/i.test(c); });
       if (nameIdx > -1) { lead.contact = rest[nameIdx]; rest.splice(nameIdx, 1); }
-      if (rest.length) lead.company = rest.shift();
-      lead.interest = interestBits.join(", ") + (place ? (interestBits.length ? ", " : "") + place : "");
-      lead.notes = rest.join(". ");
+      if (rest.length && rest[0].length < 60) lead.company = rest.shift();
+      lead.contact = lead.contact || nameFromEmail(email);
+      lead.company = lead.company || companyFromEmail(email);
+      lead.interest = interestBits.concat(place ? [place] : []).join(", ");
+      lead.notes = clip(rest.join(". "), 300);
       lead.source = /website|form/i.test(text) ? "Website form" : /chat/i.test(text) ? "Live chat" : /referr/i.test(text) ? "Referral" : /called|rang|phone call/i.test(text) ? "Phone" : "Other";
     }
+    lead.interest = clip(lead.interest, 60);
     lead.reach = [phone, email].filter(Boolean).join(" · ");
     lead.nextDate = addWorkDays(todayIso, 1);
     return lead;
@@ -641,7 +725,7 @@
       updateNav();
     }
     var p = panel("Lead tracker", "Edit any cell. Changes save as you go.");
-    var t = editableTable({ key: "leads", csvName: "wpt-leads", addLabel: "Add blank row", columns: LEAD_COLS, seed: LEAD_SEED, onChange: drawCounts,
+    var t = editableTable({ key: "leads", csvName: "wpt-leads", addLabel: "Add blank row", compact: true, columns: LEAD_COLS, seed: LEAD_SEED, onChange: drawCounts,
       emptyText: "No leads yet. Add one, or send a chat across from the Live chat page.", newRow: function (r) { r.owner = "Garry"; } });
     main.appendChild(quickAddPanel(function (lead) { t.set(t.get().filter(function (r) { return !r._ex; })); t.add(lead); }));
     p.appendChild(t.node); main.appendChild(p);

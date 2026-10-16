@@ -198,3 +198,9 @@ ul.where, ol.steps-list { margin: 6px 0 0; padding-left: 20px; font-size: .88rem
 .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: -2px; flex: none; }
 tr.sec td { background: var(--sunk); font-size: .8rem; }
 .look-box:empty { display: none; }
+/* Compact tables: long cells show two lines until you click into them or press More. */
+table.compact td textarea.cell.clamp { max-height: 3.1em; }
+table.compact td textarea.cell.clamp:focus, table.compact tr.open td textarea.cell.clamp { max-height: none; }
+table.compact td.row-lead { width: 1%; white-space: nowrap; }
+table.compact td.row-lead .btn { display: block; width: 100%; margin: 0 0 4px; }
+table.compact td { vertical-align: top; }

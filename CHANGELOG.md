@@ -6,6 +6,17 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.12.1 · 2026-10-16 10:55 BST
+
+Leads tidy-up.
+
+- **Remove** button at the start of every lead row (click twice to confirm). For leads that turn out to be existing customers or junk.
+- Long cells now show two lines only. Click into a cell, or press **More** on the row, to see all of it. Fixes rows that had gone massive.
+- Quick add now handles ordinary emails, not just website form ones. It takes the name from the From line or the signature, the company from the signature or their email address, and falls back to first.last@ addresses for the name.
+- Email threads: only the newest message decides who the lead is and what Notes says. Older quoted messages only feed the products list. WPT people (Connor, Garry, Mark James) and WPT signatures are skipped, so a thread Garry replied to no longer comes in as "Garry Bloomfield". Handles signatures like "Tom Snell / Standard8".
+- Interested in is capped to a short line. Notes is a quick breakdown (about two sentences) with greetings and sign-offs stripped.
+- 181 tests, all passing.
+
 ## v0.12.0 · 2026-10-16 10:20 BST
 
 Quick add on the Leads page.
