@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.13.0";
-  var BUILT = "2026-10-16 12:05 BST";
+  var VERSION = "0.15.0";
+  var BUILT = "2026-10-16 13:30 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -338,6 +338,7 @@
     renderPerformance(main);
     renderGa4(main);
     renderMobile(main);
+    renderDisplayCheck(main);
     renderFind(main);
 
     /* Audit panel */
@@ -1862,11 +1863,168 @@
     draw();
   }
 
+
+  /* ---------- Display check ----------
+     Opens every live page in a small window, first at desktop width and then phone width, with ?wpt_check=1.
+     The page checker snippet (version 8) adds a read-only script to that one view, which measures what's
+     actually drawn and posts the problems back here. Fixable ones become push-ready fixes. */
+  var DISPLAY_KIND = {
+    distorted: "Squashed or stretched image", cropped: "Logo or badge cut off", broken: "Broken image",
+    button_wrap: "Button text wraps onto two lines", text_clipped: "Text cut off", overflow: "Sticks out past the screen edge", no_alt: "Image with no alt text"
+  };
+  var FIT_SET = { "object-fit": "contain", "object-fit_tablet": "contain", "object-fit_mobile": "contain", "object-position": "center center" };
+  function buildDisplayFixes(d) {
+    var out = []; if (!d || !d.pages) return out;
+    var today = new Date().toISOString().slice(0, 10), groups = {};
+    var claude = {}; (window.WPT_PROPOSALS || []).forEach(function (f) { if (f.type === "elementor_style") { claude[norm(f.link) + "|" + (f.element || f.find)] = 1; if (f.widget && f.widget !== "image") claude[norm(f.link) + "|widget:" + f.widget] = 1; } });
+    Object.keys(d.pages).forEach(function (u) {
+      var pg = d.pages[u]; if (!pg || pg.error) return;
+      var seen = {};
+      ["desktop", "phone"].forEach(function (mode) {
+        (pg[mode] || []).forEach(function (it) {
+          var key = it.kind + "|" + (it.widget.id || "") + "|" + (it.file || it.text || "");
+          if (seen[key]) { seen[key].modes.push(mode); return; }
+          var x = Object.assign({ modes: [mode] }, it); seen[key] = x;
+        });
+      });
+      Object.keys(seen).forEach(function (k) {
+        var it = seen[k], onWhat = it.modes.length > 1 ? "desktop and phones" : it.modes[0] === "phone" ? "phones only" : "desktop only";
+        var wtype = it.widget.type, wid = it.widget.id;
+        var auto = (it.kind === "distorted" || it.kind === "cropped") && wid && (wtype === "image" || (wtype === "media-carousel" && it.bg));
+        if (auto && !claude[norm(u) + "|" + wid] && !(wtype !== "image" && claude[norm(u) + "|widget:" + wtype]) && !(it.file && claude[norm(u) + "|" + it.file.replace(/\.[a-z0-9]+$/i, "").replace(/-\d+x\d+$/, "").toLowerCase()])) {
+          var fid = "disp-" + (shortPath(u) + "-" + wid).replace(/\W+/g, "-").slice(0, 80);
+          if (out.some(function (o) { return o.id === fid; })) return;
+          out.push({ id: fid, auto: true, created: today, batch: "Found by display check", category: "Mobile", type: "elementor_style", size: "small",
+            priority: it.logo || it.kind === "cropped" ? "high" : "medium", postType: "pages", pageId: pg.pageId || 0, pageTitle: shortPath(u), link: u,
+            element: wid, widget: wtype, set: wtype === "media-carousel" ? { image_fit: "contain" } : FIT_SET,
+            issue: DISPLAY_KIND[it.kind] + ": " + (it.file || "image") + (it.at && it.at.near ? " (near “" + it.at.near + "”)" : ""),
+            current: (it.file || "This image") + (wtype === "media-carousel" ? " in the carousel" : "") + " is " + (it.detail || "the wrong shape") + ", on " + onWhat + ".",
+            proposed: wtype === "media-carousel" ? "Every image in this carousel fits inside its tile at its true shape, so nothing is cut off. Tiles stay the same size. Only the carousel's image fit setting changes. Undo puts it back."
+              : "Same image, same space. It fits inside at its true shape on desktop, tablet and phone. Nothing is cropped. Only how this image displays changes. Undo puts it back.",
+            why: "Found by the display check, which looks at each page the way a visitor sees it. Cut-off or squashed images look careless, especially logos and badges, which are trust signals." });
+          return;
+        }
+        var g = groups[it.kind] = groups[it.kind] || [];
+        g.push({ title: shortPath(u) + (it.at && it.at.near ? " · near “" + it.at.near + "”" : ""), link: u,
+          note: [it.file || (it.text ? "“" + it.text + "”" : ""), it.detail || "", onWhat, wtype ? "Elementor " + wtype : ""].filter(Boolean).join(" · ") });
+      });
+    });
+    var STEPS = {
+      distorted: ["Open the page in Elementor and click the image.", "In the Style tab, set Height to Default, or keep the height and set Object Fit to Contain.", "Check the phone view, then Update. Tell Claude if it's inside a widget the hub can't edit yet, and it'll add support."],
+      cropped: ["Open the page in Elementor and click the image or carousel.", "Set the image fit (Object Fit or Image Fit) to Contain so the whole image shows.", "Check the phone view, then Update."],
+      broken: ["Open the page in Elementor and find the image (it shows as empty or a broken icon).", "Choose the image again from the Media Library, or remove the widget.", "Update."],
+      button_wrap: ["Open the page in Elementor and click the button.", "Shorten the text, or in Style reduce the font size or padding on phones (phone icon), so it sits on one line.", "Check the buttons next to it match, then Update."],
+      text_clipped: ["Open the page in Elementor and click the text.", "Its box is too small for the words. Remove the fixed width or height, or shorten the text.", "Update."],
+      overflow: ["Open the page in Elementor in the phone view (phone icon, bottom left).", "Click the item listed. Look for a fixed width, a negative margin or a wide image, and set it to 100% or auto on phones.", "Update, then run the display check again."],
+      no_alt: ["Open the image in the Media Library.", "Fill in Alternative Text with a short description of what it shows (or the company name for a logo).", "Save. Google and AI tools use this to understand the image."]
+    };
+    var PRI = { broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low" };
+    Object.keys(groups).forEach(function (k) {
+      var g = groups[k];
+      out.push({ id: "disp-" + k, auto: true, type: "manual", created: today, batch: "Found by display check", category: k === "no_alt" ? "AI search" : "Mobile", priority: PRI[k],
+        pageTitle: "Display check", link: g[0].link, issue: g.length + " × " + DISPLAY_KIND[k].toLowerCase(), pages: g,
+        why: "Found by the display check, which looks at each page the way a visitor sees it, on desktop and on a phone.", steps: STEPS[k] });
+    });
+    return out;
+  }
+  function renderDisplayCheck(main) {
+    var p = panel("Display check", "Opens every live page at desktop and phone width and looks at it the way a visitor does: cut-off logos, squashed images, broken images, wrapped buttons, cut-off text and anything sticking out past the screen. Read-only.");
+    var body = el('<div style="display:flex;flex-direction:column;gap:12px"></div>'); p.appendChild(body); main.appendChild(p);
+    var stop = false;
+    function draw() {
+      var d = load("display", null);
+      body.innerHTML = '<div class="row"><button type="button" class="btn primary" id="dc-run">Check every page</button><button type="button" class="btn" id="dc-stop" hidden>Stop</button>' +
+        '<span class="muted" style="font-size:.82rem">Loads each page twice (desktop, then phone) in a small preview here. Stay on this page while it runs. About 10 seconds a page. Needs page checker version 8.</span></div><div id="dc-status"></div><div id="dc-out"></div>';
+      body.querySelector("#dc-run").addEventListener("click", run);
+      body.querySelector("#dc-stop").addEventListener("click", function () { stop = true; });
+      summary(d);
+    }
+    function summary(d) {
+      var out = body.querySelector("#dc-out");
+      if (!d || !d.pages) { out.innerHTML = '<div class="empty">No display check yet.</div>'; return; }
+      var counts = {}, pages = Object.keys(d.pages), errs = 0;
+      pages.forEach(function (u) { var pg = d.pages[u], once = {}; if (pg.error) { errs++; return; } ["desktop", "phone"].forEach(function (m) { (pg[m] || []).forEach(function (it) { var k = it.kind + "|" + it.widget.id + "|" + (it.file || it.text || ""); if (once[k]) return; once[k] = 1; counts[it.kind] = (counts[it.kind] || 0) + 1; }); }); });
+      var fixes = load("auto-fixes-display", []);
+      out.innerHTML = '<div class="stats">' + Object.keys(DISPLAY_KIND).filter(function (k) { return counts[k]; }).map(function (k) { return stat(counts[k], DISPLAY_KIND[k], k !== "no_alt"); }).join("") + stat((pages.length - errs) + " of " + pages.length, "Pages checked") + "</div>" +
+        '<p class="muted mono" style="font-size:.78rem">Checked ' + esc(new Date(d.when).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (d.phoneWidth ? " · phone pass at " + d.phoneWidth + "px wide" : d.phoneFailed ? " · the phone pass couldn't run, so only desktop was checked" : "") + (errs ? " · " + errs + " pages didn't report back" : "") + "</p>" +
+        (fixes.length ? '<div class="row"><a class="btn primary" href="#fixes">' + fixes.length + " display fixes in the Fix queue</a></div>" : "");
+    }
+    function run() {
+      var audit = load("seo-audit", null), st = body.querySelector("#dc-status");
+      if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return; }
+      var urls = audit.pages.filter(function (x) { return x.live && !x.redirectTo; }).map(function (x) { return x.link; }).slice(0, 150);
+      stop = false;
+      var origin = new URL(urls[0]).origin, d = { when: new Date().toISOString(), pages: {} }, waiting = null;
+      function onMsg(e) { if (e.origin === origin && e.data && e.data.wpt === "display-check" && waiting) waiting(e.data); }
+      window.addEventListener("message", onMsg);
+      body.querySelector("#dc-run").disabled = true; body.querySelector("#dc-stop").hidden = false;
+      /* Pages load in a frame shown small on this page (desktop 1366px wide, then phone 400px wide).
+         If the site won't load in a frame, desktop falls back to a small window. */
+      var stage = el('<div class="dc-stage"><div class="dc-scale"><iframe title="Page being checked" sandbox="allow-scripts allow-same-origin"></iframe></div></div>');
+      body.insertBefore(stage, body.querySelector("#dc-out"));
+      var frame = stage.querySelector("iframe"), popup = null, useFrame = true;
+      function size(wd) { frame.style.width = wd + "px"; frame.style.height = (wd < 768 ? 820 : 900) + "px"; var k = Math.min(1, 300 / wd); stage.querySelector(".dc-scale").style.transform = "scale(" + k + ")"; stage.style.height = Math.round((wd < 768 ? 820 : 900) * k) + "px"; stage.style.width = Math.round(wd * k) + "px"; }
+      function visit(u) {
+        return new Promise(function (res) {
+          var t = setTimeout(function () { waiting = null; res(null); }, 45000);
+          waiting = function (data) { if (norm(data.url) !== norm(u)) return; clearTimeout(t); waiting = null; res(data); };
+          var href = u + (u.indexOf("?") > -1 ? "&" : "?") + "wpt_check=1&r=" + Date.now();
+          try { if (useFrame) frame.src = href; else popup.location.href = href; } catch (e) { clearTimeout(t); res(null); }
+        });
+      }
+      var passes = [{ mode: "desktop", w: 1366 }, { mode: "phone", w: 400 }], n = 0, total = urls.length * 2, silent = 0;
+      function pass(pi) {
+        if (pi >= passes.length || stop) return Promise.resolve();
+        size(passes[pi].w);
+        var i = 0, firstTry = true;
+        function next() {
+          if (stop || i >= urls.length) return Promise.resolve();
+          var u = urls[i++];
+          st.innerHTML = '<div class="notice info">' + (passes[pi].mode === "desktop" ? "Desktop" : "Phone") + ": checking " + esc(shortPath(u)) + " (" + (++n) + " of " + total + ")…</div>";
+          return visit(u).then(function (data) {
+            if (!data && firstTry && useFrame && passes[pi].mode === "desktop") {
+              /* Site refused to load in a frame: try a small window instead (desktop only). */
+              popup = window.open("about:blank", "wpt-display-check", "popup=yes,width=1366,height=850");
+              if (popup) { useFrame = false; i--; n--; firstTry = false; return next(); }
+            }
+            firstTry = false;
+            var pg = d.pages[u] = d.pages[u] || { pageId: 0 };
+            if (!data) { silent++; if (!pg.desktop && !pg.phone) pg.error = "didn't report back"; }
+            else {
+              delete pg.error; pg.pageId = data.pageId || pg.pageId;
+              var mode = data.width < 768 ? "phone" : "desktop";
+              if (passes[pi].mode === "phone" && mode !== "phone") d.phoneFailed = true;
+              else { if (mode === "phone") d.phoneWidth = data.width; pg[mode] = data.issues; }
+            }
+            if (silent >= 3 && n <= 3) { stop = true; st.innerHTML = '<div class="notice"><b>Pages aren\'t reporting back.</b> The display check needs page checker version 8. Click Copy page checker code, replace the code in WordPress and save, then try again.</div>'; return; }
+            return next();
+          });
+        }
+        return next().then(function () {
+          if (passes[pi].mode === "desktop" && !useFrame) { useFrame = true; }   /* phone pass always uses the frame */
+          return pass(pi + 1);
+        });
+      }
+      pass(0).then(function () {
+        window.removeEventListener("message", onMsg);
+        try { if (popup) popup.close(); } catch (e) {}
+        stage.remove();
+        body.querySelector("#dc-run").disabled = false; body.querySelector("#dc-stop").hidden = true;
+        if (!Object.keys(d.pages).some(function (u) { return !d.pages[u].error; })) return;
+        save("display", d); var fx = buildDisplayFixes(d); save("auto-fixes-display", fx); updateNav();
+        if (!/version 8/.test(st.textContent)) st.innerHTML = '<div class="notice info">Display check finished. ' + fx.length + " fixes are in the Fix queue.</div>";
+        summary(d);
+      });
+    }
+    draw();
+  }
+
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
     elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix" };
   function needsV7(err) {
-    if (/no route|unknown edit type|which image or what to change/i.test(err.message)) throw new Error("Image fixes need version 7 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
+    /* An older snippet doesn't know "style", falls through to the text search and says the text isn't there. */
+    if (/no route|unknown edit type|which image or what to change|text this fix looks for/i.test(err.message)) throw new Error("Image fixes need version 7 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again.");
     throw err;
   }
   function needsV4(err) {
@@ -1876,7 +2034,7 @@
   var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
-    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []), load("auto-fixes-mobile", []));
+    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []), load("auto-fixes-mobile", []), load("auto-fixes-display", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
@@ -1947,7 +2105,7 @@
       });
     }
     if (p.type === "elementor_style") {
-      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "style", find: p.find, set: p.set } })
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "style", find: p.find || "", element: p.element || "", set: p.set, widget: p.widget || "image", all: p.all ? 1 : 0 } })
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV7);
     }
     if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap") {
@@ -2337,7 +2495,7 @@
         }).catch(function (err) {
           btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : "Approve and push live";
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
-          if (/isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
+          if (p.type !== "elementor_style" && /isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
         });
       });
       actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Rejected"); redraw(); updateNav(); });

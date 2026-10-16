@@ -13,6 +13,7 @@ out=$( {
   node tests/claim-rules.test.js assets/app.js
   node tests/page-build.test.js assets/app.js
   node tests/lead-quick-add.test.js assets/app.js
+  node tests/display-check.test.js assets/app.js tests/fixtures/display-report.json
   node tests/mobile.test.js assets/app.js tests/fixtures/psi_fixture.json
   php tests/page-checker.test.php docs/wordpress-page-checker.php | grep -E "^(PASS|FAIL)"
   php tests/analytics.test.php docs/wordpress-page-checker.php /dev/null

@@ -31,6 +31,53 @@ window.WPT_PROPOSALS = [
   ]
  },
  {
+  "id": "b6-03",
+  "created": "2026-10-16",
+  "batch": "Batch 6: home page images",
+  "type": "elementor_style",
+  "size": "small",
+  "priority": "high",
+  "category": "Mobile",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "Home",
+  "link": "https://westpiertech.com/",
+  "issue": "Partner logos in the carousel are cut off (“Microsoft Team”, “Gammc”)",
+  "widget": "media-carousel",
+  "find": "/msteams/",
+  "set": {
+   "image_fit": "contain"
+  },
+  "current": "The partner logo carousel under Our Services crops each logo to fill its tile. Wide logos lose their ends: the “s” of Microsoft Teams and the end of Gamma are chopped off, and Gamma's purple dots are clipped.",
+  "proposed": "Each logo fits inside its tile at its true shape, so the whole logo shows. Tiles stay the same size. Solid logos like 8x8's red one still fill their tile. Only the carousel's image fit setting changes. Undo puts it back.",
+  "why": "Cut-off partner logos look careless, and they're the brands buyers recognise. If this carousel turns out to be a different Elementor widget than expected, the hub says which one and changes nothing, and Claude rewrites the fix."
+ },
+ {
+  "id": "b6-04",
+  "created": "2026-10-16",
+  "batch": "Batch 6: home page images",
+  "type": "elementor_style",
+  "size": "small",
+  "priority": "medium",
+  "category": "Mobile",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "Home",
+  "link": "https://westpiertech.com/",
+  "issue": "The gold review stars are slightly squashed",
+  "find": "5-stars",
+  "all": true,
+  "set": {
+   "object-fit": "contain",
+   "object-fit_tablet": "contain",
+   "object-fit_mobile": "contain",
+   "object-position": "center center"
+  },
+  "current": "5-stars.png is used in the review cards and is shown slightly out of shape, so the stars look distorted.",
+  "proposed": "Every copy of the stars image on the home page fits its space at its true shape. Nothing is cropped. Only how the stars image displays changes. Undo puts it back.",
+  "why": "Small, but reviews are trust signals and distorted stars look off. All copies are fixed together so they match."
+ },
+ {
   "id": "b6-02",
   "created": "2026-10-15",
   "batch": "Batch 6: home page image",

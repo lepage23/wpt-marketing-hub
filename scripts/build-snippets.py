@@ -4,6 +4,12 @@ Strips the opening <?php line and the comment block, which Code Snippets doesn't
 import json, re, os
 root = os.path.join(os.path.dirname(__file__), "..")
 out = {}
+# Keep the display check script inside the page checker snippet in step with docs/display-check.js
+php_path = os.path.join(root, "docs", "wordpress-page-checker.php")
+php = open(php_path).read()
+js = open(os.path.join(root, "docs", "display-check.js")).read().strip()
+php = re.sub(r"/\*DISPLAY_CHECK_START\*/.*?/\*DISPLAY_CHECK_END\*/", lambda m: "/*DISPLAY_CHECK_START*/\n" + js + "\n/*DISPLAY_CHECK_END*/", php, flags=re.S)
+open(php_path, "w").write(php)
 for key, name in [("seo", "wordpress-snippet.php"), ("checker", "wordpress-page-checker.php"), ("ga4", "wordpress-ga4.php")]:
     src = open(os.path.join(root, "docs", name)).read()
     src = re.sub(r"^<\?php\s*", "", src)

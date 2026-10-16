@@ -6,6 +6,37 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.15.0 · 2026-10-16 13:30 BST
+
+Display check: finds visual problems on every page, not just the ones you spot.
+
+- New **Display check** panel on Website & SEO. **Check every page** loads each live page twice, at desktop width (1366px) and phone width (400px), in a small preview on the hub page. It measures what a visitor actually sees:
+  - logos and badges cut off by their box or carousel tile
+  - images squashed or stretched out of shape (anything over 5%)
+  - broken images
+  - button text wrapping onto two lines
+  - text cut off by its box
+  - anything sticking out past the screen edge on phones
+  - images with no alt text
+- Cut-off and squashed images in Elementor image widgets and media carousels become **push-ready fixes**, aimed at the exact element. Everything else is listed by page, with the nearest heading so you can find it, and says whether it's desktop, phones or both.
+- Doesn't duplicate fixes Claude has already written (the engineer photo, the partner logos, the stars).
+- Page checker snippet is version 8. It adds a read-only check script to a page only when the hub asks for it (?wpt_check=1). Visitors never get it, and that view isn't cached. Image fixes can now target an element by its Elementor id.
+- 201 tests, all passing. Tested end to end on a sample page with a cut-off carousel logo, squashed stars, a broken image, a wrapped button and an over-wide box: all five found, on desktop and phone.
+
+## v0.14.0 · 2026-10-16 12:40 BST
+
+Two more home page image fixes, push-ready.
+
+- **b6-03 (high):** partner logos in the carousel are cut off ("Microsoft Team", "Gammc"). The fix sets the carousel to fit each logo inside its tile instead of cropping it.
+- **b6-04 (medium):** the gold review stars are slightly squashed. The fix shows every copy of the stars image at its true shape, all together.
+- Image fixes can now target a carousel, and can fix every copy of a repeated image at once. If the widget turns out to be a different type than the fix expects, the hub says which one it found and changes nothing.
+- Page checker snippet is still version 7, but its code changed. Copy it again if you pasted it before this update.
+- 194 tests, all passing.
+
+## v0.13.1 · 2026-10-16 12:15 BST
+
+- Fixed: pushing an image fix with the old page checker snippet said "the text isn't on the page any more" and offered Mark as done. It now says the snippet needs updating to version 7, and doesn't offer Mark as done.
+
 ## v0.13.0 · 2026-10-16 12:05 BST
 
 Image fixes push from the hub.
