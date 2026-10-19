@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.19.1";
-  var BUILT = "2026-10-19 15:33 BST";
+  var VERSION = "0.19.2";
+  var BUILT = "2026-10-19 16:24 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3233,7 +3233,20 @@
       rows.unshift({ _id: uid(), _src: j.id, _ex: !!j.example, job: j.job, page: j.page, details: j.details, size: j.size, alt: j.alt, status: "To do" });
       seen.push(j.id);
     });
-    save("jobs", rows); save("jobs-imported", seen);
+    /* Claude can move a job on from GitHub: a job with an "update" stamp sets its status (and new
+       details, if given) once. Your own changes after that stay put until a newer stamp arrives. */
+    var applied = load("jobs-updates-applied", {});
+    (window.WPT_JOBS || []).forEach(function (j) {
+      if (!j.update || applied[j.id] === j.update) return;
+      rows.forEach(function (r) {
+        if (r._src !== j.id) return;
+        if (j.status) r.status = j.status;
+        if (j.details) r.details = j.details;
+        if (j.job) r.job = j.job;
+      });
+      applied[j.id] = j.update;
+    });
+    save("jobs", rows); save("jobs-imported", seen); save("jobs-updates-applied", applied);
   }
   function jobsToDo() { syncJobs(); return getRows("jobs").filter(function (j) { return j.status !== "Done" && !j._ex; }).length; }
   function renderJobs(main) {
