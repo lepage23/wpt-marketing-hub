@@ -6,6 +6,26 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.18.0 · 2026-10-19 14:30 BST
+
+Speed check: desktop too, and everything Google flags goes to the Fix queue.
+
+- **Desktop run** alongside mobile (tick or untick **Desktop too**). New Desktop column and average. About 40 minutes for every page with both.
+- **One fix per problem**, affected pages listed inside it, mobile and desktop together. New fixes:
+  - Main content slow to show (LCP over 2.5 s), caught even when the overall score looks fine. /charity/ was 13 s on mobile with a score of 61.
+  - Files blocking the page from showing, naming the files most often to blame.
+  - Unused CSS and JavaScript.
+  - Short cache times.
+  - Very large pages (over about 2.5 MB).
+  - Images shown at too low a resolution.
+  - Errors in the browser console, with the first error.
+  - Headings out of order.
+  - Missing security headers: one fix for the whole site, with the exact lines for Matt to add.
+- The heavy images fix now includes images Google flags on desktop.
+- Fix queue filter gains **Speed** and **Security**.
+- **Rechecking failed pages** only redoes the side (phone or desktop) that failed.
+- 258 tests, all passing. Tested against the /charity/ report from 19 October.
+
 ## v0.17.2 · 2026-10-19 14:10 BST
 
 Progress bar on long checks.

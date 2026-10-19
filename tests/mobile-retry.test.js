@@ -3,7 +3,7 @@ const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');const r
 function grab(n){const i=src.indexOf('function '+n+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(n){return src.match(new RegExp('var '+n+' = [^\\n]*;'))[0];}
 let KEY='AIzaTest';function psiKey(){return KEY;}
-eval(['summarisePsi','psiWait','psiOnce','runPsi'].map(grab).join('\n')+'\n'+grabVar('PSI_URL')+'\n'+grabVar('PSI_SKIP')+'\n'+grabVar('PSI_TIMEOUT'));
+eval(['summarisePsi','psiWait','psiOnce','runPsi'].map(grab).join('\n')+'\n'+grabVar('PSI_URL')+'\n'+grabVar('PSI_SKIP')+'\n'+grabVar('PSI_KEEP_INFO')+'\n'+grabVar('PSI_TIMEOUT'));
 PSI_WAIT=[1,1];
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 function resp(status,body){return Promise.resolve({ok:status<300,status,json:()=>Promise.resolve(body)});}

@@ -141,7 +141,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td><span class="btn primary">Approve and push live</span><br><span class="btn primary">Push the fix</span><br><span class="btn primary">Approve and fix the image</span><br><span class="btn primary">Approve and fix the layout</span><br><span class="btn primary">Approve and fix the punctuation</span><br><span class="btn primary">Approve and fix the text size</span></td><td>Changes the live website. A backup is kept, and Undo puts it back.</td></tr>
     <tr><td><span class="btn primary">Approve and unpublish</span></td><td>Turns a page into a draft. Nothing is deleted. Undo republishes it.</td></tr>
     <tr><td><span class="btn primary">Push new page build for review</span></td><td>Makes a new <b>draft</b> page. Never live until you publish it in WordPress.</td></tr>
-    <tr><td><span class="btn">Run audit now</span>, <span class="btn">Check every page</span>, <span class="btn">Run mobile check on all pages</span>, <span class="btn">Refresh</span>, <span class="btn">Check the look</span></td><td>Read-only. Safe any time.</td></tr>
+    <tr><td><span class="btn">Run audit now</span>, <span class="btn">Check every page</span>, <span class="btn">Run speed check on all pages</span>, <span class="btn">Refresh</span>, <span class="btn">Check the look</span></td><td>Read-only. Safe any time.</td></tr>
     <tr><td><span class="btn">Mark as done</span>, <span class="btn">Not doing this</span>, <span class="btn">Reject</span></td><td>Only tidies the hub. Nothing on the website changes. <span class="btn">Put back in the queue</span> reverses it.</td></tr>
     <tr><td><span class="btn">Remove</span> (Leads)</td><td>Deletes that lead from the hub after you confirm. Use Download CSV first if you want a copy.</td></tr>
   </tbody>
@@ -165,7 +165,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
 <p>Clicks, searches and positions from Google Search Console (through Rank Math), and visits and leads from Google Analytics 4. Press <span class="btn">Refresh</span> to update. Pages that get seen but not clicked, and pages sitting just off page one, become fixes.</p>
 
 <h3>Mobile and speed</h3>
-<p>Runs Google's own mobile test on every live page: speed, accessibility and SEO scores, plus anything Google flags. Add the free API key (steps on the page) so it can check every page without hitting Google's limit. Takes 15 to 30 seconds a page.</p>
+<p>Runs Google's own speed test on every live page, on phones and, with <b>Desktop too</b> ticked, on desktop as well: speed, accessibility and SEO scores, plus anything Google flags. Add the free API key (steps on the page) so it can check every page without hitting Google's limit. Takes 15 to 30 seconds a page.</p>
 <p>The table shows the 10 slowest pages. Press <span class="btn">Show all</span> to see every page, and <span class="btn">Show fewer</span> to fold it back up. If Google doesn't answer for a page, the hub tries it again up to three times. Any still missing can be rechecked with <span class="btn">Check the ones that failed again</span>, which keeps the results you already have.</p>
 <p>While the audit, mobile check or display check runs, the bar shows how far through it is, roughly how long is left and when it should finish. The first estimate is a guess, and it sharpens after a few pages.</p>
 

@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.17.2";
-  var BUILT = "2026-10-19 14:03 BST";
+  var VERSION = "0.18.0";
+  var BUILT = "2026-10-19 14:23 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1760,15 +1760,18 @@
      Built against the v5 API reference and Lighthouse 13: audits are read by what Google
      returns rather than a fixed old list, and real-visitor (CrUX) data is optional. */
   var PSI_URL = "https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed";
+  /* Security header checks don't change the score, so Google marks them "informative". Kept when they list a problem. */
+  var PSI_KEEP_INFO = /^(has-hsts|csp-xss|clickjacking-mitigation|origin-isolation|trusted-types-xss)$/;
   var PSI_SKIP = /^(metrics|screenshot-thumbnails|final-screenshot|main-thread-tasks|network-requests|network-rtt|network-server-latency|diagnostics|script-treemap-data|resource-summary|largest-contentful-paint|first-contentful-paint|speed-index|total-blocking-time|cumulative-layout-shift|interactive|max-potential-fid|first-meaningful-paint)$/;
   function psiKey() { return load("psi-key", ""); }
   function psiData() { return load("psi", null); }
+  function psiDesk() { return load("psi-desktop", true) !== false; }
   /* One page. Waits up to 2 minutes for Google, then tries again (up to 3 goes in all) when the
      failure looks temporary: no answer, Google busy (5xx) or the per-minute limit with a key. */
   var PSI_TIMEOUT = 120000, PSI_TRIES = 3, PSI_WAIT = [8000, 20000];
   function psiWait(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
-  function psiOnce(url) {
-    var q = "?url=" + encodeURIComponent(url) + "&strategy=MOBILE&category=PERFORMANCE&category=ACCESSIBILITY&category=SEO&category=BEST_PRACTICES" + (psiKey() ? "&key=" + encodeURIComponent(psiKey()) : "");
+  function psiOnce(url, strategy) {
+    var q = "?url=" + encodeURIComponent(url) + "&strategy=" + (strategy || "MOBILE") + "&category=PERFORMANCE&category=ACCESSIBILITY&category=SEO&category=BEST_PRACTICES" + (psiKey() ? "&key=" + encodeURIComponent(psiKey()) : "");
     var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
     var timer = ctl ? setTimeout(function () { ctl.abort(); }, PSI_TIMEOUT) : null;
     return fetch(PSI_URL + q, ctl ? { signal: ctl.signal } : {}).then(function (r) {
@@ -1788,12 +1791,12 @@
       e.network = true; throw e;
     }).then(function (r) { if (timer) clearTimeout(timer); return r; }, function (e) { if (timer) clearTimeout(timer); throw e; });
   }
-  function runPsi(url, tries) {
+  function runPsi(url, tries, strategy) {
     tries = tries || 1;
-    return psiOnce(url).catch(function (e) {
+    return psiOnce(url, strategy).catch(function (e) {
       var temporary = e.network || (e.status >= 500) || (e.limit && psiKey());
       if (!temporary || e.badKey || tries >= PSI_TRIES) { e.tries = tries; throw e; }
-      return psiWait(PSI_WAIT[tries - 1] || 20000).then(function () { return runPsi(url, tries + 1); });
+      return psiWait(PSI_WAIT[tries - 1] || 20000).then(function () { return runPsi(url, tries + 1, strategy); });
     });
   }
   function summarisePsi(j) {
@@ -1803,14 +1806,17 @@
     var fails = [];
     Object.keys(audits).forEach(function (id) {
       var a = audits[id];
-      if (PSI_SKIP.test(id) || a.score == null || a.score >= 0.9) return;
-      if (!/^(binary|numeric|metricSavings)$/.test(a.scoreDisplayMode || "")) return;
+      var info = PSI_KEEP_INFO.test(id) && a.details && a.details.items && a.details.items.length;
+      if (!info && (PSI_SKIP.test(id) || a.score == null || a.score >= 0.9)) return;
+      if (!info && !/^(binary|numeric|metricSavings)$/.test(a.scoreDisplayMode || "")) return;
       var items = ((a.details && a.details.items) || []).slice(0, 8).map(function (it) {
         var u = it.url || (it.node && it.node.snippet) || it.source || "";
         if (typeof u === "object") u = u.url || "";
-        return { url: String(u).slice(0, 300), wasted: it.wastedBytes || 0, displayed: it.displayedAspectRatio || "", actual: it.actualAspectRatio || "" };
+        var text = it.description || it.severity || "";
+        if (typeof text === "object") text = text.text || text.value || "";
+        return { url: String(u).slice(0, 300), wasted: it.wastedBytes || it.wastedMs || 0, displayed: it.displayedAspectRatio || "", actual: it.actualAspectRatio || "", text: String(text).slice(0, 200) };
       });
-      fails.push({ id: id, title: a.title || id, display: a.displayValue || "", score: a.score, items: items });
+      fails.push({ id: id, title: a.title || id, display: a.displayValue || "", score: a.score, items: items, value: a.numericValue != null ? a.numericValue : null });
     });
     var le = j.loadingExperience || null, field = null;
     if (le && le.metrics && !le.origin_fallback) {
@@ -1827,6 +1833,7 @@
 
   function buildMobileFixes(d) {
     var out = []; if (!d || !d.pages) return out;
+    speedFixes(d).forEach(function (f) { out.push(f); });
     var today = new Date().toISOString().slice(0, 10);
     var rows = Object.keys(d.pages).map(function (u) { return { url: u, r: d.pages[u] }; }).filter(function (x) { return x.r && !x.r.error; });
     function add(o) { o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found by mobile check"; o.category = "Mobile"; o.pageTitle = o.pageTitle || "Mobile"; o.link = o.link || "https://westpiertech.com/"; out.push(o); }
@@ -1862,7 +1869,13 @@
       why: "When images or banners load late and push the text down, people tap the wrong thing. Google measures it as CLS and wants it under 0.1.",
       steps: ["Look for images without a set width and height, and banners or cookie bars that appear after the page loads.", "In Elementor, give images a fixed size (or aspect ratio) so space is reserved before they load.", "Run the mobile check again."] });
     var heavy = [];
-    rows.forEach(function (x) { var f = failOf(x.r, "image-delivery-insight"); if (f) f.items.forEach(function (it) { if (it.wasted > 50000) heavy.push({ title: fileName(it.url), link: x.url, note: "could save " + Math.round(it.wasted / 1024) + " KB on " + shortPath(x.url) }); }); });
+    var seenImg = {};
+    rows.concat(Object.keys(d.desktop || {}).map(function (u) { return { url: u, r: d.desktop[u], dev: "desktop" }; }).filter(function (x) { return x.r && !x.r.error; })).forEach(function (x) {
+      var f = failOf(x.r, "image-delivery-insight"); if (f) f.items.forEach(function (it) {
+        var k = it.url + "|" + norm(x.url); if (it.wasted <= 50000 || seenImg[k]) return; seenImg[k] = 1;
+        heavy.push({ title: fileName(it.url), link: x.url, note: "could save " + Math.round(it.wasted / 1024) + " KB on " + shortPath(x.url) + (x.dev ? " (desktop)" : "") });
+      });
+    });
     if (heavy.length) add({ id: "mob-images", priority: heavy.length > 15 ? "high" : "medium", issue: heavy.length + " images are much bigger than they need to be", pages: heavy.slice(0, 60),
       why: "Oversized images are the most common reason pages load slowly on phones. The figures are what Google says each image could save.",
       steps: ["Turn on image optimisation and WebP in SiteGround Optimizer (Media).", "For the biggest ones, resize to the size actually shown (usually under 1600 px wide) before uploading.", "Run the mobile check again."] });
@@ -1878,8 +1891,110 @@
     return out;
   }
 
+  /* Grouped fixes for everything else Google flags, mobile and desktop together.
+     One fix per problem, every affected page listed inside it. Most share one cause
+     (theme, plugins, SiteGround settings), so one change clears them all. */
+  var PSI_IDS = {
+    render: /^(render-blocking-insight|render-blocking-resources)$/, unused: /^(unused-css-rules|unused-javascript)$/,
+    cache: /^(cache-insight|uses-long-cache-ttl)$/, heavy: /^total-byte-weight$/, lowres: /^image-size-responsive$/,
+    console: /^errors-in-console$/, headings: /^heading-order$/,
+    headers: { "has-hsts": "HSTS", "clickjacking-mitigation": "clickjacking protection (X-Frame-Options)", "csp-xss": "a Content Security Policy", "origin-isolation": "origin isolation (COOP)", "trusted-types-xss": "Trusted Types" }
+  };
+  function speedFixes(d) {
+    var out = [], today = new Date().toISOString().slice(0, 10);
+    var sets = [{ dev: "mobile", pages: d.pages || {} }, { dev: "desktop", pages: d.desktop || {} }];
+    function each(fn) { sets.forEach(function (st) { Object.keys(st.pages).forEach(function (u) { var r = st.pages[u]; if (r && !r.error) fn(u, r, st.dev); }); }); }
+    function failing(r, re) { return (r.fails || []).filter(function (f) { return re.test(f.id); }); }
+    /* Collect pages per problem; one line per page, noting mobile, desktop or both. */
+    function group(re) {
+      var by = {}, files = {};
+      each(function (u, r, dev) {
+        var fs = failing(r, re); if (!fs.length) return;
+        var k = norm(u); by[k] = by[k] || { title: shortPath(u), link: u, notes: [] };
+        by[k].notes.push(dev + ": " + fs.map(function (f) { return f.display || f.title; }).join(", "));
+        fs.forEach(function (f) { f.items.forEach(function (it) { if (it.url && /^https?:/.test(it.url)) files[fileName(it.url)] = (files[fileName(it.url)] || 0) + 1; }); });
+      });
+      var pages = Object.keys(by).map(function (k) { var x = by[k]; return { title: x.title, link: x.link, note: x.notes.join(" · ") }; });
+      var top = Object.keys(files).sort(function (a, b) { return files[b] - files[a]; }).slice(0, 6);
+      return { pages: pages, top: top };
+    }
+    function add(o) { o.auto = true; o.type = "manual"; o.created = today; o.batch = "Found by speed check"; o.pageTitle = o.pageTitle || "Whole site"; o.link = o.link || (o.pages[0] && o.pages[0].link) || "https://westpiertech.com/"; out.push(o); }
+    function topLine(t) { return t.length ? "The files Google names most often: " + t.join(", ") + "." : ""; }
+
+    /* Main content slow to appear (LCP). Google's line: good under 2.5 s, poor over 4 s. Caught even when the overall score looks fine. */
+    var lcp = {}, worst = 0;
+    each(function (u, r, dev) {
+      if (r.lcp == null || r.lcp <= 2500) return;
+      var k = norm(u); lcp[k] = lcp[k] || { title: shortPath(u), link: u, notes: [], ms: 0 };
+      lcp[k].notes.push(dev + " " + (r.lcp / 1000).toFixed(1) + " s"); lcp[k].ms = Math.max(lcp[k].ms, r.lcp); worst = Math.max(worst, r.lcp);
+    });
+    var lcpPages = Object.keys(lcp).map(function (k) { return lcp[k]; }).sort(function (a, b) { return b.ms - a.ms; }).map(function (x) { return { title: x.title, link: x.link, note: "main content after " + x.notes.join(", ") }; });
+    if (lcpPages.length) add({ id: "spd-lcp", category: "Speed", priority: worst > 4000 ? "high" : "medium", issue: lcpPages.length + " pages are slow to show their main content", pages: lcpPages,
+      why: "Largest Contentful Paint (LCP) is when the biggest thing on screen, usually the hero image or heading, appears. Google wants it under 2.5 seconds and counts it towards rankings. A page can score 60 overall and still take 13 seconds here, so this is listed even when the score looks fine. Worst first.",
+      steps: ["Clear the render-blocking and unused code fixes in this queue first. They are usually what holds the main content back.", "Make sure the hero image isn't lazy loaded: in SiteGround Optimizer, Media, add the hero images to the lazy load exclusions, or in Elementor set the first image's loading to eager.", "Keep hero images under about 200 KB, in WebP.", "Run the speed check again."] });
+
+    var g = group(PSI_IDS.render);
+    if (g.pages.length) add({ id: "spd-render-blocking", category: "Speed", priority: "high", issue: "Files stop " + g.pages.length + " pages showing until they've loaded", pages: g.pages,
+      why: "The browser can't draw anything until these CSS and JavaScript files arrive. On a phone that can add 3 seconds or more before anything appears. They come from the theme, Elementor and plugins, so one set of settings fixes every page. " + topLine(g.top),
+      steps: ["SiteGround Optimizer, then Frontend, then CSS: turn on Minify CSS, Combine CSS and Preload Combined CSS.", "Same place, JavaScript: turn on Minify JavaScript and Defer Render-blocking JavaScript.", "Elementor, then Settings, then Features: turn on Improved CSS Loading and Inline Font Icons.", "Check a few pages look right on phone and desktop after each change. If one breaks, untick the last setting.", "Run the speed check again."] });
+
+    g = group(PSI_IDS.unused);
+    if (g.pages.length) add({ id: "spd-unused-code", category: "Speed", priority: "medium", issue: g.pages.length + " pages load CSS and JavaScript they never use", pages: g.pages,
+      why: "Every page downloads code for features it doesn't have, usually plugins that load everywhere. Phones pay for it in time and data. " + topLine(g.top),
+      steps: ["Ask Matt to check which plugins load on every page (the files above show which). Chat widgets, sliders and form plugins are common culprits.", "In Elementor, Settings, then Features, turn on Optimized Control Loading and Element Caching.", "Remove any plugin that isn't used. Deactivate first, check the site, then delete.", "Run the speed check again."] });
+
+    g = group(PSI_IDS.cache);
+    if (g.pages.length) {
+      add({ id: "spd-cache", category: "Speed", priority: "low", issue: g.pages.length + " pages have files that browsers re-download on every visit", pages: g.pages,
+        why: "Files with short cache times get fetched again on each visit, so returning visitors wait longer. Files from other companies (Google, chat widgets) can't be changed from our side, so only fix our own. " + topLine(g.top),
+        steps: ["SiteGround Optimizer, then Environment: check Browser Caching is on.", "Ask Matt whether any of the files above come from westpiertech.com. If so, set a cache time of a year on them (SiteGround Site Tools, or .htaccess).", "Ignore files from other sites. Run the speed check again."] });
+    }
+
+    g = group(PSI_IDS.heavy);
+    if (g.pages.length) add({ id: "spd-heavy", category: "Speed", priority: "medium", issue: g.pages.length + " pages are very large to download", pages: g.pages,
+      why: "Google flags pages over about 2.5 MB. Big pages are slow on phones and use people's data. It's nearly always images and video.",
+      steps: ["Clear the image fixes in this queue first.", "Replace any background video with a still image on phones (Elementor, Responsive settings).", "Run the speed check again."] });
+
+    g = group(PSI_IDS.lowres);
+    if (g.pages.length) add({ id: "spd-lowres", category: "Speed", priority: "low", issue: g.pages.length + " pages show images at too low a resolution", pages: g.pages,
+      why: "These images are smaller than the space they fill, so they look blurry on sharp phone screens. " + topLine(g.top),
+      steps: ["For each image above, upload a version at least twice the width it's shown at (still under 200 KB, in WebP).", "Replace it in Elementor.", "Run the speed check again."] });
+
+    g = group(PSI_IDS.console);
+    if (g.pages.length) {
+      var first = ""; each(function (u, r) { if (first) return; var f = failing(r, PSI_IDS.console)[0]; if (f && f.items[0]) first = (f.items[0].text || f.items[0].url || "").slice(0, 160); });
+      add({ id: "spd-console", category: "Speed", priority: "low", issue: g.pages.length + " pages log errors in the browser", pages: g.pages,
+        why: "Something on these pages is broken behind the scenes, usually a plugin or tracking script. It can stop forms or chat working without anyone noticing." + (first ? " First error: " + first : ""),
+        steps: ["Send this list to Matt. He can open a page, press F12 and look at the Console tab to see each error.", "Check the contact form and chat on these pages still work.", "Run the speed check again."] });
+    }
+
+    g = group(PSI_IDS.headings);
+    if (g.pages.length) add({ id: "spd-heading-order", category: "Content", priority: "low", issue: g.pages.length + " pages skip heading levels", pages: g.pages,
+      why: "Headings should step down in order (H1, then H2, then H3). Skipping a level confuses screen readers and makes the page structure harder for Google and AI tools to read.",
+      steps: ["In Elementor, open each page and check the heading widgets. Change the HTML tag (not the look) so they go H1, H2, H3 in order.", "Run the speed check again."] });
+
+    /* Security headers: one fix for the whole site. */
+    var missing = {}, hp = [];
+    each(function (u, r) {
+      var any = false;
+      (r.fails || []).forEach(function (f) { if (PSI_IDS.headers[f.id]) { missing[f.id] = true; any = true; } });
+      if (any && !hp.some(function (x) { return norm(x.link) === norm(u); })) hp.push({ title: shortPath(u), link: u, note: "" });
+    });
+    var miss = Object.keys(missing);
+    if (miss.length) add({ id: "sec-headers", category: "Security", priority: "medium", issue: "The website is missing security headers", pages: [], pageTitle: "Whole site (found on " + hp.length + " pages checked)", link: hp[0].link.replace(/^(https?:\/\/[^\/]+).*/, "$1/"),
+      why: "Google found weak or missing " + miss.map(function (k) { return PSI_IDS.headers[k]; }).join(", ") + ". These are settings on the server, the same for every page. Public sector buyers and their security teams check them, and a quick scan of our site shows the gaps.",
+      steps: ["Ask Matt to add these lines to the top of .htaccess (Rank Math, then General Settings, then Edit .htaccess, or SiteGround File Manager). Take a copy of the file first.",
+        "Header always set Strict-Transport-Security \"max-age=31536000\"",
+        "Header always set X-Frame-Options \"SAMEORIGIN\"",
+        "Header always set X-Content-Type-Options \"nosniff\"",
+        "Header always set Referrer-Policy \"strict-origin-when-cross-origin\"",
+        "Leave Content Security Policy, origin isolation and Trusted Types for now. Set wrong, they break the site, chat and tracking.",
+        "Check the site, a form and the chat still work. Then run the speed check again."] });
+    return out;
+  }
+
   function renderMobile(main) {
-    var p = panel("Mobile and speed", "Google's own mobile test (PageSpeed Insights) on every live page. Read-only.");
+    var p = panel("Mobile and speed", "Google's own speed test (PageSpeed Insights) on every live page, on phone and desktop. Read-only.");
     var body = el('<div style="display:flex;flex-direction:column;gap:12px"></div>'); p.appendChild(body); main.appendChild(p);
     var stop = false;
     function draw() {
@@ -1888,20 +2003,26 @@
         '<details' + (psiKey() ? "" : " open") + '><summary class="muted" style="cursor:pointer;font-size:.88rem">API key (free, recommended for checking every page)' + (psiKey() ? " · saved" : "") + "</summary>" +
         '<ol class="steps-list" style="font-size:.88rem;margin-top:8px"><li>In Google Cloud, open your <b>WPT Hub</b> project.</li><li><b>APIs &amp; Services, then Library</b>. Search <b>PageSpeed Insights API</b> and click <b>Enable</b>.</li><li><b>APIs &amp; Services, then Credentials, then Create credentials, then API key</b>. Copy it.</li><li>Click the new key, then under <b>API restrictions</b> choose <b>Restrict key</b> and tick only <b>PageSpeed Insights API</b>. Save.</li><li>Paste it below. It stays in this browser.</li></ol>' +
         '<div class="row" style="margin-top:8px"><label class="field" for="psi-key" style="flex:1;min-width:220px">PageSpeed API key<input id="psi-key" type="password" autocomplete="off" placeholder="' + (psiKey() ? "Saved. Paste a new one to replace it." : "AIza…") + '"></label><button type="button" class="btn" id="psi-save" style="align-self:flex-end">Save key</button></div></details>' +
-        '<div class="row"><button type="button" class="btn primary" id="psi-run">Run mobile check on all pages</button><button type="button" class="btn" id="psi-stop" hidden>Stop</button>' +
-        '<span class="muted" style="font-size:.82rem">About 15 to 30 seconds a page, two at a time. Uses the pages from your last audit.</span></div><div id="psi-status"></div><div id="psi-out"></div>';
+        '<div class="row"><button type="button" class="btn primary" id="psi-run">Run speed check on all pages</button><button type="button" class="btn" id="psi-stop" hidden>Stop</button>' +
+        '<label class="muted" style="font-size:.86rem;display:flex;align-items:center;gap:6px"><input type="checkbox" id="psi-desk"' + (psiDesk() ? " checked" : "") + "> Desktop too</label>" +
+        '<span class="muted" style="font-size:.82rem">' + (psiDesk() ? "About 40 minutes for every page, phone and desktop." : "About 20 minutes for every page, phone only.") + " Uses the pages from your last audit.</span></div><div id=\"psi-status\"></div><div id=\"psi-out\"></div>";
       body.querySelector("#psi-save").addEventListener("click", function () { var v = body.querySelector("#psi-key").value.trim(); if (v) { save("psi-key", v); toast("Key saved"); draw(); } });
       body.querySelector("#psi-run").addEventListener("click", function () { runAll(false); });
       body.querySelector("#psi-stop").addEventListener("click", function () { stop = true; });
+      body.querySelector("#psi-desk").addEventListener("change", function () { save("psi-desktop", this.checked); draw(); });
       table(d);
     }
     var showAll = false, PSI_SHOW = 10;
+    function deskOf(d, u) { return d.desktop && d.desktop[u] ? d.desktop[u] : null; }
+    function pageFailed(d, u) { return !!(d.pages[u].error || (d.withDesktop && (!deskOf(d, u) || deskOf(d, u).error))); }
     function table(d) {
       var out = body.querySelector("#psi-out");
       if (!d || !d.pages || !Object.keys(d.pages).length) { out.innerHTML = '<div class="empty">No mobile check yet.</div>'; return; }
       var rows = Object.keys(d.pages).map(function (u) { return { u: u, r: d.pages[u] }; }).sort(function (a, b) { return (a.r.perf == null ? 101 : a.r.perf) - (b.r.perf == null ? 101 : b.r.perf); });
       var ok = rows.filter(function (x) { return !x.r.error; });
-      var failed = rows.length - ok.length;
+      var failed = rows.filter(function (x) { return pageFailed(d, x.u); }).length;
+      var dOk = d.withDesktop ? rows.map(function (x) { return deskOf(d, x.u); }).filter(function (r) { return r && !r.error && r.perf != null; }) : [];
+      var dAvg = dOk.length ? Math.round(dOk.reduce(function (s, r) { return s + r.perf; }, 0) / dOk.length) : null;
       var avg = ok.length ? Math.round(ok.reduce(function (s, x) { return s + (x.r.perf || 0); }, 0) / ok.length) : 0;
       var poor = ok.filter(function (x) { return x.r.perf < 50; }).length;
       var squashed = ok.filter(function (x) { return failOf(x.r, "image-aspect-ratio"); }).length;
@@ -1909,16 +2030,17 @@
       var shown = showAll ? rows : rows.slice(0, PSI_SHOW);
       var more = rows.length > PSI_SHOW;
       var toggle = more ? '<div class="row" style="margin-top:8px"><button type="button" class="btn small psi-toggle" aria-expanded="' + showAll + '">' + (showAll ? "Show fewer (worst " + PSI_SHOW + ")" : "Show all " + rows.length + " pages") + "</button>" + (showAll ? "" : '<span class="muted" style="font-size:.82rem">Showing the ' + PSI_SHOW + " slowest.</span>") + "</div>" : "";
-      out.innerHTML = '<div class="stats">' + stat(avg + "/100", "Average mobile speed score", avg < 50) + stat(poor, "Pages under 50", poor > 0) + stat(squashed, "Pages with squashed images", squashed > 0) + stat(ok.length + " of " + rows.length, "Pages checked") + "</div>" +
+      out.innerHTML = '<div class="stats">' + stat(avg + "/100", "Average mobile speed score", avg < 50) + (dAvg != null ? stat(dAvg + "/100", "Average desktop speed score", dAvg < 50) : "") + stat(poor, "Pages under 50", poor > 0) + stat(squashed, "Pages with squashed images", squashed > 0) + stat(ok.length + " of " + rows.length, "Pages checked") + "</div>" +
         (failed ? '<div class="row"><button type="button" class="btn" id="psi-retry">Check the ' + failed + " that failed again</button><span class=\"muted\" style=\"font-size:.82rem\">Keeps the results you already have.</span></div>" : "") +
         '<p class="muted mono" style="font-size:.78rem">Checked ' + esc(new Date(d.when).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (ok[0] && ok[0].r.version ? " · Lighthouse " + esc(ok[0].r.version) : "") + ". Scores vary a few points between runs; look at the trend. 90+ good, 50 to 89 needs work, under 50 poor.</p>" +
-        '<div class="table-wrap" id="psi-table"><table><thead><tr><th>Page</th><th class="num">Speed</th><th class="num">Access.</th><th class="num">SEO</th><th class="num">Main content</th><th class="num">Jumping</th><th>Real visitors</th><th></th></tr></thead><tbody>' +
+        '<div class="table-wrap" id="psi-table"><table><thead><tr><th>Page</th><th class="num">Mobile</th>' + (d.withDesktop ? '<th class="num">Desktop</th>' : "") + '<th class="num">Access.</th><th class="num">SEO</th><th class="num">Main content</th><th class="num">Jumping</th><th>Real visitors</th><th></th></tr></thead><tbody>' +
         shown.map(function (x) {
           var r = x.r;
-          if (r.error) return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td colspan="7" class="muted">' + esc(r.error) + "</td></tr>";
-          return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td class="num">' + chip(r.perf) + '</td><td class="num">' + chip(r.a11y) + '</td><td class="num">' + chip(r.seo) + '</td><td class="num">' + (r.lcp ? (r.lcp / 1000).toFixed(1) + " s" : "–") + '</td><td class="num">' + (r.cls != null ? r.cls.toFixed(2) : "–") + "</td><td>" + (r.field ? esc((r.field.overall || "").toLowerCase() || "–") : '<span class="muted">not enough data</span>') + '</td><td><a class="btn small" href="https://pagespeed.web.dev/analysis?url=' + encodeURIComponent(x.u) + '&form_factor=mobile" target="_blank" rel="noopener">Full report</a></td></tr>';
+          var dk = deskOf(d, x.u), dCell = d.withDesktop ? '<td class="num">' + (dk && !dk.error ? chip(dk.perf) : '<span class="muted" title="' + esc(dk ? dk.error : "not checked") + '">–</span>') + "</td>" : "";
+          if (r.error) return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td colspan="' + (d.withDesktop ? 8 : 7) + '" class="muted">' + esc(r.error) + "</td></tr>";
+          return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td class="num">' + chip(r.perf) + "</td>" + dCell + '<td class="num">' + chip(r.a11y) + '</td><td class="num">' + chip(r.seo) + '</td><td class="num">' + (r.lcp ? (r.lcp / 1000).toFixed(1) + " s" : "–") + '</td><td class="num">' + (r.cls != null ? r.cls.toFixed(2) : "–") + "</td><td>" + (r.field ? esc((r.field.overall || "").toLowerCase() || "–") : '<span class="muted">not enough data</span>') + '</td><td><a class="btn small" href="https://pagespeed.web.dev/analysis?url=' + encodeURIComponent(x.u) + '&form_factor=mobile" target="_blank" rel="noopener">Full report</a></td></tr>';
         }).join("") + "</tbody></table></div>" + toggle +
-        (load("auto-fixes-mobile", []).length ? '<div class="row" style="margin-top:10px"><a class="btn primary" href="#fixes">' + load("auto-fixes-mobile", []).length + " mobile fixes in the Fix queue</a></div>" : "");
+        (load("auto-fixes-mobile", []).length ? '<div class="row" style="margin-top:10px"><a class="btn primary" href="#fixes">' + load("auto-fixes-mobile", []).length + " speed fixes in the Fix queue</a></div>" : "");
       Array.prototype.forEach.call(out.querySelectorAll(".psi-toggle"), function (b) {
         b.addEventListener("click", function () {
           var wasAll = showAll; showAll = !showAll; table(d);
@@ -1932,30 +2054,40 @@
       if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return; }
       var old = psiData(), d, urls;
       if (failedOnly === true && old && old.pages) {
-        d = old; urls = Object.keys(old.pages).filter(function (k) { return old.pages[k].error; });
+        d = old; urls = Object.keys(old.pages).filter(function (k) { return pageFailed(old, k); });
       } else {
-        d = { when: new Date().toISOString(), pages: {} };
+        d = { when: new Date().toISOString(), pages: {}, desktop: {}, withDesktop: psiDesk() };
         urls = audit.pages.filter(function (p) { return p.live && !p.redirectTo && !p.noindex; }).map(function (p) { return p.link; }).slice(0, 120);
       }
       if (!urls.length) return;
       var i = 0, done = 0, inARow = 0, why = ""; stop = false;
-      var bar = makeProgress(st, failedOnly === true ? "Rechecking" : "Checked", urls.length, 11000);
+      d.desktop = d.desktop || {};
+      /* What each page still needs: phone, desktop or both. A recheck only redoes the side that failed. */
+      var jobs = [];
+      urls.forEach(function (u) {
+        var again = failedOnly === true;
+        if (!again || d.pages[u].error) jobs.push({ u: u, s: "MOBILE" });
+        if (d.withDesktop && (!again || !deskOf(d, u) || deskOf(d, u).error)) jobs.push({ u: u, s: "DESKTOP" });
+      });
+      var bar = makeProgress(st, failedOnly === true ? "Rechecking" : "Checked", jobs.length, 11000);
       body.querySelector("#psi-run").disabled = true; body.querySelector("#psi-stop").hidden = false;
       function next() {
-        if (stop || i >= urls.length) return Promise.resolve();
-        var u = urls[i++];
-        return runPsi(u).then(function (r) { d.pages[u] = r; inARow = 0; }, function (e) {
-          d.pages[u] = { error: e.message };
+        if (stop || i >= jobs.length) return Promise.resolve();
+        var job = jobs[i++], u = job.u, into = job.s === "DESKTOP" ? d.desktop : d.pages;
+        return runPsi(u, 1, job.s).then(function (r) { into[u] = r; inARow = 0; }, function (e) {
+          into[u] = { error: e.message };
           if (e.badKey || (e.limit && !psiKey())) { stop = true; why = e.message; }
           else if (e.network && ++inARow >= 6) { stop = true; why = "Six pages in a row got no answer from Google, so it stopped rather than mark the rest as failed. Check the internet connection, then click Check the ones that failed again."; }
-        }).then(function () { done++; bar.step(done, urls.length, shortPath(u)); save("psi", d); return next(); });
+        }).then(function () { done++; bar.step(done, jobs.length, shortPath(u) + (job.s === "DESKTOP" ? " on desktop" : " on mobile")); save("psi", d); return next(); });
       }
       Promise.all([next(), next()]).then(function () {
         bar.close();
         save("psi", d); save("auto-fixes-mobile", buildMobileFixes(d)); updateNav();
         body.querySelector("#psi-run").disabled = false; body.querySelector("#psi-stop").hidden = true;
-        var errs = Object.keys(d.pages).filter(function (k) { return d.pages[k].error; });
-        st.innerHTML = '<div class="notice ' + (errs.length ? "" : "info") + '">' + (stop && done < urls.length ? "Stopped after " + done + " pages. " : "Mobile check finished. ") + (why ? esc(why) : errs.length ? errs.length + " pages couldn't be checked, even after trying each up to three times: " + esc(d.pages[errs[0]].error) : "") + "</div>";
+        var errs = Object.keys(d.pages).filter(function (k) { return pageFailed(d, k); });
+        var firstErr = errs.length ? (d.pages[errs[0]].error || (deskOf(d, errs[0]) || {}).error || "not checked") : "";
+        var nf = load("auto-fixes-mobile", []).length;
+        st.innerHTML = '<div class="notice ' + (errs.length ? "" : "info") + '">' + (stop && done < jobs.length ? "Stopped after " + done + " of " + jobs.length + " checks. " : "Speed check finished. " + nf + ' fixes are in the <a href="#fixes">Fix queue</a>. ') + (why ? esc(why) : errs.length ? errs.length + " pages couldn't be checked, even after trying each up to three times: " + esc(firstErr) : "") + "</div>";
         table(d);
       });
     }
@@ -2400,7 +2532,7 @@
     main.innerHTML = head("Website & SEO", "Fix queue", "Everything the website needs for Google and AI search: fixes Claude has written and problems the audit found. Nothing goes live until you approve it.");
     var area = load("fix-area", "All");
     var filt = el('<div class="row"><label class="field" for="fix-area" style="flex-direction:row;align-items:center;gap:8px">Show<select id="fix-area">' +
-      ["All", "Leads", "Content", "Mobile", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
+      ["All", "Leads", "Content", "Mobile", "Speed", "Security", "Structure", "Indexing", "AI search"].map(function (o) { return "<option" + (o === area ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label></div>");
     main.appendChild(filt);
     filt.querySelector("select").addEventListener("change", function (e) { area = e.target.value; save("fix-area", area); draw(); });
     var a = wpAuth();
