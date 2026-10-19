@@ -6,6 +6,10 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.19.1 · 2026-10-19 15:40 BST
+
+- **Your jobs:** new job to apply for free Google Business Profile API access, so reviews can come into the hub later.
+
 ## v0.19.0 · 2026-10-19 15:19 BST
 
 New page: Progress & change log, under Fix queue.

@@ -1456,6 +1456,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "gbp-job-1",
+  "job": "Apply for Google Business Profile API access (free) so reviews can come into the hub",
+  "page": "Google Business Profile",
+  "details": "1. Check the profile has been verified for at least 60 days and lists westpiertech.com. 2. In Google Cloud Console, open the same project the hub already uses and copy the Project number from the Project info card. 3. Fill in Google's Business Profile API contact form: choose 'Application for Basic API Access', paste the project number, and apply from the email that manages the profile. 4. Approval comes by email, usually after a few weeks. In Cloud Console, the Business Profile API quota shows 0 per minute until approved, then 300. 5. Tell Claude once approved and it will build the reviews feed: new reviews on Today, unanswered ones in the Fix queue with a drafted reply. The API is free and needs no billing.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "ga4-job-1",
   "job": "Ask Matt which website forms send the submit_lead_form event",
   "page": "All pages with enquiry forms (WPForms)",
