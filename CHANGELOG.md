@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.17.1 · 2026-10-19 13:50 BST
+
+Mobile check copes with dropped answers, and the results list folds up.
+
+- **Tries again** when Google doesn't answer, is busy, or hits the per-minute limit: up to three goes per page, with a short wait between. Waits up to 2 minutes for slow pages.
+- **Stops cleanly** if six pages in a row get no answer (usually the connection dropped or the laptop slept), instead of marking every remaining page as failed.
+- **Check the ones that failed again** button. Rechecks only the missing pages and keeps the rest.
+- Plainer messages: "No answer from Google" instead of "Failed to fetch", and clear wording if the API key is wrong.
+- Results table shows the **10 slowest**, with **Show all** and **Show fewer**.
+- User guide updated.
+- 239 tests, all passing.
+
 ## v0.17.0 · 2026-10-16 16:30 BST
 
 Display check works at every screen size, and catches words breaking.

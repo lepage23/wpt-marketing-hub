@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.17.0";
-  var BUILT = "2026-10-16 16:30 BST";
+  var VERSION = "0.17.1";
+  var BUILT = "2026-10-19 13:45 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1718,17 +1718,37 @@
   var PSI_SKIP = /^(metrics|screenshot-thumbnails|final-screenshot|main-thread-tasks|network-requests|network-rtt|network-server-latency|diagnostics|script-treemap-data|resource-summary|largest-contentful-paint|first-contentful-paint|speed-index|total-blocking-time|cumulative-layout-shift|interactive|max-potential-fid|first-meaningful-paint)$/;
   function psiKey() { return load("psi-key", ""); }
   function psiData() { return load("psi", null); }
-  function runPsi(url) {
+  /* One page. Waits up to 2 minutes for Google, then tries again (up to 3 goes in all) when the
+     failure looks temporary: no answer, Google busy (5xx) or the per-minute limit with a key. */
+  var PSI_TIMEOUT = 120000, PSI_TRIES = 3, PSI_WAIT = [8000, 20000];
+  function psiWait(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+  function psiOnce(url) {
     var q = "?url=" + encodeURIComponent(url) + "&strategy=MOBILE&category=PERFORMANCE&category=ACCESSIBILITY&category=SEO&category=BEST_PRACTICES" + (psiKey() ? "&key=" + encodeURIComponent(psiKey()) : "");
-    return fetch(PSI_URL + q).then(function (r) {
+    var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, PSI_TIMEOUT) : null;
+    return fetch(PSI_URL + q, ctl ? { signal: ctl.signal } : {}).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           var m = (j.error && j.error.message) || ("Google answered " + r.status);
-          if (r.status === 429) m = "Google's limit for checks without a key has been reached. Add a free API key (steps above) and run it again.";
-          throw new Error(m);
+          var e = new Error(m); e.status = r.status;
+          if (r.status === 429) { e.limit = true; e.message = psiKey() ? "Google's per-minute limit was hit. It tried again and gave up. Run the failed pages again in a minute." : "Google's limit for checks without a key has been reached. Add a free API key (steps above) and run it again."; }
+          if (r.status === 400 && /API key|key not valid|API_KEY/i.test(m)) { e.badKey = true; e.message = "Google didn't accept the API key. Check it was copied in full and that PageSpeed Insights API is enabled for the WPT Hub project."; }
+          if (r.status === 403) { e.badKey = true; e.message = "Google refused the key (" + m + "). Check the key's API restriction includes PageSpeed Insights API."; }
+          throw e;
         }
         return summarisePsi(j);
       });
+    }, function (err) {
+      var e = new Error(err && err.name === "AbortError" ? "Google took more than 2 minutes to test this page." : "No answer from Google. Usually the connection dropped, the laptop slept, or Google gave up on a slow page.");
+      e.network = true; throw e;
+    }).then(function (r) { if (timer) clearTimeout(timer); return r; }, function (e) { if (timer) clearTimeout(timer); throw e; });
+  }
+  function runPsi(url, tries) {
+    tries = tries || 1;
+    return psiOnce(url).catch(function (e) {
+      var temporary = e.network || (e.status >= 500) || (e.limit && psiKey());
+      if (!temporary || e.badKey || tries >= PSI_TRIES) { e.tries = tries; throw e; }
+      return psiWait(PSI_WAIT[tries - 1] || 20000).then(function () { return runPsi(url, tries + 1); });
     });
   }
   function summarisePsi(j) {
@@ -1826,46 +1846,69 @@
         '<div class="row"><button type="button" class="btn primary" id="psi-run">Run mobile check on all pages</button><button type="button" class="btn" id="psi-stop" hidden>Stop</button>' +
         '<span class="muted" style="font-size:.82rem">About 15 to 30 seconds a page, two at a time. Uses the pages from your last audit.</span></div><div id="psi-status"></div><div id="psi-out"></div>';
       body.querySelector("#psi-save").addEventListener("click", function () { var v = body.querySelector("#psi-key").value.trim(); if (v) { save("psi-key", v); toast("Key saved"); draw(); } });
-      body.querySelector("#psi-run").addEventListener("click", runAll);
+      body.querySelector("#psi-run").addEventListener("click", function () { runAll(false); });
       body.querySelector("#psi-stop").addEventListener("click", function () { stop = true; });
       table(d);
     }
+    var showAll = false, PSI_SHOW = 10;
     function table(d) {
       var out = body.querySelector("#psi-out");
       if (!d || !d.pages || !Object.keys(d.pages).length) { out.innerHTML = '<div class="empty">No mobile check yet.</div>'; return; }
       var rows = Object.keys(d.pages).map(function (u) { return { u: u, r: d.pages[u] }; }).sort(function (a, b) { return (a.r.perf == null ? 101 : a.r.perf) - (b.r.perf == null ? 101 : b.r.perf); });
       var ok = rows.filter(function (x) { return !x.r.error; });
+      var failed = rows.length - ok.length;
       var avg = ok.length ? Math.round(ok.reduce(function (s, x) { return s + (x.r.perf || 0); }, 0) / ok.length) : 0;
       var poor = ok.filter(function (x) { return x.r.perf < 50; }).length;
       var squashed = ok.filter(function (x) { return failOf(x.r, "image-aspect-ratio"); }).length;
       function chip(v) { return v == null ? "–" : '<span class="chip ' + (v >= 90 ? "good" : v >= 50 ? "flag" : "bad") + '">' + v + "</span>"; }
+      var shown = showAll ? rows : rows.slice(0, PSI_SHOW);
+      var more = rows.length > PSI_SHOW;
+      var toggle = more ? '<div class="row" style="margin-top:8px"><button type="button" class="btn small psi-toggle" aria-expanded="' + showAll + '">' + (showAll ? "Show fewer (worst " + PSI_SHOW + ")" : "Show all " + rows.length + " pages") + "</button>" + (showAll ? "" : '<span class="muted" style="font-size:.82rem">Showing the ' + PSI_SHOW + " slowest.</span>") + "</div>" : "";
       out.innerHTML = '<div class="stats">' + stat(avg + "/100", "Average mobile speed score", avg < 50) + stat(poor, "Pages under 50", poor > 0) + stat(squashed, "Pages with squashed images", squashed > 0) + stat(ok.length + " of " + rows.length, "Pages checked") + "</div>" +
+        (failed ? '<div class="row"><button type="button" class="btn" id="psi-retry">Check the ' + failed + " that failed again</button><span class=\"muted\" style=\"font-size:.82rem\">Keeps the results you already have.</span></div>" : "") +
         '<p class="muted mono" style="font-size:.78rem">Checked ' + esc(new Date(d.when).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (ok[0] && ok[0].r.version ? " · Lighthouse " + esc(ok[0].r.version) : "") + ". Scores vary a few points between runs; look at the trend. 90+ good, 50 to 89 needs work, under 50 poor.</p>" +
-        '<div class="table-wrap"><table><thead><tr><th>Page</th><th class="num">Speed</th><th class="num">Access.</th><th class="num">SEO</th><th class="num">Main content</th><th class="num">Jumping</th><th>Real visitors</th><th></th></tr></thead><tbody>' +
-        rows.map(function (x) {
+        '<div class="table-wrap" id="psi-table"><table><thead><tr><th>Page</th><th class="num">Speed</th><th class="num">Access.</th><th class="num">SEO</th><th class="num">Main content</th><th class="num">Jumping</th><th>Real visitors</th><th></th></tr></thead><tbody>' +
+        shown.map(function (x) {
           var r = x.r;
           if (r.error) return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td colspan="7" class="muted">' + esc(r.error) + "</td></tr>";
           return '<tr><td><a href="' + esc(x.u) + '" target="_blank" rel="noopener">' + esc(shortPath(x.u)) + '</a></td><td class="num">' + chip(r.perf) + '</td><td class="num">' + chip(r.a11y) + '</td><td class="num">' + chip(r.seo) + '</td><td class="num">' + (r.lcp ? (r.lcp / 1000).toFixed(1) + " s" : "–") + '</td><td class="num">' + (r.cls != null ? r.cls.toFixed(2) : "–") + "</td><td>" + (r.field ? esc((r.field.overall || "").toLowerCase() || "–") : '<span class="muted">not enough data</span>') + '</td><td><a class="btn small" href="https://pagespeed.web.dev/analysis?url=' + encodeURIComponent(x.u) + '&form_factor=mobile" target="_blank" rel="noopener">Full report</a></td></tr>';
-        }).join("") + "</tbody></table></div>" +
+        }).join("") + "</tbody></table></div>" + toggle +
         (load("auto-fixes-mobile", []).length ? '<div class="row" style="margin-top:10px"><a class="btn primary" href="#fixes">' + load("auto-fixes-mobile", []).length + " mobile fixes in the Fix queue</a></div>" : "");
+      Array.prototype.forEach.call(out.querySelectorAll(".psi-toggle"), function (b) {
+        b.addEventListener("click", function () {
+          var wasAll = showAll; showAll = !showAll; table(d);
+          if (wasAll) { var t = out.querySelector("#psi-table"); if (t && t.scrollIntoView) t.scrollIntoView({ block: "start", behavior: "smooth" }); }
+        });
+      });
+      var rb = out.querySelector("#psi-retry"); if (rb) rb.addEventListener("click", function () { runAll(true); });
     }
-    function runAll() {
+    function runAll(failedOnly) {
       var audit = load("seo-audit", null), st = body.querySelector("#psi-status");
       if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return; }
-      var urls = audit.pages.filter(function (p) { return p.live && !p.redirectTo && !p.noindex; }).map(function (p) { return p.link; }).slice(0, 120);
-      var d = { when: new Date().toISOString(), pages: {} }, i = 0, done = 0; stop = false;
+      var old = psiData(), d, urls;
+      if (failedOnly === true && old && old.pages) {
+        d = old; urls = Object.keys(old.pages).filter(function (k) { return old.pages[k].error; });
+      } else {
+        d = { when: new Date().toISOString(), pages: {} };
+        urls = audit.pages.filter(function (p) { return p.live && !p.redirectTo && !p.noindex; }).map(function (p) { return p.link; }).slice(0, 120);
+      }
+      if (!urls.length) return;
+      var i = 0, done = 0, inARow = 0, why = ""; stop = false;
       body.querySelector("#psi-run").disabled = true; body.querySelector("#psi-stop").hidden = false;
       function next() {
         if (stop || i >= urls.length) return Promise.resolve();
         var u = urls[i++];
-        return runPsi(u).then(function (r) { d.pages[u] = r; }, function (e) { d.pages[u] = { error: e.message }; if (/limit/.test(e.message)) stop = true; })
-          .then(function () { done++; st.innerHTML = '<div class="notice info">Checked ' + done + " of " + urls.length + "…</div>"; save("psi", d); return next(); });
+        return runPsi(u).then(function (r) { d.pages[u] = r; inARow = 0; }, function (e) {
+          d.pages[u] = { error: e.message };
+          if (e.badKey || (e.limit && !psiKey())) { stop = true; why = e.message; }
+          else if (e.network && ++inARow >= 6) { stop = true; why = "Six pages in a row got no answer from Google, so it stopped rather than mark the rest as failed. Check the internet connection, then click Check the ones that failed again."; }
+        }).then(function () { done++; st.innerHTML = '<div class="notice info">Checked ' + done + " of " + urls.length + "…</div>"; save("psi", d); return next(); });
       }
       Promise.all([next(), next()]).then(function () {
         save("psi", d); save("auto-fixes-mobile", buildMobileFixes(d)); updateNav();
         body.querySelector("#psi-run").disabled = false; body.querySelector("#psi-stop").hidden = true;
         var errs = Object.keys(d.pages).filter(function (k) { return d.pages[k].error; });
-        st.innerHTML = '<div class="notice ' + (errs.length ? "" : "info") + '">' + (stop && done < urls.length ? "Stopped after " + done + " pages. " : "Mobile check finished. ") + (errs.length ? errs.length + " pages couldn't be checked: " + esc(d.pages[errs[0]].error) : "") + "</div>";
+        st.innerHTML = '<div class="notice ' + (errs.length ? "" : "info") + '">' + (stop && done < urls.length ? "Stopped after " + done + " pages. " : "Mobile check finished. ") + (why ? esc(why) : errs.length ? errs.length + " pages couldn't be checked, even after trying each up to three times: " + esc(d.pages[errs[0]].error) : "") + "</div>";
         table(d);
       });
     }
