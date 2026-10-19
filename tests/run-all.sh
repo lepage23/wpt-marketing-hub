@@ -18,6 +18,7 @@ out=$( {
   node tests/display-widths.test.js assets/app.js tests/fixtures/display-run-3.json
   node tests/mobile.test.js assets/app.js tests/fixtures/psi_fixture.json
   node tests/mobile-retry.test.js assets/app.js tests/fixtures/psi_fixture.json
+  node tests/progress.test.js assets/app.js
   php tests/page-checker.test.php docs/wordpress-page-checker.php | grep -E "^(PASS|FAIL)"
   php tests/analytics.test.php docs/wordpress-page-checker.php /dev/null
   php tests/ga4.test.php docs/wordpress-ga4.php /dev/null

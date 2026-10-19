@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.17.2 · 2026-10-19 14:10 BST
+
+Progress bar on long checks.
+
+- The page audit, mobile check and display check now show a **progress bar** with the **percentage**, **time left** (counting down every second) and roughly **when it'll be done**.
+- Time left starts from a typical pace, then switches to the real pace once pages finish, so it gets more accurate as it goes.
+- Still shows which page it's on.
+- 245 tests, all passing.
+
 ## v0.17.1 · 2026-10-19 13:50 BST
 
 Mobile check copes with dropped answers, and the results list folds up.

@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.17.1";
-  var BUILT = "2026-10-19 13:45 BST";
+  var VERSION = "0.17.2";
+  var BUILT = "2026-10-19 14:03 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -275,6 +275,46 @@
     return '<div class="stat' + (flag ? " flag" : "") + '"><span class="n">' + esc(n) + '</span><span class="l">' + esc(label) + "</span></div>";
   }
 
+
+  /* Progress for long checks: a bar, the percentage, time left and a rough finish time.
+     Time left starts from a guess per item, then uses the real pace once items finish,
+     and counts down every second between updates. */
+  function fmtDur(ms) {
+    var t = Math.max(0, Math.round(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    if (h) return h + " hr " + m + " min";
+    if (m) return m < 10 ? m + " min " + sec + " sec" : m + " min";
+    return sec + " sec";
+  }
+  function progressText(done, total, startedAt, perGuess, now) {
+    var pct = total ? Math.min(100, Math.floor(done / total * 100)) : 0, el = now - startedAt, left;
+    if (done > 0) left = el / done * (total - done);
+    else left = Math.max(0, perGuess * total - el);
+    return { pct: pct, elapsed: fmtDur(el), left: left, leftText: done >= total ? "" : left < 5000 ? "Nearly done" : "About " + fmtDur(left) + " left", finish: new Date(now + left) };
+  }
+  function makeProgress(box, label, total, perGuess) {
+    var started = Date.now(), done = 0, detail = "", stamp = started, timer = null, closed = false, mine = null;
+    function draw() {
+      if (closed) return;
+      /* Stop if the box has gone, or something else has written into it (an error or the result). */
+      if (!box.isConnected || (mine && box.firstElementChild !== mine)) { stopTimer(); closed = true; return; }
+      var now = Date.now(), p = progressText(done, total, started, perGuess, stamp);
+      var left = Math.max(0, p.left - (now - stamp));
+      var leftText = done >= total ? "Finishing off…" : left < 5000 ? "Nearly done" : "About " + fmtDur(left) + " left";
+      var finish = new Date(stamp + p.left).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      box.innerHTML = '<div class="notice info progress"><div class="prog-top"><span>' + esc(label) + " " + Math.floor(done) + " of " + total + (detail ? '<span class="muted"> · ' + esc(detail) + "</span>" : "") + '</span><b class="mono">' + p.pct + "%</b></div>" +
+        '<div class="prog-bar" role="progressbar" aria-label="' + esc(label) + '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + p.pct + '"><span style="width:' + p.pct + '%"></span></div>' +
+        '<div class="prog-meta muted mono">' + esc(leftText) + (done < total && left >= 5000 ? " · done by about " + finish : "") + " · " + fmtDur(now - started) + " so far</div></div>";
+      mine = box.firstElementChild;
+    }
+    function stopTimer() { if (timer) clearInterval(timer); timer = null; }
+    timer = setInterval(draw, 1000); draw();
+    return {
+      step: function (d, t, det) { done = d; if (t) total = t; if (det != null) detail = det; stamp = Date.now(); draw(); },
+      note: function (det) { detail = det; draw(); },
+      close: function () { stopTimer(); closed = true; }
+    };
+  }
+
   /* Website & SEO */
   function stripHtml(h) { var d = document.createElement("div"); d.innerHTML = h || ""; return (d.textContent || "").replace(/\s+/g, " ").trim(); }
   function auditItem(item, type, site) {
@@ -445,13 +485,17 @@
             status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " items checked. Add the page checker snippet to also catch redirects.</div>";
             return;
           }
-          function prog(d, n) { status.innerHTML = '<div class="notice info">Checking live pages: ' + d + " of " + n + "…</div>"; }
+          var bar = null;
+          function phase(label, guess) { if (bar) bar.close(); bar = null; return function (d, n) { if (!bar) bar = makeProgress(status, label, n, guess); bar.step(d, n); }; }
+          var prog = phase("Checking live pages", 1500);
           return checkUrls(pages.map(function (p) { return p.link; }), prog).then(function (live) {
             var targets = applyLive(pages, live);
-            return (targets.length ? checkUrls(targets, prog) : Promise.resolve({})).then(function (live2) {
+            return (targets.length ? checkUrls(targets, phase("Checking where redirects lead", 1500)) : Promise.resolve({})).then(function (live2) {
               targets.forEach(function (u) { pages.push(liveOnlyRow(u, live2[norm(u)])); });
+              if (bar) bar.close(); bar = null;
               status.innerHTML = '<div class="notice info">Checking the site: robots.txt, sitemap, redirects and links…</div>';
-              return siteAudit(pages, prog).then(function (res) {
+              return siteAudit(pages, phase("Checking extra addresses found on the site", 1500)).then(function (res) {
+                if (bar) bar.close();
                 var known = {}; pages.forEach(function (p) { known[norm(p.link)] = true; });
                 var inMap = {}; (res.site.sitemap_urls || []).forEach(function (u) { inMap[norm(u)] = true; });
                 Object.keys(res.extraRows).forEach(function (k) {
@@ -471,6 +515,7 @@
                 status.innerHTML = '<div class="notice info">Audit finished. ' + pages.length + " addresses checked against the live site (" + red + " redirect elsewhere). " + autos.length + ' technical fixes are in the <a href="#fixes">Fix queue</a>.</div>';
               }, function (err) {
                 storeAudit(pages, site);
+                if (bar) bar.close();
                 status.innerHTML = '<div class="notice"><b>Pages checked, but the site-wide check didn\'t run.</b> ' + esc(err.message) + ' If it says "No route was found", update the page checker snippet with the new version in docs/wordpress-page-checker.php.</div>';
               });
             });
@@ -1894,6 +1939,7 @@
       }
       if (!urls.length) return;
       var i = 0, done = 0, inARow = 0, why = ""; stop = false;
+      var bar = makeProgress(st, failedOnly === true ? "Rechecking" : "Checked", urls.length, 11000);
       body.querySelector("#psi-run").disabled = true; body.querySelector("#psi-stop").hidden = false;
       function next() {
         if (stop || i >= urls.length) return Promise.resolve();
@@ -1902,9 +1948,10 @@
           d.pages[u] = { error: e.message };
           if (e.badKey || (e.limit && !psiKey())) { stop = true; why = e.message; }
           else if (e.network && ++inARow >= 6) { stop = true; why = "Six pages in a row got no answer from Google, so it stopped rather than mark the rest as failed. Check the internet connection, then click Check the ones that failed again."; }
-        }).then(function () { done++; st.innerHTML = '<div class="notice info">Checked ' + done + " of " + urls.length + "…</div>"; save("psi", d); return next(); });
+        }).then(function () { done++; bar.step(done, urls.length, shortPath(u)); save("psi", d); return next(); });
       }
       Promise.all([next(), next()]).then(function () {
+        bar.close();
         save("psi", d); save("auto-fixes-mobile", buildMobileFixes(d)); updateNav();
         body.querySelector("#psi-run").disabled = false; body.querySelector("#psi-stop").hidden = true;
         var errs = Object.keys(d.pages).filter(function (k) { return d.pages[k].error; });
@@ -2125,6 +2172,7 @@
          page is asked to check itself again. Words that break, and layouts that slip, often only do so
          at one size. Tablet and phone widths match Elementor's breakpoints. */
       var WIDTHS = [1366, 1536, 1440, 1280, 1120, 1024, 900, 768, 600, 400], n = 0, total = urls.length, silent = 0;
+      var bar = makeProgress(st, "Checking page", total, 30000);
       function recheck(u, wd) {
         return new Promise(function (res) {
           size(wd);
@@ -2136,7 +2184,7 @@
       function doPage(u) {
         var pg = d.pages[u] = { pageId: 0, reports: [] };
         size(WIDTHS[0]);
-        st.innerHTML = '<div class="notice info">Checking ' + esc(shortPath(u)) + " (" + (++n) + " of " + total + ") at " + WIDTHS.length + " screen widths…</div>";
+        ++n; bar.step(n - 1, total, shortPath(u) + " at " + WIDTHS.length + " screen widths");
         return visit(u).then(function (first) {
           if (!first && useFrame && n === 1) {
             /* Site refused to load in a frame: fall back to a small window at desktop width only. */
@@ -2148,7 +2196,7 @@
           function nextWidth() {
             if (stop || i >= WIDTHS.length) return Promise.resolve(got);
             var wd = WIDTHS[i++];
-            st.innerHTML = '<div class="notice info">Checking ' + esc(shortPath(u)) + " (" + n + " of " + total + ") at " + wd + "px wide…</div>";
+            bar.note(shortPath(u) + " at " + wd + "px wide");
             return recheck(u, wd).then(function (r) { if (r) got.push(r); return nextWidth(); });
           }
           return nextWidth();
@@ -2164,13 +2212,15 @@
         function next() {
           if (stop || i >= urls.length) return Promise.resolve();
           return doPage(urls[i++]).then(function () {
-            if (silent >= 2 && n <= 2) { stop = true; st.innerHTML = '<div class="notice"><b>Pages aren\'t reporting back.</b> The display check needs page checker version 10. Click Copy page checker code, replace the code in WordPress and save, then try again.</div>'; return; }
+            bar.step(n, total);
+            if (silent >= 2 && n <= 2) { stop = true; bar.close(); st.innerHTML = '<div class="notice"><b>Pages aren\'t reporting back.</b> The display check needs page checker version 10. Click Copy page checker code, replace the code in WordPress and save, then try again.</div>'; return; }
             return next();
           });
         }
         return next();
       }
       pass().then(function () {
+        bar.close();
         window.removeEventListener("message", onMsg);
         try { if (popup) popup.close(); } catch (e) {}
         stage.remove();
