@@ -6,7 +6,7 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
-## v0.19.2 · 2026-10-19 16:26 BST
+## v0.19.2 · 2026-10-19 16:24 BST
 
 - **Your jobs:** Claude can now update a job's status and details from GitHub. Each update applies once, so your own later changes stick.
 - Business Profile API job marked **Doing**, with the case ID (4-3006000041270) and what to expect.
