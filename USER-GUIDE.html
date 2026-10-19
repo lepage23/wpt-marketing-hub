@@ -83,6 +83,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
   <a href="#today">Today</a>
   <a href="#seo">Website &amp; SEO</a>
   <a href="#fixes">Fix queue</a>
+  <a href="#progress">Progress &amp; change log</a>
   <a href="#jobs">Your jobs</a>
   <a href="#leads">Leads</a>
   <a href="#email">Email campaigns</a>
@@ -132,6 +133,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
   <li><b>Monday:</b> run the weekly brief, save it, and pick a blog idea.</li>
   <li><b>Website &amp; SEO:</b> run the page audit, the mobile check and the display check, then deal with what they put in the Fix queue.</li>
   <li><b>Email campaigns:</b> import results from any send that's had three days to settle.</li>
+  <li><b>Progress &amp; change log:</b> after the audit, check the health score has moved the right way. Copy the report for Garry when he wants an update.</li>
 </ul>
 
 <h2 id="safety">What's safe to click</h2>
@@ -197,8 +199,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
 <h3>Find text on the site</h3>
 <p>Searches every published page and post, including Elementor pages, for any words. Handy for checking where a claim, a product name or an old phone number appears.</p>
 
-<h3>Change log</h3>
-<p>Every change the hub has made to the website, newest first: what, where and when, including undos.</p>
+<p>The change log used to sit at the bottom of this page. It now has its own page: <a href="#progress">Progress &amp; change log</a>.</p>
 
 <h2 id="fixes">Fix queue</h2>
 <p>Everything the website needs, written by Claude or found by the checks. Nothing goes live until you approve it.</p>
@@ -229,6 +230,44 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
 <p>Press <span class="btn">Check the look</span> to see the fonts, sizes and colours the new page will copy. When Claude has written the page, <span class="btn primary">Push new page build for review</span> makes the draft and gives you <span class="btn">Preview the draft</span> and <span class="btn">Edit in Elementor</span>. You need to be logged in to WordPress in the same browser to see the preview. <span class="btn">Bin this draft</span> moves it to the WordPress bin.</p>
 <h3>Undo</h3>
 <p>On any pushed fix, click <span class="btn">Undo</span> twice. If the page has been edited since, the hub warns you, because undoing would also remove those later edits. You can still go ahead, or use Revisions in Elementor instead.</p>
+
+<h2 id="progress">Progress &amp; change log</h2>
+<p>Shows how the website's scores have moved since your first audit, and lists every change the hub has made to the site. It sits under Fix queue in the left menu. Use it to prove the SEO work is paying off.</p>
+
+<h3>Snapshots</h3>
+<p>Every time you run the page audit on Website &amp; SEO, the hub saves that day's scores as a snapshot. The first one is your baseline, the starting point everything else is measured against. If you'd already run an audit before this page existed, that audit becomes the baseline the first time you open the page, dated the day it ran.</p>
+<p>There's one snapshot per day. Run the audit twice in a day and the second run replaces the first.</p>
+<p>If you've updated keyword positions or AI search answers without running the audit again, press <span class="btn">Save today's snapshot</span>. It saves today's figures using the last audit.</p>
+
+<h3>The health score</h3>
+<p>The headline number. It's the percentage of all page checks the site passes. Each page is checked for twelve problems: thin content, missing meta description, meta description too long or short, title over 60 characters, missing or extra H1, no H2s, images without alt text, few internal links, not updated in a year, set to noindex, canonical pointing elsewhere and not loading properly. Pages that redirect elsewhere aren't counted.</p>
+<p>Fix a missing meta description on one page and the score goes up a little. Clear every problem on every page and it reads 100%.</p>
+
+<h3>Comparing two dates</h3>
+<p>Pick any two snapshots in <b>Compare from</b> and <b>To</b>. By default it compares your baseline with the latest one. Every measure then shows:</p>
+<ul>
+  <li>the figure on each date</li>
+  <li>the change, such as <b>-14</b> or <b>+8.3 pts</b></li>
+  <li>the change as a percentage, such as <b>56% better</b> or <b>12% worse</b></li>
+</ul>
+<p>Green means better and red means worse. For issues and keyword positions, lower is better, so a drop shows green.</p>
+<p>As well as the page checks, the scorecard includes average mobile and desktop speed scores (from the last speed check before each snapshot), your average keyword position, keywords in Google's top 10 and how many AI answers name WPT. Those last three come from the tables on Website &amp; SEO, so they only mean something if you keep them up to date.</p>
+
+<h3>The rest of the page</h3>
+<ul>
+  <li><b>Health score over time.</b> A chart of every snapshot. Hover the line for the figure on each date.</li>
+  <li><b>Pages that moved.</b> Pages whose issue count changed between the two dates, biggest improvements first.</li>
+  <li><b>Website changes made.</b> How many fixes were pushed live in that period. Undos and fixes marked done without a push aren't counted.</li>
+  <li><b>Snapshot history.</b> Every snapshot, with a Delete button (click twice) if one was taken by mistake.</li>
+</ul>
+
+<h3>Copy report for Garry</h3>
+<p>Appears once you have two snapshots. It copies a plain-text summary of the comparison, ready to paste into an email: each measure before and after with its percentage, the number of website changes and the five most improved pages.</p>
+
+<h3>Change log</h3>
+<p>At the bottom of the page. Every change the hub has made to the website, newest first: what, where and when, including undos. <span class="btn">Copy as CSV</span> copies the whole log.</p>
+
+<div class="warn">Snapshots are saved in your browser, like your leads. Press <span class="btn">Copy history as CSV</span> now and then and paste it somewhere safe, such as a spreadsheet, so you don't lose your baseline if the browser data gets cleared.</div>
 
 <h2 id="jobs">Your jobs</h2>
 <p>Things only you can do: make an image in Canva at the size given, confirm a fact, get a sign-off from Garry. Claude adds to this list with each batch of fixes. Set each one to Doing or Done as you go.</p>
@@ -306,7 +345,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
   <thead><tr><th>What</th><th>Where</th></tr></thead>
   <tbody>
     <tr><td>The hub itself, and fixes Claude writes</td><td>The folder on your laptop, backed up to GitHub when you push.</td></tr>
-    <tr><td>Leads, campaigns, chats, briefs, tables you fill in, which fixes you've pushed</td><td>Your browser on this laptop only. Not on GitHub.</td></tr>
+    <tr><td>Leads, campaigns, chats, briefs, tables you fill in, which fixes you've pushed, progress snapshots and the change log</td><td>Your browser on this laptop only. Not on GitHub.</td></tr>
     <tr><td>WordPress application password, API keys</td><td>Your browser on this laptop only. Never in the folder or on GitHub.</td></tr>
     <tr><td>Website changes</td><td>WordPress, with a backup of the page kept before each change.</td></tr>
   </tbody>

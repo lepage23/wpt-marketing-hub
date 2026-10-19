@@ -6,6 +6,22 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.19.0 · 2026-10-19 15:45 BST
+
+New page: Progress & change log, under Fix queue.
+
+- **Snapshots.** Every page audit saves that day's scores. The first becomes the baseline. An audit run before this version becomes the baseline the first time the page opens, dated the day it ran. **Save today's snapshot** saves again without a new audit.
+- **Website health score**: the percentage of page checks the site passes, across 12 checks per page. Redirects aren't counted.
+- **Compare any two dates.** Every measure shows both figures, the change and a percentage (for example 56% better). Green is better, red is worse.
+- Scorecard also covers average mobile and desktop speed, keyword positions and AI answers naming WPT.
+- Health score chart, pages that moved most, and how many website changes were pushed in the period.
+- **Copy report for Garry**: plain-text summary for an email.
+- **Copy history as CSV** and a Delete button for each snapshot.
+- The **Change log** has moved here from the bottom of Website & SEO, and gains **Copy as CSV**. New entries now carry a date so they can be counted by period. Older entries still count.
+- Website & SEO gains a **Progress report** button.
+- User guide updated.
+- 277 tests, all passing.
+
 ## v0.18.0 · 2026-10-19 14:30 BST
 
 Speed check: desktop too, and everything Google flags goes to the Fix queue.

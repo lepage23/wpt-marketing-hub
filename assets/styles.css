@@ -183,6 +183,14 @@ ul.where, ol.steps-list { margin: 6px 0 0; padding-left: 20px; font-size: .88rem
 .hint { font-size: .75rem; color: var(--muted); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 @media (max-width: 700px) { .cols2 { grid-template-columns: 1fr; } }
+/* Progress & change log */
+.stat .d { font: 600 .78rem var(--font-mono); }
+.stat .d.up, .delta.up { color: var(--good); }
+.stat .d.down, .delta.down { color: var(--bad); }
+.stat .d.flat, .delta.flat { color: var(--muted); }
+.delta.up, .delta.down { font-weight: 600; }
+.compare-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.compare-row .field { min-width: 180px; }
 .toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: var(--radius); font-size: .88rem; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

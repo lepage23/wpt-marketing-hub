@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.18.0";
-  var BUILT = "2026-10-19 14:23 BST";
+  var VERSION = "0.19.0";
+  var BUILT = "2026-10-19 15:19 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -202,6 +202,7 @@
     { id: "today", label: "Today", render: renderToday },
     { id: "seo", label: "Website & SEO", pri: "Priority", render: renderSeo },
     { id: "fixes", label: "Fix queue", render: renderFixes },
+    { id: "progress", label: "Progress & change log", render: renderProgress },
     { id: "jobs", label: "Your jobs", render: renderJobs },
     { id: "leads", label: "Leads", render: renderLeads },
     { id: "email", label: "Email campaigns", render: renderEmail },
@@ -382,7 +383,7 @@
   function renderSeo(main) {
     var cfg = load("seo-settings", { site: "https://westpiertech.com", types: "pages,posts" });
     main.innerHTML = head("Priority area", "Website & SEO", "Audit westpiertech.com through the WordPress API, track rankings and AI search visibility, and plan content.",
-      '<a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a>");
+      '<div class="row"><a class="btn" href="#progress">Progress report</a><a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a></div>");
     renderWpConnect(main);
     renderPerformance(main);
     renderGa4(main);
@@ -415,7 +416,7 @@
 
     function storeAudit(pages, site, siteData, statusMap) {
       var audit = { when: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }), site: site, pages: pages, siteData: siteData || null, status: statusMap || null };
-      save("seo-audit", audit); drawAudit(audit); updateNav();
+      save("seo-audit", audit); recordSnapshot(audit); drawAudit(audit); updateNav();
       return audit;
     }
     function drawAudit(audit) {
@@ -586,8 +587,6 @@
       ]
     }).node);
     main.appendChild(plan);
-
-    renderChangeLog(main);
   }
 
 
@@ -2397,7 +2396,7 @@
     var s = fixState();
     return proposals().filter(function (p) { return !p.example && !(s[p.id] && s[p.id].status); });
   }
-  function logChange(entry) { var l = load("change-log", []); l.unshift(entry); save("change-log", l); }
+  function logChange(entry) { if (!entry.date) entry.date = today(); var l = load("change-log", []); l.unshift(entry); save("change-log", l); }
 
   function countOnce(hay, needle) {
     if (!needle) return 0; var n = 0, i = hay.indexOf(needle);
@@ -2971,12 +2970,258 @@
   }
 
   function renderChangeLog(main) {
-    var p = panel("Change log", "Every change the hub has made to the website, newest first.");
     var l = load("change-log", []);
+    var p = panel("Change log", "Every change the hub has made to the website, newest first.",
+      l.length ? '<button type="button" class="btn small" id="log-copy">Copy as CSV</button>' : "");
     p.appendChild(el(l.length ? '<div class="table-wrap"><table><thead><tr><th>When</th><th>Page</th><th>Change</th><th>What happened</th></tr></thead><tbody>' +
       l.map(function (x) { return '<tr><td class="mono">' + esc(x.when) + '</td><td><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.page) + "</a></td><td>" + esc(x.type) + "</td><td>" + esc(x.action) + "</td></tr>"; }).join("") +
-      "</tbody></table></div>" : '<div class="empty">No changes made yet.</div>'));
+      "</tbody></table></div>" : '<div class="empty">No changes made yet. Approve a fix in the Fix queue and it shows up here.</div>'));
+    var c = p.querySelector("#log-copy");
+    if (c) c.addEventListener("click", function () {
+      copyText(toCsv([{ k: "when", label: "When" }, { k: "page", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Change" }, { k: "action", label: "What happened" }], l), "Change log copied as CSV");
+    });
     main.appendChild(p);
+  }
+
+  /* ---------- Progress & change log ----------
+     Every audit saves a snapshot of the scores (one per day, the latest run that day wins).
+     The page compares any two snapshots so improvements show as numbers and percentages.
+     Checks read the audit's own issue labels, so they match what the audit table shows. */
+  var PROGRESS_CHECKS = [
+    { k: "thin", label: "Thin pages (under 300 words)", re: /^Thin content/ },
+    { k: "noDesc", label: "Missing meta descriptions", re: /^No (custom )?meta description/ },
+    { k: "descLen", label: "Meta description too long or short", re: /^Meta description (too long|short)/ },
+    { k: "titleLong", label: "Title tag over 60 characters", re: /^Title tag over/ },
+    { k: "h1", label: "No H1, or more than one", re: /^(No H1|\d+ H1s)/ },
+    { k: "noH2", label: "No H2 subheadings", re: /^No H2/ },
+    { k: "noAlt", label: "Pages with images missing alt text", re: /missing alt text/ },
+    { k: "fewLinks", label: "Few internal links", re: /^Few internal links/ },
+    { k: "stale", label: "Not updated in over a year", re: /^Not updated/ },
+    { k: "noindex", label: "Hidden from Google (noindex)", re: /^Set to noindex/ },
+    { k: "canonical", label: "Canonical points elsewhere", re: /^Canonical points/ },
+    { k: "broken", label: "Pages not loading properly", re: /^(Live page answers|Live check failed)/ }
+  ];
+  /* Changes that actually altered the site. Undos, binned drafts and "marked done" don't count. */
+  var COUNTED_CHANGE = /^(Pushed live|Draft saved|Draft built|Removed from page|Unpublished|Image fixed|Layout fixed|Punctuation fixed|Text size fixed)/;
+  var MONTHS = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Sept: 9, Oct: 10, Nov: 11, Dec: 12 };
+  /* Change log rows from before v0.19 only have "19 Oct 2026, 14:30". Turn that into 2026-10-19. */
+  function logDate(x) {
+    if (x.date) return x.date;
+    var m = /(\d{1,2}) (\w{3,4}) (\d{4})/.exec(x.when || "");
+    if (!m || !MONTHS[m[2]]) return "";
+    return m[3] + "-" + ("0" + MONTHS[m[2]]).slice(-2) + "-" + ("0" + m[1]).slice(-2);
+  }
+  function fmtDate(iso) {
+    if (!iso) return "–";
+    var d = new Date(iso + "T12:00:00");
+    return isNaN(d) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }
+  function avgSpeed(map) {
+    var ok = Object.keys(map || {}).map(function (k) { return map[k]; }).filter(function (r) { return r && !r.error && r.perf != null; });
+    return ok.length ? Math.round(ok.reduce(function (s, r) { return s + r.perf; }, 0) / ok.length) : null;
+  }
+  /* Pure: works out one snapshot from an audit plus the other tracked data. */
+  function buildSnapshot(audit, date, kwRows, aiRows, psi) {
+    var pages = audit.pages.filter(function (x) { return !x.redirectTo; });
+    if (!pages.length) return null;
+    var counts = {}, failed = 0;
+    PROGRESS_CHECKS.forEach(function (c) {
+      counts[c.k] = pages.filter(function (x) { return x.issues.some(function (i) { return c.re.test(i); }); }).length;
+      failed += counts[c.k];
+    });
+    var perPage = {};
+    pages.forEach(function (x) { perPage[x.link] = { t: x.title, n: x.issues.length }; });
+    var kw = (kwRows || []).filter(function (r) { return !r._ex && Number(r.pos) > 0; });
+    var ai = (aiRows || []).filter(function (r) { return !r._ex && r.named && r.named !== "Not checked"; });
+    return {
+      date: date, when: audit.when, site: audit.site,
+      pages: pages.length,
+      issues: pages.reduce(function (n, x) { return n + x.issues.length; }, 0),
+      score: Math.round((1 - failed / (pages.length * PROGRESS_CHECKS.length)) * 1000) / 10,
+      clear: pages.filter(function (x) { return !x.issues.length; }).length,
+      counts: counts, perPage: perPage,
+      kwTracked: kw.length,
+      kwAvg: kw.length ? Math.round(kw.reduce(function (n, r) { return n + Number(r.pos); }, 0) / kw.length * 10) / 10 : null,
+      kwTop10: kw.filter(function (r) { return Number(r.pos) <= 10; }).length,
+      aiChecked: ai.length,
+      aiNamed: ai.filter(function (r) { return r.named === "Yes"; }).length,
+      speedMobile: psi ? avgSpeed(psi.pages) : null,
+      speedDesktop: psi && psi.withDesktop ? avgSpeed(psi.desktop) : null
+    };
+  }
+  function snapHistory() { return (load("seo-history", []) || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }); }
+  function recordSnapshot(audit, date) {
+    if (!audit || !audit.pages || !audit.pages.length) return null;
+    var snap = buildSnapshot(audit, date || today(), getRows("keywords"), getRows("ai-visibility"), psiData());
+    if (!snap) return null;
+    var h = snapHistory().filter(function (s) { return s.date !== snap.date; });
+    h.push(snap); save("seo-history", h);
+    return snap;
+  }
+  /* First time the page opens: the audit already saved becomes the baseline, dated the day it ran. */
+  function ensureBaseline() {
+    if (snapHistory().length) return;
+    var a = load("seo-audit", null);
+    if (a && a.pages && a.pages.length) recordSnapshot(a, logDate({ when: a.when }) || today());
+  }
+  /* For measures where lower is better (issues, positions), a drop counts as an improvement. */
+  function delta(base, now, lowerBetter, unit) {
+    if (base == null || now == null || isNaN(base) || isNaN(now)) return { txt: "–", pct: "–", cls: "flat" };
+    var d = Math.round((now - base) * 10) / 10;
+    var better = lowerBetter ? d < 0 : d > 0;
+    var cls = d === 0 ? "flat" : better ? "up" : "down";
+    var txt = d === 0 ? "no change" : (d > 0 ? "+" : "") + d + (unit || "");
+    var pctTxt = "–";
+    if (d === 0) pctTxt = "0%";
+    else if (base !== 0) pctTxt = Math.round(Math.abs(d) / Math.abs(base) * 100) + "% " + (better ? "better" : "worse");
+    else pctTxt = better ? "better" : "worse";
+    return { txt: txt, pct: pctTxt, cls: cls };
+  }
+  function metricRows(a, b) {
+    var rows = [
+      { label: "Website health score", a: a.score, b: b.score, lower: false, unit: "%", note: "Share of all page checks passed" },
+      { label: "Issues found", a: a.issues, b: b.issues, lower: true },
+      { label: "Pages with no issues", a: a.clear, b: b.clear, lower: false }
+    ];
+    PROGRESS_CHECKS.forEach(function (c) { rows.push({ label: c.label, a: (a.counts || {})[c.k], b: (b.counts || {})[c.k], lower: true }); });
+    rows.push({ label: "Average mobile speed score", a: a.speedMobile, b: b.speedMobile, lower: false, note: "From the last speed check before each snapshot" });
+    rows.push({ label: "Average desktop speed score", a: a.speedDesktop, b: b.speedDesktop, lower: false });
+    rows.push({ label: "Keyword average position", a: a.kwAvg, b: b.kwAvg, lower: true, note: "Tracked searches on Website & SEO" });
+    rows.push({ label: "Keywords in Google's top 10", a: a.kwTop10, b: b.kwTop10, lower: false });
+    rows.push({ label: "AI answers naming WPT", a: a.aiNamed, b: b.aiNamed, lower: false });
+    return rows;
+  }
+  /* Website changes made after the start date, up to and including the end date. */
+  function changesBetween(log, a, b) {
+    return (log || []).filter(function (x) {
+      if (!COUNTED_CHANGE.test(x.action || "")) return false;
+      var d = logDate(x); return d && d > a.date && d <= b.date;
+    }).length;
+  }
+  function changesSoFar(log, b) {
+    return (log || []).filter(function (x) { var d = logDate(x); return COUNTED_CHANGE.test(x.action || "") && d && d <= b.date; }).length;
+  }
+  function pageMoves(a, b) {
+    var out = [];
+    Object.keys(b.perPage || {}).forEach(function (link) {
+      var before = (a.perPage || {})[link], now = b.perPage[link];
+      if (!before) { out.push({ link: link, t: now.t, a: "new", b: now.n, d: 0, isNew: true }); return; }
+      if (before.n !== now.n) out.push({ link: link, t: now.t, a: before.n, b: now.n, d: now.n - before.n });
+    });
+    return out.sort(function (x, y) { return (x.isNew ? 1 : 0) - (y.isNew ? 1 : 0) || x.d - y.d; });
+  }
+  function fmtVal(v, unit) { return v == null ? "–" : v + (unit || ""); }
+  function reportText(a, b, log) {
+    var lines = ["WPT website progress report", "Compared " + fmtDate(a.date) + " (start) with " + fmtDate(b.date) + " (latest)", ""];
+    metricRows(a, b).forEach(function (m) {
+      if (m.a == null && m.b == null) return;
+      var d = delta(m.a, m.b, m.lower, m.unit === "%" ? " pts" : "");
+      lines.push(m.label + ": " + fmtVal(m.a, m.unit) + " to " + fmtVal(m.b, m.unit) + (d.pct !== "–" ? " (" + d.pct + ")" : ""));
+    });
+    lines.push("", "Website changes made in this period: " + changesBetween(log, a, b));
+    var moved = pageMoves(a, b).filter(function (p) { return p.d < 0; }).slice(0, 5);
+    if (moved.length) {
+      lines.push("", "Most improved pages:");
+      moved.forEach(function (p) { lines.push("- " + p.t + ": " + p.a + " issues down to " + p.b); });
+    }
+    return lines.join("\n");
+  }
+
+  function renderProgress(main) {
+    ensureBaseline();
+    var hist = snapHistory(), log = load("change-log", []);
+    main.innerHTML = head("Website & SEO", "Progress & change log", "How the website's scores have moved since the first audit, and every change the hub has made. Built to show Garry.",
+      hist.length > 1 ? '<button type="button" class="btn primary" id="rep-copy">Copy report for Garry</button>' : "");
+
+    if (!hist.length) {
+      var e = panel("No baseline yet", "Run the page audit on Website & SEO. That first run becomes the starting point every later report is measured against.");
+      e.appendChild(el('<div class="row"><a class="btn primary" href="#seo">Go to the page audit</a></div>'));
+      main.appendChild(e); renderChangeLog(main); return;
+    }
+
+    var sel = load("progress-compare", {});
+    var has = function (d) { return hist.some(function (s) { return s.date === d; }); };
+    var aDate = has(sel.a) ? sel.a : hist[0].date, bDate = has(sel.b) ? sel.b : hist[hist.length - 1].date;
+    var a = hist.filter(function (s) { return s.date === aDate; })[0], b = hist.filter(function (s) { return s.date === bDate; })[0];
+    var two = hist.length > 1 && aDate !== bDate;
+
+    var opts = function (cur) { return hist.map(function (s) { return '<option value="' + s.date + '"' + (s.date === cur ? " selected" : "") + ">" + esc(fmtDate(s.date)) + " · " + s.score + "%</option>"; }).join(""); };
+    var cmp = el('<div class="compare-row">' +
+      '<label class="field" for="cmp-a">Compare from<select id="cmp-a">' + opts(aDate) + "</select></label>" +
+      '<label class="field" for="cmp-b">To<select id="cmp-b">' + opts(bDate) + "</select></label>" +
+      '<button type="button" class="btn" id="snap-now">Save today\'s snapshot</button></div>');
+    main.appendChild(cmp);
+    cmp.addEventListener("change", function () { save("progress-compare", { a: cmp.querySelector("#cmp-a").value, b: cmp.querySelector("#cmp-b").value }); route(); });
+    cmp.querySelector("#snap-now").addEventListener("click", function () {
+      var au = load("seo-audit", null); if (!au) return toast("Run an audit first");
+      recordSnapshot(au, today()); save("progress-compare", {}); toast("Snapshot saved for " + fmtDate(today())); route();
+    });
+
+    if (hist.length === 1) main.appendChild(el('<div class="notice info"><b>Baseline saved ' + esc(fmtDate(a.date)) + '.</b> These are your starting scores. Run the audit again next week and this page will show how much each one has moved, in numbers and percentages.</div>'));
+
+    function tile(label, now, d) {
+      return '<div class="stat"><span class="n">' + esc(now) + '</span><span class="l">' + esc(label) + "</span>" +
+        (two ? '<span class="d ' + d.cls + '">' + esc(d.txt) + (d.pct !== "–" ? " · " + esc(d.pct) : "") + "</span>" : "") + "</div>";
+    }
+    var nChanges = two ? changesBetween(log, a, b) : changesSoFar(log, b);
+    main.appendChild(el('<div class="stats">' +
+      tile("Website health score", b.score + "%", delta(a.score, b.score, false, " pts")) +
+      tile("Issues found", b.issues, delta(a.issues, b.issues, true)) +
+      tile("Pages with no issues", b.clear + " of " + b.pages, delta(a.clear, b.clear, false)) +
+      '<div class="stat"><span class="n">' + nChanges + '</span><span class="l">Website changes made ' + (two ? "since " + esc(fmtDate(a.date)) : "so far") + "</span></div></div>"));
+
+    if (hist.length > 1) {
+      var chartP = panel("Health score over time", "Every saved snapshot. Hover the line for the figures.");
+      chartP.appendChild(lineChart(hist.map(function (s) { return { d: s.date, v: s.score }; }), "Health score", function (v) { return Math.round(v) + "%"; }));
+      main.appendChild(chartP);
+    }
+
+    var card = panel("Scorecard", two ? fmtDate(a.date) + " compared with " + fmtDate(b.date) + ". Green is better, red is worse." : "Starting scores. Changes appear after the next audit.");
+    card.appendChild(el('<div class="table-wrap"><table><thead><tr><th>Measure</th><th class="num">' + esc(fmtDate(a.date)) + "</th>" + (two ? '<th class="num">' + esc(fmtDate(b.date)) + '</th><th class="num">Change</th><th class="num">Improvement</th>' : "") + "</tr></thead><tbody>" +
+      metricRows(a, b).map(function (m) {
+        var d = delta(m.a, m.b, m.lower, m.unit === "%" ? " pts" : "");
+        return "<tr><td>" + esc(m.label) + (m.note ? '<div class="hint">' + esc(m.note) + "</div>" : "") + '</td><td class="num">' + esc(fmtVal(m.a, m.unit)) + "</td>" +
+          (two ? '<td class="num">' + esc(fmtVal(m.b, m.unit)) + '</td><td class="num"><span class="delta ' + d.cls + '">' + esc(d.txt) + '</span></td><td class="num"><span class="delta ' + d.cls + '">' + esc(d.pct) + "</span></td>" : "") + "</tr>";
+      }).join("") + "</tbody></table></div>"));
+    main.appendChild(card);
+
+    if (two) {
+      var moves = pageMoves(a, b);
+      var mp = panel("Pages that moved", "Pages whose issue count changed between the two dates. Biggest improvements first.");
+      mp.appendChild(el(moves.length ? '<div class="table-wrap"><table><thead><tr><th>Page</th><th class="num">Issues before</th><th class="num">Issues now</th><th class="num">Change</th></tr></thead><tbody>' +
+        moves.map(function (p) {
+          var cls = p.isNew ? "flat" : p.d < 0 ? "up" : "down";
+          return '<tr><td><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.t) + '</a></td><td class="num">' + esc(p.a) + '</td><td class="num">' + esc(p.b) +
+            '</td><td class="num"><span class="delta ' + cls + '">' + (p.isNew ? "new page" : (p.d > 0 ? "+" : "") + p.d) + "</span></td></tr>";
+        }).join("") + "</tbody></table></div>" : '<div class="empty">No page changed its issue count between these dates.</div>'));
+      main.appendChild(mp);
+    }
+
+    var hp = panel("Snapshot history", "One snapshot per day. Running the audit again on the same day replaces that day's snapshot.",
+      '<button type="button" class="btn small" id="hist-copy">Copy history as CSV</button>');
+    hp.appendChild(el('<div class="table-wrap"><table><thead><tr><th>Date</th><th class="num">Pages</th><th class="num">Issues</th><th class="num">Health score</th><th class="num">Mobile speed</th><th class="num">Keywords top 10</th><th></th></tr></thead><tbody>' +
+      hist.slice().reverse().map(function (s) {
+        return '<tr><td class="mono">' + esc(fmtDate(s.date)) + '</td><td class="num">' + s.pages + '</td><td class="num">' + s.issues + '</td><td class="num">' + s.score + '%</td><td class="num">' + fmtVal(s.speedMobile) + '</td><td class="num">' + (s.kwTracked ? s.kwTop10 + " of " + s.kwTracked : "–") +
+          '</td><td><button type="button" class="btn small danger" data-del="' + s.date + '">Delete</button></td></tr>';
+      }).join("") + "</tbody></table></div>"));
+    hp.addEventListener("click", function (ev) {
+      var d = ev.target.getAttribute("data-del");
+      if (d) {
+        if (!ev.target.dataset.sure) { ev.target.dataset.sure = "1"; ev.target.textContent = "Click again to delete"; return; }
+        save("seo-history", snapHistory().filter(function (s) { return s.date !== d; })); toast("Snapshot deleted"); route();
+      }
+      if (ev.target.id === "hist-copy") {
+        copyText(toCsv([{ k: "date", label: "Date" }, { k: "pages", label: "Pages" }, { k: "issues", label: "Issues" }, { k: "score", label: "Health score %" }, { k: "clear", label: "Pages clear" },
+          { k: "speedMobile", label: "Mobile speed" }, { k: "speedDesktop", label: "Desktop speed" }, { k: "kwAvg", label: "Keyword avg position" }, { k: "kwTop10", label: "Keywords top 10" }, { k: "aiNamed", label: "AI answers naming WPT" }], snapHistory()), "History copied as CSV");
+      }
+    });
+    main.appendChild(hp);
+    main.appendChild(el('<div class="notice info">Snapshots are saved in this browser, like the rest of the hub. Use Copy history as CSV now and then to keep a copy somewhere safe.</div>'));
+
+    var rc = main.querySelector("#rep-copy");
+    if (rc) rc.addEventListener("click", function () { copyText(reportText(a, b, log), "Report copied. Paste it into an email to Garry."); });
+
+    renderChangeLog(main);
   }
 
   /* ---------- Your jobs ---------- */
