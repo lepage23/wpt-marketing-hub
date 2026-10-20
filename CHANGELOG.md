@@ -6,6 +6,20 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.27.0 · 2026-10-20 16:37 BST
+
+Keeping up with search changes, from inside the hub.
+
+- **Google ranking updates** on Search and traffic. The hub reads Google's Search Status Dashboard and lists recent core and spam updates with their dates. Refresh any time; it checks itself every six hours.
+- **Today** shows a notice while an update is rolling out and for two weeks after it ends, so a ranking drop can be checked against Google's own changes first. Right now that's the September spam update, finished 8 October.
+- **Weekly brief** prompt has a new section, Search and AI search changes. It checks Google Search Central, the status dashboard, Bing's blog, OpenAI's crawler docs and Search Engine Land, and only keeps changes that affect our site.
+- User guide updated.
+- 396 tests, all passing.
+
+## Backup · 2026-10-20 16:34 BST
+
+`backup/v0.26.4-2026-10-20-1634`, taken before v0.27.0.
+
 ## v0.26.4 · 2026-10-20 16:29 BST
 
 - **New job:** check Bing Webmaster Tools is set up, switch on IndexNow, and export Bing's AI Performance report (which pages Copilot cites).

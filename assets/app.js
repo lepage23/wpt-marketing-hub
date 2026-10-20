@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.26.4";
-  var BUILT = "2026-10-20 16:29 BST";
+  var VERSION = "0.27.0";
+  var BUILT = "2026-10-20 16:37 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -274,6 +274,9 @@
       }).join("") + "</div>"));
     }
     grid.appendChild(p1); grid.appendChild(p2); main.appendChild(grid);
+    var gu = el('<div id="today-google"></div>'); grid.insertAdjacentElement("beforebegin", gu);
+    gu.innerHTML = updateNotice(load("google-updates", null));
+    googleUpdates(false).then(function (d) { if (gu.isConnected) gu.innerHTML = updateNotice(d); }, function () { /* the status page is optional */ });
   }
   function stat(n, label, flag) {
     return '<div class="stat' + (flag ? " flag" : "") + '"><span class="n">' + esc(n) + '</span><span class="l">' + esc(label) + "</span></div>";
@@ -389,6 +392,7 @@
       '<div class="row"><a class="btn" href="#progress">Progress report</a><a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a></div>");
     renderWpConnect(main);
     renderPerformance(main);
+    renderGoogleUpdates(main);
     renderGa4(main);
     renderMobile(main);
     renderDisplayCheck(main);
@@ -780,7 +784,7 @@
      A panel is placed by its heading. Anything without a heading (notices) shows on every tab. */
   var SEO_TABS = [
     { id: "audit", label: "Audit", match: /^(Page audit|Find text on the site|Change log)/ },
-    { id: "search", label: "Search and traffic", match: /^(Search performance|Website traffic and leads|Keyword rankings)/ },
+    { id: "search", label: "Search and traffic", match: /^(Search performance|Google ranking updates|Website traffic and leads|Keyword rankings)/ },
     { id: "ai", label: "AI visibility", match: /^AI (search )?visibility/ },
     { id: "speed", label: "Speed and display", match: /^(Mobile and speed|Display check)/ },
     { id: "content", label: "Content plan", match: /^Content plan/ },
@@ -1150,7 +1154,7 @@
   }
 
   /* Weekly brief */
-  var BRIEF_PROMPT = "Produce a weekly briefing for West Pier Technologies. Review westpiertech.com and search for major, consequential UK telecoms developments across unified communications, contact centre, business mobile, connectivity, IT services, cyber security, and AI automation. Include relevant public-sector and private-sector tenders, procurement notices, contract opportunities, partnership opportunities, and credible lead-generation signals. For each item, explain what changed, why it matters to West Pier Technologies, and practical campaign, content, outreach, positioning, or sales angles. Prioritise genuinely significant updates over minor industry noise, include dates and source links, and clearly separate: Big developments, Tenders and opportunities, Lead signals, and Recommended marketing actions.";
+  var BRIEF_PROMPT = "Produce a weekly briefing for West Pier Technologies. Review westpiertech.com and search for major, consequential UK telecoms developments across unified communications, contact centre, business mobile, connectivity, IT services, cyber security, and AI automation. Include relevant public-sector and private-sector tenders, procurement notices, contract opportunities, partnership opportunities, and credible lead-generation signals. For each item, explain what changed, why it matters to West Pier Technologies, and practical campaign, content, outreach, positioning, or sales angles. Prioritise genuinely significant updates over minor industry noise, include dates and source links, and clearly separate: Big developments, Tenders and opportunities, Lead signals, Search and AI search changes, and Recommended marketing actions. For Search and AI search changes, check Google Search Central Blog, the Google Search Status Dashboard, the Bing Webmaster Blog, OpenAI's crawler documentation and Search Engine Land for changes in the last week to Google rankings, AI Overviews and AI Mode, Bing and Copilot, and ChatGPT search. Only include changes that affect a small B2B WordPress site, say what to check or change on westpiertech.com, and say \"Nothing this week\" if there is nothing worth acting on.";
   function renderBrief(main) {
     main.innerHTML = head("Every Monday", "Weekly brief and blog ideas", "Run the brief, save it here, then turn the best items into posts aimed at searches we want to win.");
     var grid = el('<div class="grid-2"></div>');
@@ -1778,6 +1782,63 @@
   }
   function shortDate(d) { var t = new Date(String(d).slice(0, 10) + "T12:00:00"); return isNaN(t) ? d : t.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
   function fmtNum(v) { v = +v || 0; return v >= 10000 ? (v / 1000).toFixed(0) + "k" : v >= 1000 ? (v / 1000).toFixed(1) + "k" : String(Math.round(v)); }
+
+  /* ---------- Google ranking updates ----------
+     Read from Google's Search Status Dashboard. Public, no login, no cost.
+     Shown on Today while an update is rolling out or settling, and listed on Search and traffic,
+     so a drop in rankings can be checked against Google's own changes. */
+  var GU_URL = "https://status.search.google.com/incidents.json";
+  var GU_PAGE = "https://status.search.google.com/";
+  var GU_SETTLE_DAYS = 14;
+  function guDate(iso) { var t = new Date(iso); return isNaN(t) ? "" : t.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
+  function updateSummary(list, now) {
+    now = now || Date.now();
+    var all = (list || []).filter(function (i) { return i && i.begin && (!i.service_name || i.service_name === "Ranking"); }).map(function (i) {
+      var b = Date.parse(i.begin), e = i.end ? Date.parse(i.end) : null;
+      var state = !e || e > now ? "live" : now - e < GU_SETTLE_DAYS * 864e5 ? "settling" : "done";
+      return { name: i.external_desc || "Google update", begin: i.begin, end: i.end || "", state: state, core: /core/i.test(i.external_desc || ""),
+        link: i.uri ? "https://status.search.google.com/" + i.uri : GU_PAGE };
+    }).sort(function (a, b) { return Date.parse(b.begin) - Date.parse(a.begin); });
+    return { all: all, live: all.filter(function (u) { return u.state === "live"; }), settling: all.filter(function (u) { return u.state === "settling"; }) };
+  }
+  function updateLine(u) {
+    if (u.state === "live") return "Rolling out since " + guDate(u.begin) + ". Rankings may jump about until it finishes.";
+    if (u.state === "settling") return "Finished " + guDate(u.end) + ". Rankings can keep moving for about two weeks after.";
+    return guDate(u.begin) + " to " + guDate(u.end);
+  }
+  function googleUpdates(force) {
+    var c = load("google-updates", null);
+    if (!force && c && Date.now() - c.at < 6 * 36e5) return Promise.resolve(c);
+    return fetch(GU_URL, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("Google's status page answered " + r.status + "."); return r.json(); })
+      .then(function (j) { var d = { at: Date.now(), list: Array.isArray(j) ? j : [] }; save("google-updates", d); return d; })
+      .catch(function (e) { if (c) return c; throw e; });
+  }
+  function renderGoogleUpdates(main) {
+    var p = panel("Google ranking updates", "Core and spam updates from Google's Search Status Dashboard. Check here first if rankings or clicks move suddenly.");
+    var body = el('<div></div>'); p.appendChild(body); main.appendChild(p);
+    function draw(d, err) {
+      var s = updateSummary(d ? d.list : []);
+      var rows = s.all.slice(0, 8).map(function (u) {
+        var chip = u.state === "live" ? '<span class="chip flag">Rolling out</span>' : u.state === "settling" ? '<span class="chip info">Settling</span>' : '<span class="chip good">Done</span>';
+        return '<div class="list-item">' + chip + '<div><div class="t"><a href="' + esc(u.link) + '" target="_blank" rel="noopener">' + esc(u.name) + '</a></div><div class="s">' + esc(updateLine(u)) + "</div></div><span></span></div>";
+      }).join("");
+      body.innerHTML = (err ? '<div class="notice">' + esc(err) + "</div>" : "") +
+        (rows ? '<div class="list">' + rows + "</div>" : '<div class="empty">No updates loaded yet.</div>') +
+        '<div class="row" style="margin-top:10px"><button type="button" class="btn" id="gu-refresh">Refresh</button>' +
+        (d ? '<span class="muted mono" style="font-size:.78rem">Checked ' + esc(new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })) + "</span>" : "") +
+        '<a class="btn" href="' + GU_PAGE + '" target="_blank" rel="noopener">Open Google\'s dashboard</a></div>';
+      body.querySelector("#gu-refresh").addEventListener("click", function () { go(true); });
+    }
+    function go(force) { googleUpdates(force).then(function (d) { draw(d); }, function (e) { draw(load("google-updates", null), "Couldn't reach Google's status page. " + e.message); }); }
+    draw(load("google-updates", null)); go(false);
+  }
+  /* A notice for Today when an update is live or settling. Empty string when there's nothing to say. */
+  function updateNotice(d, now) {
+    var s = updateSummary(d ? d.list : [], now), u = s.live[0] || s.settling[0];
+    if (!u) return "";
+    return '<div class="notice' + (u.state === "live" ? "" : " info") + '"><b>Google ' + (u.state === "live" ? "is rolling out the " : "recently finished the ") + esc(u.name) + ".</b> " + esc(updateLine(u)) +
+      " If clicks or positions move this week, this is the likely reason. Don't change pages just to chase it.</div>";
+  }
 
   function renderPerformance(main) {
     var p = panel("Search performance", "Clicks and searches from Google Search Console, through Rank Math. Read-only.");
