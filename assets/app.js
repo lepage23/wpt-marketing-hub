@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.20.0";
-  var BUILT = "2026-10-20 08:52 BST";
+  var VERSION = "0.21.0";
+  var BUILT = "2026-10-20 10:10 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2388,6 +2388,7 @@
   var PRI_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
+    syncFixProgress();
     var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []), load("auto-fixes-mobile", []), load("auto-fixes-display", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
@@ -2459,6 +2460,84 @@
         parkFix(p.id, d, form.querySelector(".ip-note").value.trim());
         toast("In progress until " + fmtDay(d)); redraw(); updateNav();
       });
+    });
+  }
+  /* Progress log. A fix can carry "tracks" in proposals.js (one per vendor or strand of work), each with
+     a status, a next step and dated log entries written by Claude. Connor adds his own entries and can
+     change a track's status in the hub; those stay in this browser.
+     A fix's "progress" block ({update, nextDate, note}) puts it In progress once per update stamp,
+     the same way job updates work. A new stamp also lets Claude's track statuses take over again. */
+  var TRACK_STATUS = ["To do", "Waiting on them", "Done", "Not possible"];
+  var TRACK_CHIP = { "To do": "flag", "Waiting on them": "info", "Done": "good", "Not possible": "" };
+  function syncFixProgress() {
+    var applied = load("fix-progress-applied", {}), changed = false;
+    (window.WPT_PROPOSALS || []).forEach(function (p) {
+      var g = p.progress;
+      if (!g || !g.update || applied[p.id] === g.update) return;
+      var st = fixState()[p.id] || {};
+      if (!/^(done|pushed|rejected)$/.test(st.status || "") && g.nextDate && g.nextDate > localDay()) parkFix(p.id, g.nextDate, g.note || "");
+      var ts = load("fix-track-status", {}); delete ts[p.id]; save("fix-track-status", ts);
+      applied[p.id] = g.update; changed = true;
+    });
+    if (changed) save("fix-progress-applied", applied);
+  }
+  function trackStatus(p, t) { var ts = (load("fix-track-status", {})[p.id] || {}); return ts[t.name] || t.status || "To do"; }
+  function setTrackStatus(id, name, status) { var ts = load("fix-track-status", {}); ts[id] = ts[id] || {}; ts[id][name] = status; save("fix-track-status", ts); }
+  function fixLogEntries(p, name) {
+    var t = (p.tracks || []).filter(function (x) { return x.name === name; })[0];
+    var mine = ((load("fix-log", {})[p.id] || {})[name || ""] || []).map(function (e) { return Object.assign({ mine: true }, e); });
+    var all = ((t && t.log) || []).map(function (e, i) { return Object.assign({ n: i }, e); }).concat(mine.map(function (e, i) { return Object.assign({ n: 1000 + i }, e); }));
+    return all.sort(function (a, b) { return a.date !== b.date ? (a.date < b.date ? 1 : -1) : b.n - a.n; });
+  }
+  function addFixLog(id, name, date, text) {
+    var l = load("fix-log", {}); l[id] = l[id] || {}; var k = name || ""; l[id][k] = l[id][k] || [];
+    l[id][k].push({ date: date, text: text }); save("fix-log", l);
+  }
+  function deleteFixLog(id, name, date, text) {
+    var l = load("fix-log", {}), k = name || "", rows = (l[id] || {})[k] || [];
+    for (var i = rows.length - 1; i > -1; i--) if (rows[i].date === date && rows[i].text === text) { rows.splice(i, 1); break; }
+    save("fix-log", l);
+  }
+  function hasFixLog(p) { var l = load("fix-log", {})[p.id] || {}; return !!(p.tracks && p.tracks.length) || Object.keys(l).some(function (k) { return l[k].length; }); }
+  function progressLog(card, p, st, redraw) {
+    var ip = st && st.status === "inprogress";
+    if (!hasFixLog(p) && !ip) return;
+    var tracks = p.tracks || [], sel = load("fix-log-tab", {})[p.id];
+    if (!tracks.some(function (t) { return t.name === sel; })) sel = tracks.length ? tracks[0].name : "";
+    var box = el('<div class="progress-log"></div>');
+    var actions = card.querySelector(".fix-actions");
+    if (actions) card.insertBefore(box, actions); else card.appendChild(box);
+    function draw() {
+      var t = tracks.filter(function (x) { return x.name === sel; })[0], entries = fixLogEntries(p, sel), status = t ? trackStatus(p, t) : "";
+      box.innerHTML = '<b style="font-size:.9rem">Progress log</b>' +
+        (tracks.length ? '<div class="row log-tabs" role="tablist">' + tracks.map(function (x) {
+          var s = trackStatus(p, x);
+          return '<button type="button" role="tab" class="btn small' + (x.name === sel ? " primary" : "") + '" data-track="' + esc(x.name) + '" aria-selected="' + (x.name === sel) + '">' + esc(x.name) + ' <span class="chip ' + TRACK_CHIP[s] + '">' + esc(s) + "</span></button>";
+        }).join("") + "</div>" : "") +
+        (t ? '<div class="row" style="font-size:.86rem"><label class="field" style="flex-direction:row;align-items:center;gap:6px">Status <select class="log-status">' +
+          TRACK_STATUS.map(function (s) { return "<option" + (s === status ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select></label>" +
+          (t.next ? '<span><b>Next:</b> ' + esc(t.next) + "</span>" : "") + "</div>" : "") +
+        (entries.length ? '<ul class="log-list">' + entries.map(function (e) {
+          return '<li><span class="mono muted">' + esc(fmtDay(e.date)) + "</span> " + esc(e.text) +
+            (e.mine ? ' <button type="button" class="btn small log-del" data-date="' + esc(e.date) + '" data-text="' + esc(e.text) + '">Delete</button>' : ' <span class="chip">Claude</span>') + "</li>";
+        }).join("") + "</ul>" : '<p class="muted" style="font-size:.86rem">Nothing logged yet.</p>') +
+        '<div class="row log-add"><input type="date" class="log-date" value="' + localDay() + '" max="' + localDay() + '">' +
+        '<input type="text" class="log-text" placeholder="What happened, e.g. Emailed Paul, chased ticket" style="flex:1;min-width:200px">' +
+        '<button type="button" class="btn small primary log-save">Add to log</button></div>';
+    }
+    draw();
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      if (b.hasAttribute("data-track")) { sel = b.getAttribute("data-track"); var m = load("fix-log-tab", {}); m[p.id] = sel; save("fix-log-tab", m); draw(); }
+      else if (b.classList.contains("log-del")) { deleteFixLog(p.id, sel, b.getAttribute("data-date"), b.getAttribute("data-text")); draw(); }
+      else if (b.classList.contains("log-save")) {
+        var text = box.querySelector(".log-text").value.trim(), date = box.querySelector(".log-date").value || localDay();
+        if (!text) { box.querySelector(".log-text").focus(); return; }
+        addFixLog(p.id, sel, date, text); toast("Added to the log"); draw();
+      }
+    });
+    box.addEventListener("change", function (e) {
+      if (e.target.classList.contains("log-status")) { setTrackStatus(p.id, sel, e.target.value); toast(sel + ": " + e.target.value); draw(); }
     });
   }
   function logChange(entry) { if (!entry.date) entry.date = today(); var l = load("change-log", []); l.unshift(entry); save("change-log", l); }
@@ -2625,6 +2704,7 @@
       list.innerHTML = "";
       items.forEach(function (p) {
         var raw = s[p.id] || {}, card = fixCard(p, cardState(raw), draw);
+        progressLog(card, p, raw, draw);
         if (view === "waiting" || view === "inprogress") progressControls(card, p, raw, draw);
         list.appendChild(card);
       });

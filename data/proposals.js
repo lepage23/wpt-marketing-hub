@@ -13,6 +13,9 @@
    and manual (step-by-step fixes you tick off). priority: critical, high, medium, low.
    category: Content, Structure, Indexing, AI search.
    pageId 0 means the hub finds the page from its address when you push.
+   progress: {update, nextDate, note} puts a fix In progress once per update stamp (bump the stamp to apply again).
+   tracks: [{name, status, next, log: [{date, text}]}] shows a Progress log with one tab per vendor or strand.
+     status: To do, Waiting on them, Done, Not possible. A new progress stamp lets these statuses override Connor's.
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
 window.WPT_PROPOSALS = [
@@ -1363,6 +1366,23 @@ window.WPT_PROPOSALS = [
    "Where you're listed, check the name, website link (https://westpiertech.com/), phone and partner level are right.",
    "Where you're missing, ask your partner manager to add you.",
    "Tell Claude which are live so they can be linked from your partner pages too."
+  ],
+  "progress": { "update": "2026-10-20a", "nextDate": "2026-10-27", "note": "Chase 3CX (Paul Clarke) and Zoom ticket SRC-601089. Ask Gamma and 8x8 for a case study." },
+  "tracks": [
+   { "name": "3CX", "status": "Waiting on them", "next": "Chase Paul Clarke if no reply by Tue 27 Oct.", "log": [
+    { "date": "2026-10-20", "text": "Checked the 3CX partner finder. Not listed, by name or in the South East results. Carden Telecoms in Brighton is listed." },
+    { "date": "2026-10-20", "text": "Emailed Paul Clarke at 3CX asking for a listing, with our name, website, phone, region and partner level." }
+   ] },
+   { "name": "Zoom", "status": "Waiting on them", "next": "Chase ticket SRC-601089 if no reply by Tue 27 Oct.", "log": [
+    { "date": "2026-10-20", "text": "Checked the Zoom Partner Locator. Not listed." },
+    { "date": "2026-10-20", "text": "No Zoom account manager assigned, so raised a support ticket asking whether we qualify for a listing. Ticket SRC-601089." }
+   ] },
+   { "name": "Gamma", "status": "To do", "next": "Ask our Gamma partner manager for a joint case study or partner news post that links to us.", "log": [
+    { "date": "2026-10-20", "text": "Checked. Gamma has no public partner finder. Its site sends buyers to its own sales team." }
+   ] },
+   { "name": "8x8", "status": "To do", "next": "Ask our 8x8 partner manager for a joint case study or partner news post that links to us.", "log": [
+    { "date": "2026-10-20", "text": "Checked. 8x8 has no public reseller finder. Its only directory is for software integrations." }
+   ] }
   ]
  },
  {

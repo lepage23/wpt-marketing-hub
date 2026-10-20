@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.21.0 · 2026-10-20 10:25 BST
+
+Progress log on fix cards, with a tab per vendor.
+
+- Fixes now show a **Progress log**: dated entries of what's happened, newest first.
+- A fix covering several vendors gets one tab each, with its own status (To do, Waiting on them, Done, Not possible) and next step.
+- **Add to log** for your own entries, and change a vendor's status from the dropdown. Your entries can be deleted, Claude's can't.
+- Claude can now put a fix In progress from GitHub, with the next action date and note. Each update applies once.
+- **Partner directories** fix is now In progress until Tue 27 Oct, with tabs for 3CX (emailed Paul Clarke), Zoom (ticket SRC-601089), Gamma and 8x8.
+- User guide updated.
+- 304 tests, all passing.
+
 ## v0.20.0 · 2026-10-20 08:52 BST
 
 New tab in the Fix queue: **In progress**.
