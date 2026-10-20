@@ -1476,6 +1476,22 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "admin-job-1",
+  "job": "Get Claude Business Pro for Garry and Kelly",
+  "page": "Claude (claude.ai)",
+  "details": "Set Garry and Kelly up with Claude seats on the business plan. Check the price per seat with Garry before buying, and agree who in the company pays for it.",
+  "size": "",
+  "alt": ""
+ },
+ {
+  "id": "chat-job-1",
+  "job": "Get the 8x8 AI chatbot sorted ASAP",
+  "page": "Website (all pages)",
+  "details": "Replace the current website chatbot with 8x8's AI chatbot. Once it's live, tell Claude so the hub's Live chat dashboard can show chats and any that turn into leads.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "gbp-job-1",
   "job": "Google Business Profile API access: applied, waiting for Google",
   "page": "Google Business Profile",

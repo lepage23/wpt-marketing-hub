@@ -6,6 +6,13 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.21.1 · 2026-10-20 10:31 BST
+
+Two new jobs in **Your jobs**:
+
+- Get Claude Business Pro for Garry and Kelly.
+- Get the 8x8 AI chatbot sorted ASAP.
+
 ## v0.21.0 · 2026-10-20 10:10 BST
 
 Progress log on fix cards, with a tab per vendor.
