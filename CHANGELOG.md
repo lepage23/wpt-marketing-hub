@@ -6,14 +6,14 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
-## v0.26.4 · 2026-10-20 16:40 BST
+## v0.26.4 · 2026-10-20 16:29 BST
 
 - **New job:** check Bing Webmaster Tools is set up, switch on IndexNow, and export Bing's AI Performance report (which pages Copilot cites).
 - Removed two Batch 8 fixes that repeated jobs already in Your jobs (8x8 Feature Matrix, the two UCaaS pages).
 - The 8x8 Feature Matrix job no longer suggests redirecting to Feature Comparison, as that page is password-protected.
 - 387 tests, all passing.
 
-## v0.26.3 · 2026-10-20 16:20 BST
+## v0.26.3 · 2026-10-20 16:14 BST
 
 Links for the nine pages flagged as having no links pointing to them, and a fix to the check that flagged them.
 
