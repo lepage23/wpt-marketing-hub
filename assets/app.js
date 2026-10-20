@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.21.1";
-  var BUILT = "2026-10-20 10:31 BST";
+  var VERSION = "0.22.0";
+  var BUILT = "2026-10-20 10:46 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1197,7 +1197,7 @@
       '<div class="list-item"><span class="chip info">SEO</span><div>' + seoLine + '<div class="s" style="margin-top:4px">' +
       (k && !a.metaReady ? "Title and description fixes can't be pushed until the snippet in docs/wordpress-snippet.php is added. Content fixes work now." : k ? "Title, description and content fixes can all be pushed." : "Content fixes work. Title and description fixes need an SEO plugin.") +
       "</div></div><span></span></div>" +
-      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion >= 5 && a.checkerVersion < 10 ? '<span class="chip flag">Page checker version ' + a.checkerVersion + ' (10 adds the display check at ten screen widths, with text size, layout, punctuation and image fixes, and page builds)</span><div class="s" style="margin-top:4px">Everything else works. To use the display check, image fixes and Push new page build, replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
+      '<div class="list-item"><span class="chip info">Live</span><div>' + (a.checker && a.checkerVersion && a.checkerVersion < 5 ? '<span class="chip bad">Page checker out of date (version ' + a.checkerVersion + ' installed, 5 needed)</span><div class="s" style="margin-top:4px">Replace the code in Snippets, WPT Hub page checker, with everything from docs/wordpress-page-checker.php, then Save and test again. Until then the site checks, Search Console and page editing won\'t work.</div>' : a.checker && a.checkerVersion >= 5 && a.checkerVersion < 11 ? '<span class="chip flag">Page checker version ' + a.checkerVersion + ' (11 adds FAQ blocks; 10 adds the display check and page builds)</span><div class="s" style="margin-top:4px">Everything else works. To push FAQ blocks (and the display check, if older than version 10), replace the code in Snippets, WPT Hub page checker, with the latest from Copy page checker code.</div>' : a.checker ? '<span class="chip good">Page checker ready' + (a.checkerVersion ? " (version " + a.checkerVersion + ")" : "") + '</span><div class="s" style="margin-top:4px">The audit checks redirects and what visitors actually see on each page.</div>' : '<span class="chip flag">Page checker not added</span><div class="s" style="margin-top:4px">Add docs/wordpress-page-checker.php as a second snippet so the audit can spot redirected pages and read Elementor pages properly.</div>') + "</div><span></span></div>" +
       (admin ? '<div class="list-item"><span class="chip flag">Role</span><div><div class="t">This is an administrator account</div><div class="s">It works, but if the password leaked it could change plugins and users. A separate Editor account is safer.</div></div><span></span></div>' : "") +
       "</div>";
   }
@@ -2370,7 +2370,28 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block" };
+  /* FAQ fixes are written as plain text so Connor can edit them in the box:
+     "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
+  function parseFaq(text) {
+    var heading = "", items = [], cur = null;
+    String(text || "").replace(/\r/g, "").split("\n").forEach(function (line) {
+      var m;
+      if ((m = line.match(/^\s*heading\s*:\s*(.*)$/i)) && !items.length && !cur) { heading = m[1].trim(); return; }
+      if ((m = line.match(/^\s*q\s*:\s*(.*)$/i))) { cur = { q: m[1].trim(), a: "" }; items.push(cur); return; }
+      if ((m = line.match(/^\s*a\s*:\s*(.*)$/i)) && cur) { cur.a = m[1].trim(); return; }
+      if (cur && cur.a && line.trim()) cur.a += " " + line.trim();
+    });
+    items.forEach(function (it, i) {
+      if (it.q.length < 5 || it.a.length < 10) throw new Error("Question " + (i + 1) + " needs both a question (Q:) and an answer (A:). Nothing was changed.");
+    });
+    if (items.length < 2 || items.length > 12) throw new Error("An FAQ block needs between 2 and 12 questions, each starting Q: with its answer on a line starting A:. Nothing was changed.");
+    return { heading: heading, items: items };
+  }
+  function needsV11(err) {
+    if (/no route|unknown edit type|doesn't say which text/i.test(err.message)) throw new Error("FAQ blocks need version 11 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then click Save and test: it should say version 11. Then try again.");
+    throw err;
+  }
   function needsV9(err) {
     if (/no route|unknown edit type|doesn't say which text|can only change image size/i.test(err.message)) throw new Error("This fix needs version 10 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then click Save and test: it should say version 10. Then try again.");
     throw err;
@@ -2603,6 +2624,12 @@
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_tidy" ? "tidy" : p.type === "elementor_type" ? "type" : "layout", element: p.element, set: p.set || {}, clear_negative_margin: p.clearNeg ? 1 : 0 } })
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV9);
     }
+    if (p.type === "elementor_faq") {
+      var faq;
+      try { faq = parseFaq(text); } catch (e) { return Promise.reject(e); }
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "faq", heading: faq.heading, items: faq.items, before: p.before || "" } })
+        .then(function (r) { return { before: r.before || "(no FAQ on the page)", after: r.after, backup: r.backup }; }, needsV11);
+    }
     if (p.type === "elementor_style") {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "style", find: p.find || "", element: p.element || "", set: p.set, widget: p.widget || "image", all: p.all ? 1 : 0 } })
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV7);
@@ -2645,7 +2672,7 @@
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     var base = "/wp/v2/" + p.postType + "/";
-    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type") {
+    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
     }
     if (p.type === "set_status") return wpFetch(base + p.pageId, { method: "POST", body: { status: st.before || "publish" } });
@@ -2950,8 +2977,8 @@
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
-      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type/.test(p.type) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : "Proposed (you can edit this)") +
-      '<textarea id="fix-' + esc(p.id) + '"' + (done || /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type/.test(p.type) ? " readonly" : "") + (/content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
+      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type/.test(p.type) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : p.type === "elementor_faq" ? "Questions and answers (edit any of them, keep the Q: and A: labels)" : "Proposed (you can edit this)") +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done || /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type/.test(p.type) ? " readonly" : "") + (p.type === "elementor_faq" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
       (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
       '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
       '<div class="fix-actions row"></div><div class="fix-msg"></div>';
@@ -2983,7 +3010,7 @@
     }
     if (!st.status) {
       actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
-        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : "Approve and push live") + "</button>" +
+        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : "Approve and push live") + "</button>" +
         '<button type="button" class="btn rej">Reject</button>' + (st.edited != null ? '<button type="button" class="btn small reset">Reset to Claude\'s version</button>' : "");
       actions.querySelector(".go").addEventListener("click", function () {
         var sure = actions.querySelector(".sure");
@@ -2996,11 +3023,11 @@
         pushFix(p.type === "elementor_remove" ? Object.assign({}, p, { level: lv == null ? null : lv, scope: "" }) : p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : "Pushed live" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
-          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : "Approve and push live";
+          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : "Approve and push live";
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
           if (p.type !== "elementor_style" && /isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
         });

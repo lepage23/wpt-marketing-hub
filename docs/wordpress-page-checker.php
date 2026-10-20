@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 10, adds font size and line spacing fixes, and checks pages at several screen widths).
+ * WPT Marketing Hub: page checker (version 11, adds FAQ blocks with FAQ schema on Elementor pages).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -273,7 +273,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 10, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 11, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -314,7 +314,7 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
-/* Page editing for Elementor pages (version 4).
+/* Page editing for Elementor pages (version 4; FAQ blocks added in version 11).
  * /wpt-hub/v1/find          GET  ?q=  Find text across published pages and posts (read-only).
  * /wpt-hub/v1/elementor-edit POST Change one widget's text, or remove a widget or whole section,
  *                                 on one page. Only for users who can edit that page.
@@ -531,6 +531,110 @@ add_action( 'rest_api_init', function () {
 				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $elid, 'widget' => $type, 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
+			}
+			if ( 'faq' === $op ) {
+				/* faq: add an FAQ block to the page, or replace the one the hub added before (version 11).
+				 * A heading plus Elementor's accordion with its "FAQ Schema" switched on, so Google and AI tools
+				 * get FAQPage schema. Goes before the block containing "before" text (e.g. the closing call to
+				 * action), or at the end of the page. A block the hub added is replaced where it sits. */
+				$items = array();
+				foreach ( (array) $r->get_param( 'items' ) as $it ) {
+					$q = isset( $it['q'] ) ? sanitize_text_field( (string) $it['q'] ) : '';
+					$a = isset( $it['a'] ) ? trim( wp_kses_post( (string) $it['a'] ) ) : '';
+					if ( strlen( $q ) < 5 || strlen( wp_strip_all_tags( $a ) ) < 10 ) {
+						return new WP_Error( 'wpt_edit', 'Question ' . ( count( $items ) + 1 ) . ' needs both a question and an answer. Nothing was changed.', array( 'status' => 400 ) );
+					}
+					$items[] = array( 'q' => $q, 'a' => $a );
+				}
+				if ( count( $items ) < 2 || count( $items ) > 12 ) {
+					return new WP_Error( 'wpt_edit', 'An FAQ block needs between 2 and 12 questions. Nothing was changed.', array( 'status' => 400 ) );
+				}
+				$heading = sanitize_text_field( (string) $r->get_param( 'heading' ) );
+				$heading = $heading ? $heading : 'Frequently asked questions';
+				$mine = null;
+				foreach ( $data as $i => $el ) {
+					if ( isset( $el['settings']['css_classes'] ) && false !== strpos( (string) $el['settings']['css_classes'], 'wpt-hub-faq' ) ) {
+						$mine = $i;
+					}
+				}
+				/* Two FAQ schemas on one page confuse Google, so refuse if someone else already added one. */
+				$other = false;
+				$scan  = function ( $els ) use ( &$scan, &$other ) {
+					foreach ( $els as $el ) {
+						if ( isset( $el['settings']['faq_schema'] ) && 'yes' === $el['settings']['faq_schema'] ) {
+							$other = true;
+						}
+						if ( ! empty( $el['elements'] ) ) {
+							$scan( $el['elements'] );
+						}
+					}
+				};
+				foreach ( $data as $i => $el ) {
+					if ( $i !== $mine ) {
+						$scan( array( $el ) );
+					}
+				}
+				if ( $other ) {
+					return new WP_Error( 'wpt_edit', 'This page already has an FAQ with schema that the hub didn\'t add. Nothing was changed. Tell Claude and it will rewrite this fix to update that one instead.', array( 'status' => 409 ) );
+				}
+				$nid  = function () {
+					return substr( md5( wp_rand( 0, PHP_INT_MAX ) . microtime() ), 0, 7 );
+				};
+				$tabs = array();
+				foreach ( $items as $it ) {
+					$ans    = preg_match( '#^\s*<(p|ul|ol|div)[\s>]#i', $it['a'] ) ? $it['a'] : '<p>' . $it['a'] . '</p>';
+					$tabs[] = array( '_id' => $nid(), 'tab_title' => $it['q'], 'tab_content' => $ans );
+				}
+				$widgets = array(
+					array( 'id' => $nid(), 'elType' => 'widget', 'widgetType' => 'heading', 'settings' => array( 'title' => $heading, 'header_size' => 'h2' ), 'elements' => array() ),
+					array( 'id' => $nid(), 'elType' => 'widget', 'widgetType' => 'accordion', 'settings' => array( 'tabs' => $tabs, 'faq_schema' => 'yes', 'title_html_tag' => 'h3' ), 'elements' => array() ),
+				);
+				$containers = false;
+				foreach ( $data as $el ) {
+					if ( isset( $el['elType'] ) && 'container' === $el['elType'] ) {
+						$containers = true;
+					}
+				}
+				$pad = array( 'unit' => 'px', 'top' => '40', 'right' => '20', 'bottom' => '40', 'left' => '20', 'isLinked' => false );
+				if ( $containers ) {
+					$block = array( 'id' => $nid(), 'elType' => 'container', 'isInner' => false, 'settings' => array( 'content_width' => 'boxed', 'flex_direction' => 'column', 'padding' => $pad, 'css_classes' => 'wpt-hub-faq' ), 'elements' => $widgets );
+				} else {
+					$block = array( 'id' => $nid(), 'elType' => 'section', 'isInner' => false, 'settings' => array( 'padding' => $pad, 'css_classes' => 'wpt-hub-faq' ), 'elements' => array(
+						array( 'id' => $nid(), 'elType' => 'column', 'isInner' => false, 'settings' => array( '_column_size' => 100, '_inline_size' => null ), 'elements' => $widgets ),
+					) );
+				}
+				$before_txt = '';
+				$where      = count( $data );
+				if ( null !== $mine ) {
+					$was   = $data[ $mine ];
+					$where = $mine;
+					foreach ( $texts( array( $was ) ) as $t ) {
+						$before_txt .= $plain( $t['value'] ) . "\n";
+					}
+				} else {
+					$anchor = $plain( (string) $r->get_param( 'before' ) );
+					if ( strlen( $anchor ) >= 3 ) {
+						$at = array();
+						foreach ( $texts( $data ) as $t ) {
+							if ( false !== stripos( $plain( $t['value'] ), $anchor ) ) {
+								$at[ $t['path'][0] ] = 1;
+							}
+						}
+						if ( 1 === count( $at ) ) {
+							$where = (int) key( $at );
+						}
+					}
+				}
+				$before = wp_json_encode( $data );
+				array_splice( $data, $where, null !== $mine ? 1 : 0, array( $block ) );
+				$after = $heading;
+				foreach ( $items as $it ) {
+					$after .= "\n\nQ: " . $it['q'] . "\nA: " . $plain( $it['a'] );
+				}
+				$bid = 'b' . time() . wp_rand( 100, 999 );
+				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				$save( $id, $data );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => $block['id'], 'widget' => 'accordion', 'replaced' => null !== $mine, 'position' => $where, 'before' => trim( $before_txt ), 'after' => $after );
 			}
 			if ( 'tidy' === $op || 'layout' === $op ) {
 				/* tidy:   remove the space or line break before . , ? ! : ; in one element's text (version 9).

@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.22.0 · 2026-10-20 10:46 BST
+
+FAQ blocks now push from the Fix queue. No more pasting into Elementor.
+
+- New fix type, **FAQ block**. The card shows the questions and answers in a box you can edit. **Approve and add the FAQ to the page** puts a heading and an accordion on the page, with Elementor's FAQ schema switched on.
+- It goes just above "Why switch to West Pier". Pushing again replaces the hub's block in place, so you never get two. Undo takes it off.
+- It refuses if the page already has an FAQ with schema that the hub didn't add, so Google never sees two.
+- FAQ drafts in the queue for **8x8** (8 questions), **3CX** (7), **Gamma** (6), **Zoom** (6) and **Avaya** (5). They replace the old manual "Add an FAQ section" fix. Teams is left out, as that page already has 12 questions.
+- **Page checker snippet version 11.** Update it once: Website & SEO, Copy page checker code, paste over the code in Snippets, WPT Hub page checker, Save. Then Save and test should say version 11.
+- User guide updated.
+- 329 tests, all passing.
+
 ## v0.21.1 · 2026-10-20 10:31 BST
 
 Two new jobs in **Your jobs**:
