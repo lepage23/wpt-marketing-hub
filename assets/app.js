@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.26.2";
-  var BUILT = "2026-10-20 15:30 BST";
+  var VERSION = "0.26.3";
+  var BUILT = "2026-10-20 16:13 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1468,6 +1468,20 @@
     return n / Math.min(a.length, b.length);
   }
 
+  /* Every parent path of the given addresses, once each. */
+  function parentPages(urls) {
+    var out = [], seen = {};
+    urls.forEach(function (u) {
+      var m = String(u || "").match(/^(https?:\/\/[^\/]+)(\/.*)$/); if (!m) return;
+      var parts = m[2].split("?")[0].split("#")[0].split("/").filter(Boolean);
+      for (var i = parts.length - 1; i >= 1; i--) {
+        var p = m[1] + "/" + parts.slice(0, i).join("/") + "/";
+        if (!seen[p]) { seen[p] = true; out.push(p); }
+      }
+    });
+    return out;
+  }
+
   /* Run the site-wide check and extra address checks, then store everything on the audit. */
   function siteAudit(pages, prog) {
     return wpFetch("/wpt-hub/v1/site").then(function (site) {
@@ -1475,6 +1489,10 @@
       pages.forEach(function (p) { if (p.liveStatus || p.live) status[norm(p.link)] = { status: p.liveStatus || 200, location: p.redirectTo || "" }; });
       var extra = [];
       function want(u) { var k = norm(u); if (!status[k] && extra.indexOf(u) < 0 && extra.length < 250) extra.push(u); }
+      /* Parent pages first (/business-phone-systems/8x8/ for /business-phone-systems/8x8/brighton/).
+         They hold the location link lists, so if the 250 cap fills before they are read,
+         every page they link to looks like it has no links pointing to it. */
+      parentPages(pages.map(function (p) { return p.link; })).forEach(want);
       (site.sitemap_urls || []).forEach(want);
       pages.forEach(function (p) { (p.linksAll || []).forEach(want); });
       (site.redirections || []).forEach(function (r) { if (r.url_to && /^https?:/.test(r.url_to)) want(r.url_to); else if (r.url_to) want(site.home.replace(/\/$/, "") + "/" + r.url_to.replace(/^\//, "")); });

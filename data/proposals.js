@@ -1543,6 +1543,163 @@ window.WPT_PROPOSALS = [
    "For each, note the problem, what WPT did, and one number (calls answered, cost saved, time to switch).",
    "Send the notes to Claude. The case studies come back as drafts in this queue."
   ]
+ },
+ {
+  "id": "b8-01",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "content_replace",
+  "size": "small",
+  "priority": "high",
+  "category": "Structure",
+  "postType": "posts",
+  "pageId": 2815,
+  "pageTitle": "The Top UCaaS Platforms for 2026",
+  "link": "https://westpiertech.com/the-top-ucaas-platforms-for-2026/",
+  "issue": "Link the older UCaaS post to the new Top 10 UCaaS comparison",
+  "current": "The table below provides a high-level view of how leading platforms are positioned in the UCaaS market.",
+  "proposed": "The table below provides a high-level view of how leading platforms are positioned in the UCaaS market. For a fuller side-by-side of ten providers, see our <a href=\"https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/\">UK comparison of the top 10 UCaaS providers</a>.",
+  "why": "Your new Top 10 UCaaS post has no links pointing to it. This older post gets the most impressions on the site (over 5,000 in three months), so a link from here is the quickest way for Google to find the new one and see it matters. Only this one sentence changes."
+ },
+ {
+  "id": "b8-02",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "elementor_swap",
+  "size": "small",
+  "priority": "high",
+  "category": "Structure",
+  "postType": "pages",
+  "pageId": 649,
+  "pageTitle": "Unified Communications",
+  "link": "https://westpiertech.com/unified-communications/",
+  "find": "to bespoke solutions that match your unique needs.",
+  "issue": "Link the Unified Communications page to the Top 10 UCaaS comparison",
+  "current": "...from Avaya Cloud Office, 8×8, 3CX, Zoom, Microsoft Teams to bespoke solutions that match your unique needs.",
+  "proposed": "to bespoke solutions that match your unique needs. See how they compare in our <a href=\"https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/\">top 10 UCaaS providers guide</a>.",
+  "why": "This is the second link the new post needs, from the service page it supports. The line already lists the platforms, so the link sits where a reader would want it. Only the end of the Tailored Solutions bullet changes."
+ },
+ {
+  "id": "b8-03",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "elementor_swap",
+  "size": "small",
+  "priority": "high",
+  "category": "Structure",
+  "postType": "pages",
+  "pageId": 649,
+  "pageTitle": "Unified Communications",
+  "link": "https://westpiertech.com/unified-communications/",
+  "find": "our experts ensure zero downtime for your business.",
+  "issue": "Link the Unified Communications page to the training page",
+  "current": "Seamless Migration: our experts ensure zero downtime for your business.",
+  "proposed": "our experts ensure zero downtime for your business, and our <a href=\"https://westpiertech.com/business-telecoms-training/\">user training</a> gets your team confident from day one.",
+  "why": "The training page has no links pointing to it. The Latymer testimonial further down this page already praises the training, so this is a natural place to link it. Only the end of the Seamless Migration bullet changes."
+ },
+ {
+  "id": "b8-04",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "manual",
+  "priority": "medium",
+  "category": "Structure",
+  "pageTitle": "Business Telecoms Training",
+  "link": "https://westpiertech.com/business-telecoms-training/",
+  "issue": "Add the training page to the footer Our Solutions list",
+  "why": "One link from the Unified Communications page helps, but the audit wants at least two. A footer link puts it on every page in one go. Training is a real service, so it belongs there.",
+  "steps": [
+   "WordPress, then Appearance, then Menus (or the Elementor footer template, if the footer is built there).",
+   "Find the Our Solutions list in the footer.",
+   "Add Business Telecoms Training, pointing at /business-telecoms-training/, under Maintenance & Support.",
+   "Save, then run the audit again."
+  ]
+ },
+ {
+  "id": "b8-05",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "manual",
+  "priority": "medium",
+  "category": "Structure",
+  "pageTitle": "Brighton location pages (8x8, 3CX, Zoom, Webex for Gamma)",
+  "link": "https://westpiertech.com/business-phone-systems/sussex/brighton-hove/",
+  "issue": "Brighton manufacturer pages: already linked once, give them a second link from the Brighton & Hove page (ask Matt)",
+  "why": "These four were flagged by mistake. Each one is linked from its manufacturer page (for example \"8x8 in Brighton\" on /business-phone-systems/8x8/). The audit missed those links because it ran out of checks before it read the manufacturer pages. That's now fixed in the hub. They still only have one link each, buried in a list of 200, so a second link is worth having. The Brighton & Hove page (Matt's town template) lists 8x8, Gamma / Webex, 3CX and Zoom but links each to the national page, not the Brighton one.",
+  "steps": [
+   "Ask Matt to change the town template's \"Phone systems available\" list: where a local manufacturer page exists for that town (/business-phone-systems/8x8/brighton/ and so on), link to it instead of the national page.",
+   "That one template change fixes this for every town that has local manufacturer pages, not just Brighton.",
+   "Run the audit again. These four should drop off the list."
+  ]
+ },
+ {
+  "id": "b8-06",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "manual",
+  "priority": "medium",
+  "category": "Structure",
+  "pageTitle": "Microsoft Teams Phone Systems in Brighton",
+  "link": "https://westpiertech.com/business-phone-systems-microsoft-teams-phone-brighton/",
+  "issue": "Teams Phone Brighton page has no links in, and its address doesn't match the other location pages",
+  "why": "Every other Brighton page lives at /business-phone-systems/{system}/brighton/. This one is /business-phone-systems-microsoft-teams-phone-brighton/, so the manufacturer page's town list doesn't pick it up. Its own breadcrumb points at /business-phone-systems/microsoft-teams-phone/.",
+  "steps": [
+   "Ask Matt whether it should move to /business-phone-systems/microsoft-teams-phone/brighton/ with a 301 redirect from the old address, like the other Brighton pages.",
+   "Once moved, make sure the Teams Phone manufacturer page links to it, and the Brighton & Hove page lists Teams (see the Brighton fix above).",
+   "Run the audit again."
+  ]
+ },
+ {
+  "id": "b8-07",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "manual",
+  "priority": "medium",
+  "category": "Indexing",
+  "pageTitle": "Feature Comparison",
+  "link": "https://westpiertech.com/feature-comparison/",
+  "issue": "Feature Comparison page is password-protected, so don't link to it. Hide it from Google instead",
+  "why": "Visitors and Google only see a password box. Linking to it would send people to a locked page. It looks like a working copy of the comparison table that now lives on the manufacturer pages and the Sussex page.",
+  "steps": [
+   "Decide if it's still needed. If not, move it to Draft.",
+   "If you need to keep it, set Visibility to Private, or set it to noindex in Rank Math so it leaves the sitemap.",
+   "Run the audit again."
+  ]
+ },
+ {
+  "id": "b8-08",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "manual",
+  "priority": "low",
+  "category": "Content",
+  "pageTitle": "8x8 Feature Matrix with Engage Voice",
+  "link": "https://westpiertech.com/8x8-feature-matrix-with-engage-voice/",
+  "issue": "8x8 Feature Matrix page is a PDF with one line of text. Link the PDF, not the page",
+  "why": "The page has about ten words of its own, so Google treats it as thin, and linking to it adds little. The PDF is what people want.",
+  "steps": [
+   "Ask Matt to add a \"Download the 8x8 feature matrix (PDF)\" link on /business-phone-systems/8x8/, pointing straight at the PDF.",
+   "Set this page to noindex in Rank Math (or Draft) so it stops showing as a thin page.",
+   "If you'd rather keep it as a page, tell Claude and it'll write a short intro (what Engage Voice is, who it suits) so it's worth linking to."
+  ]
+ },
+ {
+  "id": "b8-09",
+  "created": "2026-10-20",
+  "batch": "Batch 8: pages with no links",
+  "type": "manual",
+  "priority": "medium",
+  "category": "Content",
+  "pageTitle": "Top 10 UCaaS Providers for 2026",
+  "link": "https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/",
+  "issue": "Two UCaaS posts compete for the same searches. Pick one to win",
+  "why": "\"The Top UCaaS Platforms for 2026\" (January) and \"Top 10 UCaaS Providers for 2026\" (August) cover the same ground. Google will rank one and ignore the other. The links in fix b8-01 help in the short term.",
+  "steps": [
+   "Decide which one stays. The newer Top 10 post is the stronger page; the older one has the impressions.",
+   "Option A: merge anything unique from the old post into the new one, then 301 the old address to the new one.",
+   "Option B: keep both, but rewrite the old one around a different search (for example Teams vs 8x8 vs Zoom for small UK firms).",
+   "Tell Claude which, and it'll write the fix."
+  ]
  }
 ];
 

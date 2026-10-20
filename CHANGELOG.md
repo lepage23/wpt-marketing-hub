@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.26.3 · 2026-10-20 16:20 BST
+
+Links for the nine pages flagged as having no links pointing to them, and a fix to the check that flagged them.
+
+- **Fix queue, Batch 8.** Three link fixes you can push: the older UCaaS post and the Unified Communications page now link to the new Top 10 UCaaS post, and Unified Communications links to the training page. Six step-by-step fixes for the rest (footer link for training, the Brighton pages and the Teams Brighton address for Matt, the locked Feature Comparison page, the 8x8 feature matrix PDF, and the two UCaaS posts competing).
+- **Audit fix.** Four Brighton pages (8x8, 3CX, Zoom, Webex for Gamma) were flagged by mistake. Their manufacturer pages do link to them, but the audit stopped at 250 extra addresses before reading those pages. It now reads parent pages first, so their links count.
+- 387 tests, all passing.
+
+## Backup · 2026-10-20 16:12 BST
+
+`backup/v0.26.2-2026-10-20-1612`, taken before v0.26.3.
+
 ## v0.26.2 · 2026-10-20 15:35 BST
 
 Call notes for The SEO Works.
