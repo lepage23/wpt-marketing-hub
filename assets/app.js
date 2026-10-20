@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.22.1";
-  var BUILT = "2026-10-20 10:47 BST";
+  var VERSION = "0.23.0";
+  var BUILT = "2026-10-20 10:52 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1256,7 +1256,8 @@
   }
 
   function indexable(p) { return !p.redirectTo && p.live && !p.noindex; }
-  function pageRef(p, note) { return { title: p.title, link: p.link, note: note || "" }; }
+  function autoKey(u) { return norm(u).replace(/^[^\/]*/, "").replace(/\W+/g, "-").replace(/^-|-$/g, "") || "home"; }
+  function pageRef(p, note) { return { title: String(p.title || "").trim() || shortPath(p.link), link: p.link, note: note || "" }; }
 
   function buildAutoFixes(audit) {
     var out = [], site = audit.siteData, status = audit.status || {}, pages = audit.pages, today = new Date().toISOString().slice(0, 10);
@@ -1292,6 +1293,14 @@
       var smKeys = {}; (site.sitemap_urls || []).forEach(function (u) { smKeys[norm(u)] = u; });
       var badInMap = Object.keys(smKeys).filter(function (k) { var s = status[k]; var p = byKey[k]; return (s && s.status && s.status !== 200) || (p && p.noindex); })
         .map(function (k) { var s = status[k] || {}; var p = byKey[k]; return { title: shortPath(smKeys[k]), link: smKeys[k], note: p && p.noindex ? "set to noindex" : s.status >= 300 && s.status < 400 ? "redirects to " + shortPath(s.location) : "answers " + s.status }; });
+      badInMap.filter(function (b) { return /^redirects to /.test(b.note); }).forEach(function (b) {
+        var to = (status[norm(b.link)] || {}).location || "";
+        out.push({ id: "auto-sitemap-draft-" + autoKey(b.link), auto: true, type: "set_status", status: "draft", size: "small", created: today, batch: "Found by audit", priority: "high", category: "Indexing",
+          postType: "pages", pageId: 0, pageTitle: b.title, link: b.link, keepRedirect: to, issue: "Old address still in the sitemap",
+          current: "Published, but visitors are redirected to " + shortPath(to), proposed: "Set the old page to draft. Visitors still get redirected to " + shortPath(to) + ", and the old address drops out of the sitemap.",
+          why: "The sitemap should only list pages you want in Google. After pushing, the hub checks the redirect still works. If it doesn't, the page goes straight back to published and you're told why." });
+      });
+      badInMap = badInMap.filter(function (b) { return !/^redirects to /.test(b.note); });
       if (badInMap.length) add({ id: "auto-sitemap-bad", priority: "high", category: "Indexing", issue: badInMap.length + " addresses in the sitemap aren't live pages", pages: badInMap,
         why: "The sitemap should only list pages you want in Google. Listing redirects, missing pages or noindexed pages wastes Google's crawl and makes the sitemap look unreliable.", steps: ["For redirected pages: in WordPress, open the old page and set it to draft, or in Rank Math set it to noindex, so it drops out of the sitemap.", "For pages answering 404: remove them or redirect them in Rank Math, then Redirections.", "For noindexed pages: Rank Math leaves them out automatically once the setting is saved. If one still shows, re-save the page.", "Run the audit again."] });
       var missing = idx.filter(function (p) { return !smKeys[norm(p.link)]; }).map(function (p) { return pageRef(p); });
@@ -1365,8 +1374,12 @@
 
     /* Page structure */
     var noH1 = idx.filter(function (p) { return !(p.h1 || []).length; }).map(function (p) { return pageRef(p); });
-    if (noH1.length) add({ id: "auto-h1-missing", priority: "high", category: "Structure", issue: noH1.length + " pages have no H1 heading", pages: noH1,
-      why: "The H1 is the main heading that tells search engines and AI tools what the page is about.", steps: ["Open each page in Elementor.", "Set the main heading widget's HTML tag to H1 (Heading widget, then Content, then HTML Tag).", "Run the audit again."] });
+    noH1.forEach(function (r) {
+      out.push({ id: "auto-h1-" + autoKey(r.link), auto: true, type: "elementor_h1", size: "small", created: today, batch: "Found by audit", priority: "high", category: "Structure",
+        postType: "pages", pageId: 0, pageTitle: r.title, link: r.link, issue: "No H1 heading",
+        current: "(no H1 on the live page)", proposed: "The first heading on the page becomes the H1. Its wording stays the same.",
+        why: "The H1 is the main heading that tells search engines and AI tools what the page is about. This changes one setting on the heading widget. The heading may look bigger afterwards, so check the page and use Undo if it looks wrong." });
+    });
     var multiH1 = idx.filter(function (p) { return (p.h1 || []).length > 1; }).map(function (p) { return pageRef(p, p.h1.length + " H1s: " + p.h1.slice(0, 3).join(" / ")); });
     if (multiH1.length) add({ id: "auto-h1-multiple", priority: "medium", category: "Structure", issue: multiH1.length + " pages have more than one H1", pages: multiH1,
       why: "One clear main heading per page is easiest for search engines to read. Extra H1s blur what the page is about.", steps: ["Open each page in Elementor.", "Keep one main heading as H1 and change the others to H2.", "Run the audit again."] });
@@ -2370,7 +2383,7 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix" };
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
   function parseFaq(text) {
@@ -2581,6 +2594,7 @@
       var exact = rows.filter(function (r) { return norm(r.link) === norm(p.link); });
       if (exact.length === 1) return exact[0].id;
       if (rows.length === 1) return rows[0].id;
+      if (!rows.length && p.postType === "pages" && !p._triedPosts) return resolveId(Object.assign({}, p, { postType: "posts", _triedPosts: true })).then(function (id) { p.postType = "posts"; return id; });
       throw new Error("Couldn't find this page by its address (" + p.link + "). It may have moved. Nothing was changed.");
     });
   }
@@ -2588,7 +2602,7 @@
 
   function pushFix(p, text) {
     if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
-    if (p.type !== "new_draft" && p.link && !p._liveChecked && hasChecker()) {
+    if (p.type !== "new_draft" && !p.keepRedirect && p.link && !p._liveChecked && hasChecker()) {
       return checkUrls([p.link]).then(function (live) {
         var r = live[norm(p.link)];
         if (isRedirect(r)) throw new Error("This page redirects to " + r.location + ", so changing it would do nothing. Nothing was changed. Reject this fix.");
@@ -2624,6 +2638,10 @@
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_tidy" ? "tidy" : p.type === "elementor_type" ? "type" : "layout", element: p.element, set: p.set || {}, clear_negative_margin: p.clearNeg ? 1 : 0 } })
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV9);
     }
+    if (p.type === "elementor_h1") {
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "h1", element: p.element || "" } })
+        .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, needsV11);
+    }
     if (p.type === "elementor_faq") {
       var faq;
       try { faq = parseFaq(text); } catch (e) { return Promise.reject(e); }
@@ -2643,7 +2661,16 @@
       return wpFetch(base + p.pageId + "?context=edit&_fields=id,status").then(function (cur) {
         return wpFetch(base + p.pageId, { method: "POST", body: { status: p.status || "draft" } }).then(function (r) {
           if (r.status !== (p.status || "draft")) throw new Error("WordPress didn't change the page status. Nothing was changed.");
-          return { before: cur.status, after: r.status };
+          var res = { before: cur.status, after: r.status };
+          if (!p.keepRedirect || !hasChecker()) return res;
+          /* The old address must still redirect. If the redirect lived on the page itself, put the page back. */
+          return checkUrls([p.link]).then(function (live) {
+            var l = live[norm(p.link)];
+            if (isRedirect(l) && norm(l.location) === norm(p.keepRedirect)) return res;
+            return wpFetch(base + p.pageId, { method: "POST", body: { status: cur.status } }).then(function () {
+              throw new Error("Setting the page to draft stopped the redirect to " + shortPath(p.keepRedirect) + " working, so the page has been put back as it was. The redirect must be set on the page itself. Ask Matt to add it in Rank Math, then Redirections, then push again.");
+            });
+          });
         });
       });
     }
@@ -2669,10 +2696,20 @@
       }, needsV4);
     });
   }
+  /* Ask WordPress which heading would become the H1, without changing anything. */
+  function previewH1(p) {
+    var go = p.pageId > 0 ? Promise.resolve(p.pageId) : resolveId(p);
+    return go.then(function (id) {
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: id, op: "h1", dry_run: 1 } }).then(function (r) {
+        if (!r.dry_run) throw new Error("Update the page checker snippet to version 11 to preview this fix.");
+        return r;
+      }, needsV11);
+    });
+  }
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     var base = "/wp/v2/" + p.postType + "/";
-    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq") {
+    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq" || p.type === "elementor_h1") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
     }
     if (p.type === "set_status") return wpFetch(base + p.pageId, { method: "POST", body: { status: st.before || "publish" } });
@@ -2767,12 +2804,17 @@
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<p style="font-size:.9rem"><b>Why it matters:</b> ' + esc(p.why) + "</p>" +
       (pages.length ? '<details' + (pages.length <= 6 ? " open" : "") + '><summary style="cursor:pointer;font-size:.88rem"><b>Where (' + pages.length + ")</b></summary><ul class=\"where\">" +
-        pages.map(function (x) { return '<li><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.title) + "</a>" + (x.note ? ' <span class="muted">· ' + esc(x.note) + "</span>" : "") + "</li>"; }).join("") + "</ul></details>" : "") +
+        pages.map(function (x) { return '<li><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(String(x.title || "").trim() || shortPath(x.link) || "(no address)") + "</a>" + (x.note ? ' <span class="muted">· ' + esc(x.note) + "</span>" : "") + "</li>"; }).join("") + "</ul></details>" : "") +
       '<div><b style="font-size:.9rem">How to fix it</b><ol class="steps-list">' + (p.steps || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol></div>" +
       '<div class="fix-actions row"></div>';
     var actions = card.querySelector(".fix-actions");
     if (!st.status) {
-      actions.innerHTML = '<button type="button" class="btn primary">Mark as done</button><button type="button" class="btn rej">Not doing this</button>';
+      actions.innerHTML = '<button type="button" class="btn primary">Mark as done</button><button type="button" class="btn rej">Not doing this</button>' + (pages.length ? '<button type="button" class="btn small copy-claude">Copy list for Claude</button>' : "");
+      var cc = actions.querySelector(".copy-claude");
+      if (cc) cc.addEventListener("click", function () {
+        var txt = "From the hub Fix queue: " + p.issue + "\n" + pages.map(function (x) { return "- " + x.link + (x.note ? " (" + x.note + ")" : ""); }).join("\n") + "\nPlease write these as fixes I can push.";
+        copyText(txt, "Copied. Paste it into Claude.");
+      });
       actions.querySelector(".primary").addEventListener("click", function () {
         var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
         setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now(), reopened: false });
@@ -2977,8 +3019,8 @@
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
-      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type/.test(p.type) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : p.type === "elementor_faq" ? "Questions and answers (edit any of them, keep the Q: and A: labels)" : "Proposed (you can edit this)") +
-      '<textarea id="fix-' + esc(p.id) + '"' + (done || /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type/.test(p.type) ? " readonly" : "") + (p.type === "elementor_faq" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
+      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1/.test(p.type) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : p.type === "elementor_faq" ? "Questions and answers (edit any of them, keep the Q: and A: labels)" : "Proposed (you can edit this)") +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done || /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1/.test(p.type) ? " readonly" : "") + (p.type === "elementor_faq" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
       (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
       '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
       '<div class="fix-actions row"></div><div class="fix-msg"></div>';
@@ -2987,6 +3029,13 @@
     showHint();
     if (!done) ta.addEventListener("input", function () { showHint(); setFix(p.id, { edited: ta.value }); });
 
+    if (!st.status && p.type === "elementor_h1" && !p.example) {
+      var a1 = wpAuth();
+      if (a1 && a1.ok) previewH1(p).then(function (h) {
+        card.querySelector("pre.was").textContent = "No H1. The first heading is an " + h.tag.toUpperCase() + ":\n\u201c" + h.text + "\u201d";
+        ta.value = "\u201c" + h.text + "\u201d becomes the H1. The wording stays the same.";
+      }).catch(function (err) { msg.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+    }
     if (!st.status && p.type === "elementor_remove") {
       var pick = el('<div class="remove-pick"><div class="row"><b style="font-size:.9rem">Choose exactly what to remove</b><button type="button" class="btn small">Show the options</button></div><div class="opts"></div></div>');
       card.insertBefore(pick, actions);
@@ -3010,24 +3059,24 @@
     }
     if (!st.status) {
       actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
-        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : "Approve and push live") + "</button>" +
+        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live") + "</button>" +
         '<button type="button" class="btn rej">Reject</button>' + (st.edited != null ? '<button type="button" class="btn small reset">Reset to Claude\'s version</button>' : "");
       actions.querySelector(".go").addEventListener("click", function () {
         var sure = actions.querySelector(".sure");
         if (sure && !sure.checked) { msg.innerHTML = '<div class="notice">Tick the box to confirm you\'ve read this change.</div>'; return; }
         var value = ta.value;
         if (p.needsEdit && value.trim() === String(p.current).trim()) { msg.innerHTML = '<div class="notice">Change the wording in the box first, then push.</div>'; return; }
-        if (!value.trim() && !/^(meta_description|elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
+        if (!value.trim() && !/^(meta_description|elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
         var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
         var lv = fixState()[p.id] && fixState()[p.id].level;
         pushFix(p.type === "elementor_remove" ? Object.assign({}, p, { level: lv == null ? null : lv, scope: "" }) : p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : "Pushed live" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
-          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : "Approve and push live";
+          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live";
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
           if (p.type !== "elementor_style" && /isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
         });

@@ -6,6 +6,19 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.23.0 · 2026-10-20 10:52 BST
+
+More audit fixes now push from the Fix queue instead of being steps.
+
+- **Old addresses in the sitemap.** Each old page that redirects now gets its own fix: set it to draft. After pushing, the hub checks the redirect still works. If it doesn't, the page goes straight back to published and the card tells you why. Missing and noindexed addresses stay as steps.
+- **Pages with no H1.** One fix per page. The card shows which heading will become the H1 before you approve. Undo puts it back.
+- **Blank page names fixed.** Pages with no WordPress title were showing as empty bullets in the Where lists. They now show their address.
+- **Copy list for Claude** on audit cards with a list of pages, for fixes that need Claude to write them (like links to orphan pages).
+- Page checker snippet version 11 now also covers H1 fixes. If you've already updated to 11 today, update it once more.
+- Run the audit again to turn the old step cards into pushable fixes.
+- User guide updated.
+- 345 tests, all passing.
+
 ## v0.22.1 · 2026-10-20 10:47 BST
 
 New fix in the queue: partner pages still link to the old westpiertele.com domain (Read more button, contact email, footer badge).

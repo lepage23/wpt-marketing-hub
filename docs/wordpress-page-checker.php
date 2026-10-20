@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 11, adds FAQ blocks with FAQ schema on Elementor pages).
+ * WPT Marketing Hub: page checker (version 11, adds FAQ blocks with FAQ schema, and setting a page's H1, on Elementor pages).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -531,6 +531,54 @@ add_action( 'rest_api_init', function () {
 				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $elid, 'widget' => $type, 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
+			}
+			if ( 'h1' === $op ) {
+				/* h1: make one heading widget the page's H1 (version 11). Without "element" it picks the first
+				 * heading on the page. dry_run says which heading it would change, and changes nothing. */
+				$heads = array();
+				$walk  = function ( $els, $path ) use ( &$walk, &$heads ) {
+					foreach ( $els as $i => $el ) {
+						$p = array_merge( $path, array( $i ) );
+						if ( isset( $el['widgetType'] ) && 'heading' === $el['widgetType'] ) {
+							$heads[] = array( 'path' => $p, 'id' => isset( $el['id'] ) ? $el['id'] : '', 'tag' => isset( $el['settings']['header_size'] ) ? (string) $el['settings']['header_size'] : 'h2', 'text' => isset( $el['settings']['title'] ) ? (string) $el['settings']['title'] : '' );
+						}
+						if ( ! empty( $el['elements'] ) ) {
+							$walk( $el['elements'], array_merge( $p, array( 'elements' ) ) );
+						}
+					}
+				};
+				$walk( $data, array() );
+				foreach ( $heads as $h ) {
+					if ( 'h1' === $h['tag'] ) {
+						return new WP_Error( 'wpt_edit', 'Elementor already has an H1 on this page ("' . $plain( $h['text'] ) . '"), but it isn\'t showing to visitors. It may be hidden on some screens. Nothing was changed. Tell Claude and it will look into it.', array( 'status' => 409 ) );
+					}
+				}
+				$elid = preg_replace( '/[^a-z0-9]/i', '', (string) $r->get_param( 'element' ) );
+				$pick = null;
+				foreach ( $heads as $h ) {
+					if ( ( $elid && $h['id'] === $elid ) || ( ! $elid && strlen( $plain( $h['text'] ) ) >= 3 ) ) {
+						$pick = $h;
+						break;
+					}
+				}
+				if ( ! $pick ) {
+					return new WP_Error( 'wpt_edit', $elid ? 'That heading isn\'t on the page any more, so someone may have changed it. Nothing was changed.' : 'This page has no heading widget to turn into the H1. Nothing was changed. Tell Claude and it will write a different fix.', array( 'status' => 409 ) );
+				}
+				$label = strtoupper( $pick['tag'] ) . ': ' . $plain( $pick['text'] );
+				if ( $r->get_param( 'dry_run' ) ) {
+					return array( 'ok' => true, 'dry_run' => true, 'element' => $pick['id'], 'tag' => $pick['tag'], 'text' => $plain( $pick['text'] ) );
+				}
+				$before = wp_json_encode( $data );
+				$node   = &$data;
+				foreach ( $pick['path'] as $k ) {
+					$node = &$node[ $k ];
+				}
+				$node['settings']['header_size'] = 'h1';
+				unset( $node );
+				$bid = 'b' . time() . wp_rand( 100, 999 );
+				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				$save( $id, $data );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => $pick['id'], 'widget' => 'heading', 'before' => $label, 'after' => 'H1: ' . $plain( $pick['text'] ) );
 			}
 			if ( 'faq' === $op ) {
 				/* faq: add an FAQ block to the page, or replace the one the hub added before (version 11).

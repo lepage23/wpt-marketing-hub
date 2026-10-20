@@ -24,6 +24,7 @@ out=$( {
   node tests/in-progress.test.js assets/app.js
   node tests/fix-log.test.js assets/app.js
   node tests/faq.test.js assets/app.js
+  node tests/audit-push.test.js assets/app.js
   node tests/speed-fixes.test.js assets/app.js tests/fixtures/psi_charity.json
   php tests/page-checker.test.php docs/wordpress-page-checker.php | grep -E "^(PASS|FAIL)"
   php tests/analytics.test.php docs/wordpress-page-checker.php /dev/null
