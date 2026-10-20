@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.19.2";
-  var BUILT = "2026-10-19 16:24 BST";
+  var VERSION = "0.20.0";
+  var BUILT = "2026-10-20 08:52 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -256,7 +256,10 @@
     var p1 = panel("Needs you today", "Lead actions due, then flagged emails.");
     var items = due.map(function (l) {
       return { chip: '<span class="chip flag">Lead</span>', t: l.company || "Unnamed lead", s: (l.next || "No next step set") + " · " + (l.owner || "") + (l.nextDate < today() ? " · late" : "") };
-    }).concat(inbox.slice(0, 5).map(function (m) {
+    }).concat((function () { var fs = fixState(); return proposals().filter(function (p) { return !p.example && isDueBackFix(fs[p.id]); }).map(function (p) {
+      var st = fs[p.id];
+      return { chip: '<span class="chip info">Fix</span>', t: p.issue || p.pageTitle || "Fix", s: "Back from In progress, next action due " + fmtDay(st.nextDate) + (st.progressNote ? " · " + st.progressNote : "") };
+    }); })()).concat(inbox.slice(0, 5).map(function (m) {
       return { chip: '<span class="chip ' + (m.category === "Lead" ? "flag" : m.category === "Complaint" ? "bad" : "info") + '">' + esc(m.category) + "</span>", t: m.subject, s: m.from + " · " + (m.why || "") };
     }));
     p1.appendChild(el(items.length ? '<div class="list">' + items.map(function (i) {
@@ -2394,7 +2397,69 @@
   function setFix(id, patch) { var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s); }
   function pendingFixes() {
     var s = fixState();
-    return proposals().filter(function (p) { return !p.example && !(s[p.id] && s[p.id].status); });
+    return proposals().filter(function (p) { return !p.example && isOpenFix(s[p.id]); });
+  }
+  /* In progress: a fix you've started, parked until its next action date.
+     On that date it comes back to the top of Waiting for you. */
+  function localDay(d) { d = d || new Date(); var m = d.getMonth() + 1, n = d.getDate(); return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (n < 10 ? "0" : "") + n; }
+  function addDays(iso, n) { var p = iso.split("-"); return localDay(new Date(+p[0], +p[1] - 1, +p[2] + n)); }
+  function fmtDay(iso) { var p = String(iso || "").split("-"); if (p.length !== 3) return iso || ""; return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }); }
+  function isParkedFix(st) { return !!(st && st.status === "inprogress" && st.nextDate && st.nextDate > localDay()); }
+  function isDueBackFix(st) { return !!(st && st.status === "inprogress" && !isParkedFix(st)); }
+  function isOpenFix(st) { return !(st && st.status) || isDueBackFix(st); }
+  function cardState(st) { st = st || {}; if (st.status !== "inprogress") return st; var c = Object.assign({}, st); delete c.status; return c; }
+  function sortFixGroup(list, s, view) {
+    var dated = function (p) { var st = s[p.id]; return st && st.status === "inprogress" ? st.nextDate || "" : null; };
+    return list.map(function (p, i) { return { p: p, i: i, d: dated(p) }; }).sort(function (a, b) {
+      if (view === "waiting" && (a.d == null) !== (b.d == null)) return a.d == null ? 1 : -1;
+      if (a.d != null && b.d != null && a.d !== b.d) return a.d < b.d ? -1 : 1;
+      return a.i - b.i;
+    }).map(function (x) { return x.p; });
+  }
+  function parkFix(id, nextDate, note) {
+    var st = fixState()[id] || {};
+    setFix(id, { status: "inprogress", nextDate: nextDate, progressNote: note || "", progressSince: st.status === "inprogress" && st.progressSince ? st.progressSince : localDay() });
+  }
+  function unparkFix(id) {
+    var s = fixState(); if (s[id]) { delete s[id].status; delete s[id].nextDate; delete s[id].progressNote; delete s[id].progressSince; } save("fix-state", s);
+  }
+  /* Adds the In progress strip and button to any fix card. */
+  function progressControls(card, p, st, redraw) {
+    var ip = st && st.status === "inprogress", due = ip && isDueBackFix(st);
+    if (ip) {
+      var strip = el('<div class="notice ' + (due ? "" : "info") + ' progress-strip"></div>');
+      strip.innerHTML = (due ? "<b>Back from In progress.</b> Next action was due " + esc(fmtDay(st.nextDate)) + "."
+        : "<b>In progress</b> since " + esc(fmtDay(st.progressSince)) + ". Comes back to the queue on " + esc(fmtDay(st.nextDate)) + ".") +
+        (st.progressNote ? '<div style="margin-top:4px"><b>Next action:</b> ' + esc(st.progressNote) + "</div>" : "");
+      var head = card.querySelector(".panel-head");
+      if (head && head.nextSibling) card.insertBefore(strip, head.nextSibling); else card.insertBefore(strip, card.firstChild);
+    }
+    var actions = card.querySelector(".fix-actions"); if (!actions) return;
+    var btn = el('<button type="button" class="btn ip">' + (ip ? (due ? "Still in progress" : "Change date") : "In progress") + "</button>");
+    actions.appendChild(btn);
+    if (ip && !due) {
+      var back = el('<button type="button" class="btn small">Back in the queue now</button>');
+      actions.appendChild(back);
+      back.addEventListener("click", function () { unparkFix(p.id); toast("Back in Waiting for you"); redraw(); updateNav(); });
+    }
+    btn.addEventListener("click", function () {
+      if (card.querySelector(".ip-form")) return;
+      var tomorrow = addDays(localDay(), 1);
+      var def = ip && st.nextDate > localDay() ? st.nextDate : addDays(localDay(), 7);
+      var form = el('<div class="ip-form panel" style="padding:12px;display:flex;flex-direction:column;gap:8px">' +
+        '<label class="field">Date for the next action<input type="date" class="ip-date" min="' + tomorrow + '" value="' + def + '" required></label>' +
+        '<label class="field">What happens next (optional)<input type="text" class="ip-note" placeholder="e.g. Chase Matt for Google account access" value="' + esc(ip ? st.progressNote || "" : "") + '"></label>' +
+        '<div class="row"><button type="button" class="btn primary ip-save">Save</button><button type="button" class="btn small ip-cancel">Cancel</button>' +
+        '<span class="muted" style="font-size:.84rem">On that date it goes back to the top of Waiting for you.</span></div><div class="ip-msg"></div></div>');
+      actions.parentNode.insertBefore(form, actions.nextSibling);
+      form.querySelector(".ip-cancel").addEventListener("click", function () { form.remove(); });
+      form.querySelector(".ip-save").addEventListener("click", function () {
+        var d = form.querySelector(".ip-date").value;
+        if (!d || d <= localDay()) { form.querySelector(".ip-msg").innerHTML = '<div class="notice">Pick a date after today.</div>'; return; }
+        parkFix(p.id, d, form.querySelector(".ip-note").value.trim());
+        toast("In progress until " + fmtDay(d)); redraw(); updateNav();
+      });
+    });
   }
   function logChange(entry) { if (!entry.date) entry.date = today(); var l = load("change-log", []); l.unshift(entry); save("change-log", l); }
 
@@ -2542,21 +2607,27 @@
     function draw() {
       var s = fixState(), all = proposals().filter(function (p) { return area === "All" || (p.category || "Content") === area; });
       var groups = {
-        waiting: all.filter(function (p) { return !(s[p.id] && s[p.id].status); }),
+        waiting: sortFixGroup(all.filter(function (p) { return isOpenFix(s[p.id]); }), s, "waiting"),
+        inprogress: sortFixGroup(all.filter(function (p) { return isParkedFix(s[p.id]); }), s, "inprogress"),
         pushed: all.filter(function (p) { return s[p.id] && /^(pushed|undone|done)$/.test(s[p.id].status); }),
         rejected: all.filter(function (p) { return s[p.id] && s[p.id].status === "rejected"; })
       };
-      var names = { waiting: "Waiting for you", pushed: "Done", rejected: "Not doing" };
+      var names = { waiting: "Waiting for you", inprogress: "In progress", pushed: "Done", rejected: "Not doing" };
       tabs.innerHTML = Object.keys(groups).map(function (g) {
         return '<button type="button" role="tab" class="btn' + (g === view ? " primary" : "") + '" data-view="' + g + '" aria-selected="' + (g === view) + '">' + names[g] + " (" + groups[g].length + ")</button>";
       }).join("");
+      if (!groups[view]) view = "waiting";
       var items = groups[view];
       if (!items.length) {
-        list.innerHTML = '<div class="panel"><div class="empty">' + (view === "waiting" ? "No fixes waiting. Send Claude the audit (Copy as CSV on the Website & SEO page) and ask for the next batch." : "Nothing here yet.") + "</div></div>";
+        list.innerHTML = '<div class="panel"><div class="empty">' + (view === "waiting" ? "No fixes waiting. Send Claude the audit (Copy as CSV on the Website & SEO page) and ask for the next batch." : view === "inprogress" ? "Nothing in progress. Click In progress on a fix you've started and pick a date for the next action." : "Nothing here yet.") + "</div></div>";
         return;
       }
       list.innerHTML = "";
-      items.forEach(function (p) { list.appendChild(fixCard(p, s[p.id] || {}, draw)); });
+      items.forEach(function (p) {
+        var raw = s[p.id] || {}, card = fixCard(p, cardState(raw), draw);
+        if (view === "waiting" || view === "inprogress") progressControls(card, p, raw, draw);
+        list.appendChild(card);
+      });
     }
     tabs.addEventListener("click", function (e) { var v = e.target.getAttribute("data-view"); if (v) { view = v; save("fix-view", v); draw(); } });
     draw();

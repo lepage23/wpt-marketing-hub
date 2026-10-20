@@ -144,7 +144,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td><span class="btn primary">Approve and unpublish</span></td><td>Turns a page into a draft. Nothing is deleted. Undo republishes it.</td></tr>
     <tr><td><span class="btn primary">Push new page build for review</span></td><td>Makes a new <b>draft</b> page. Never live until you publish it in WordPress.</td></tr>
     <tr><td><span class="btn">Run audit now</span>, <span class="btn">Check every page</span>, <span class="btn">Run speed check on all pages</span>, <span class="btn">Refresh</span>, <span class="btn">Check the look</span></td><td>Read-only. Safe any time.</td></tr>
-    <tr><td><span class="btn">Mark as done</span>, <span class="btn">Not doing this</span>, <span class="btn">Reject</span></td><td>Only tidies the hub. Nothing on the website changes. <span class="btn">Put back in the queue</span> reverses it.</td></tr>
+    <tr><td><span class="btn">Mark as done</span>, <span class="btn">Not doing this</span>, <span class="btn">In progress</span>, <span class="btn">Reject</span></td><td>Only tidies the hub. Nothing on the website changes. <span class="btn">Put back in the queue</span> reverses it.</td></tr>
     <tr><td><span class="btn">Remove</span> (Leads)</td><td>Deletes that lead from the hub after you confirm. Use Download CSV first if you want a copy.</td></tr>
   </tbody>
 </table>
@@ -223,7 +223,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
   </tbody>
 </table>
 <h3>Tabs and filter</h3>
-<p><b>Waiting for you</b> is what's left to do. <b>Done</b> holds pushed fixes, each with its Undo. <b>Not doing</b> holds what you've rejected, and any of them can go back in the queue. The area filter (Content, Mobile, Structure and so on) narrows the list.</p>
+<p><b>Waiting for you</b> is what's left to do. <b>In progress</b> holds fixes you've started but can't finish yet: click <span class="btn">In progress</span> on any fix, pick the date for the next action and add a note if you like. On that date the fix comes back to the top of Waiting for you and shows on the Today page. <span class="btn">Change date</span> moves the date and <span class="btn">Back in the queue now</span> brings it back early. <b>Done</b> holds pushed fixes, each with its Undo. <b>Not doing</b> holds what you've rejected, and any of them can go back in the queue. The area filter (Content, Mobile, Structure and so on) narrows the list.</p>
 <h3>The claims card</h3>
 <p>Lists every page still making a false claim, each with its own <span class="btn primary">Push the fix</span>. Pages already fixed say <span class="chip good">Fix pushed</span>. <span class="btn primary">Check the site again now</span> re-runs the check, and the card disappears once the site is clean.</p>
 <h3>New page builds</h3>

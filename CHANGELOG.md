@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.20.0 · 2026-10-20 08:52 BST
+
+New tab in the Fix queue: **In progress**.
+
+- Click **In progress** on any fix you've started. Pick the date for the next action and add a note (optional).
+- The fix leaves Waiting for you and sits in In progress until that date.
+- On the date it comes back to the **top** of Waiting for you, marked "Back from In progress" with your note. It also shows under Needs you today on the Today page.
+- From In progress you can still mark it done or not doing, **Change date**, or bring it **Back in the queue now**.
+- Fixes that are back count in the Fix queue badge again.
+- User guide updated.
+- 293 tests, all passing.
+
 ## v0.19.2 · 2026-10-19 16:24 BST
 
 - **Your jobs:** Claude can now update a job's status and details from GitHub. Each update applies once, so your own later changes stick.
