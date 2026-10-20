@@ -6,6 +6,10 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.22.1 · 2026-10-20 10:47 BST
+
+New fix in the queue: partner pages still link to the old westpiertele.com domain (Read more button, contact email, footer badge).
+
 ## v0.22.0 · 2026-10-20 10:46 BST
 
 FAQ blocks now push from the Fix queue. No more pasting into Elementor.

@@ -1637,5 +1637,23 @@ window.WPT_JOBS = [
   "details": "WordPress holds about 2,300 words for this page but visitors' browsers get only 137 in the page itself. The comparison is probably loaded by a script or plugin after the page opens. Search engines may struggle to read it. Ask Matt how the comparison table is built. Claude can then suggest a fix.",
   "size": "",
   "alt": ""
+ },
+ {
+  "id": "ai-17",
+  "created": "2026-10-20",
+  "batch": "Off-site and AI search (Claude)",
+  "type": "manual",
+  "priority": "medium",
+  "category": "Structure",
+  "pageTitle": "Partner pages",
+  "link": "https://westpiertech.com/8x8/",
+  "issue": "Partner pages still link to the old westpiertele.com domain",
+  "why": "On the 8x8, 3CX, Gamma, Zoom and Avaya pages, the “Read more” button under “Why switch to West Pier” and the contact email (info@westpiertele.com) point at westpiertele.com, and the Cyber Essentials Plus badge in the footer links there too. Even if the old domain redirects, it sends search engines and AI tools mixed signals about which domain is yours, and an email on the old domain looks out of date.",
+  "steps": [
+   "Check whether info@westpiertele.com still delivers. If not, this is urgent.",
+   "In Elementor on each partner page, change the “Read more” button link to the matching westpiertech.com page, and the email to the westpiertech.com address you want shown.",
+   "Ask Matt to update the footer badge link to a copy of the certificate on westpiertech.com.",
+   "Tell Claude which email address to use and it can sweep the rest of the site for westpiertele.com links."
+  ]
  }
 ];
