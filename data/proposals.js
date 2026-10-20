@@ -1549,6 +1549,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "seoworks-call-1",
+  "job": "Notes for Tom's call (The SEO Works LLM report)",
+  "page": "Website & SEO, AI visibility",
+  "details": "Tom Lindop, Senior BDM at The SEO Works. Mobile 07542 940 842, t.lindop@seoworks.co.uk. He sent a free LLM report on 20 Oct for \"business phone systems\" and said he'd ring in the next few days. Treat it as a sales call.\n\nWhat the report shows\n- WPT isn't in it. No WPT row in How You Rank, and every Position is a dash.\n- It ranks vendors (Microsoft, RingCentral, Aircall, BT), not resellers. Focus Group, Opus, Wavenet, Yo Telecom and Techvu don't appear either.\n- Our partners do. 8x8, Zoom Phone, 3CX and Gamma Horizon are all in the top 10, and 8x8.com and 3cx.com are cited sources.\n- Small sample: 10 prompts, ChatGPT and Gemini only. Every % is really \"X out of 10\".\n- The keyword is SMB buyer language. Our wins are police, tenders and contact centre.\n\nAsk Tom\n- Did WPT appear in any answer at all?\n- What location did the \"near me\" prompt use?\n- Was each prompt run once or several times?\n- What would a paid job cost per month, and what would they actually do?\n\nOur angle\nRide on our partners' visibility. Check WPT is listed and up to date on the 8x8, 3CX, Zoom and Gamma partner finders. The hub already runs 30 WPT prompts a week on the AI visibility tab, so we don't need to pay for this check.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "ai-vis-job-1",
   "job": "Cost up an automated weekly AI visibility run",
   "page": "Website & SEO, AI visibility",

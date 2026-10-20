@@ -6,6 +6,12 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.26.2 · 2026-10-20 15:35 BST
+
+Call notes for The SEO Works.
+
+- New job in **Your jobs**: notes for Tom Lindop's call about their free LLM report. What the report shows, what to ask him and our angle.
+
 ## v0.26.1 · 2026-10-20 13:00 BST
 
 AI visibility scoring fixed for real ChatGPT answers, and a warning about personal accounts.
