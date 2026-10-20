@@ -1665,46 +1665,19 @@ window.WPT_PROPOSALS = [
    "If you need to keep it, set Visibility to Private, or set it to noindex in Rank Math so it leaves the sitemap.",
    "Run the audit again."
   ]
- },
- {
-  "id": "b8-08",
-  "created": "2026-10-20",
-  "batch": "Batch 8: pages with no links",
-  "type": "manual",
-  "priority": "low",
-  "category": "Content",
-  "pageTitle": "8x8 Feature Matrix with Engage Voice",
-  "link": "https://westpiertech.com/8x8-feature-matrix-with-engage-voice/",
-  "issue": "8x8 Feature Matrix page is a PDF with one line of text. Link the PDF, not the page",
-  "why": "The page has about ten words of its own, so Google treats it as thin, and linking to it adds little. The PDF is what people want.",
-  "steps": [
-   "Ask Matt to add a \"Download the 8x8 feature matrix (PDF)\" link on /business-phone-systems/8x8/, pointing straight at the PDF.",
-   "Set this page to noindex in Rank Math (or Draft) so it stops showing as a thin page.",
-   "If you'd rather keep it as a page, tell Claude and it'll write a short intro (what Engage Voice is, who it suits) so it's worth linking to."
-  ]
- },
- {
-  "id": "b8-09",
-  "created": "2026-10-20",
-  "batch": "Batch 8: pages with no links",
-  "type": "manual",
-  "priority": "medium",
-  "category": "Content",
-  "pageTitle": "Top 10 UCaaS Providers for 2026",
-  "link": "https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/",
-  "issue": "Two UCaaS posts compete for the same searches. Pick one to win",
-  "why": "\"The Top UCaaS Platforms for 2026\" (January) and \"Top 10 UCaaS Providers for 2026\" (August) cover the same ground. Google will rank one and ignore the other. The links in fix b8-01 help in the short term.",
-  "steps": [
-   "Decide which one stays. The newer Top 10 post is the stronger page; the older one has the impressions.",
-   "Option A: merge anything unique from the old post into the new one, then 301 the old address to the new one.",
-   "Option B: keep both, but rewrite the old one around a different search (for example Teams vs 8x8 vs Zoom for small UK firms).",
-   "Tell Claude which, and it'll write the fix."
-  ]
  }
 ];
 
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
+ {
+  "id": "bing-job-1",
+  "job": "Check Bing Webmaster Tools is set up, and export the AI Performance report",
+  "page": "bing.com/webmasters",
+  "details": "Bing's AI Performance report shows which of our pages Microsoft Copilot cites, and for which questions. It's real citation data, not a guess from running prompts by hand.\n\n1. Sign in at bing.com/webmasters with the account the site is verified on. If it isn't set up, use Import from Google Search Console.\n2. Check the sitemap is submitted.\n3. In Rank Math, switch on Instant Indexing (IndexNow) so Bing hears about page changes straight away.\n4. Open AI Performance. Export whatever it lets you (CSV) and send it to Claude.\n\nClaude will then add a Copilot citations panel to the AI visibility tab that reads the export, next to the weekly prompt checks.",
+  "size": "",
+  "alt": ""
+ },
  {
   "id": "seoworks-call-1",
   "job": "Notes for Tom's call (The SEO Works LLM report)",
@@ -1767,7 +1740,7 @@ window.WPT_JOBS = [
   "id": "b1-job-1",
   "job": "Decide what to do with the 8x8 Feature Matrix page",
   "page": "/8x8-feature-matrix-with-engage-voice/",
-  "details": "Only 16 words on it. Either fill it in, redirect it to the Feature Comparison page, or set it to noindex in Rank Math. Tell Claude which and the fix can be written.",
+  "details": "Only 16 words on it. Either fill it in, or link the PDF from the 8x8 page and set this one to noindex in Rank Math. (Don't redirect it to Feature Comparison: that page is password-protected.) Tell Claude which and the fix can be written.",
   "size": "",
   "alt": ""
  },
