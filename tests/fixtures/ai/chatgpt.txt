@@ -1,0 +1,14 @@
+Here are some well-regarded VoIP providers in Sussex that would suit a 40-person office:
+
+1. **Focus Group** – A large UK provider with offices in the South East. Offers hosted VoIP, Microsoft Teams calling and connectivity. ([focusgroup.co.uk](https://www.focusgroup.co.uk/voip?utm_source=chatgpt.com))
+2. **West Pier Technologies** – Brighton-based reseller of 8x8, Gamma and 3CX. Strong local support and on-site engineers. ([westpiertech.com](https://westpiertech.com/business-phone-systems/sussex/?utm_source=chatgpt.com))
+3. **Wavenet** – National managed services provider with a strong UC portfolio.
+   - Pros: Wide range of services
+   - Cons: Less local presence
+4. **Daisy** – Offers business phones and broadband.
+
+### Things to consider
+- **Pricing:** Most charge per user per month.
+- Check they support number porting.
+
+If you'd like, I can compare 8x8 and RingCentral for your setup.

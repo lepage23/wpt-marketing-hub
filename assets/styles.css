@@ -254,3 +254,16 @@ tr.open > td { border-bottom-color: transparent; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .subtabs button[aria-current="true"] { color: #0E171E; } }
 @media (max-width: 640px) { .subtabs { flex-wrap: nowrap; overflow-x: auto; } .subtabs button { flex: none; } }
 .page > [hidden] { display: none !important; }
+
+/* AI visibility: how-to, progress, ticks and the paste box */
+.ai-how { border: 1px solid var(--line); border-radius: var(--radius); background: var(--accent-soft); padding: 10px 14px; margin: 0 0 12px; }
+.ai-how summary { cursor: pointer; font-weight: 600; }
+.ai-how ol { margin: 8px 0 2px 20px; display: flex; flex-direction: column; gap: 4px; }
+.ai-progress { margin-bottom: 8px; color: var(--muted); }
+.ai-progress b { color: var(--fg); }
+.ai-ticks { margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap; }
+.ai-ticks .chip { font-size: .75rem; }
+.ai-logger { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.ai-logger textarea { width: 100%; min-height: 160px; }
+tr.open td { background: var(--accent-soft); }
+.notice.good { border-color: var(--good); background: var(--good-soft); }

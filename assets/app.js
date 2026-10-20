@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.25.0";
-  var BUILT = "2026-10-20 12:20 BST";
+  var VERSION = "0.26.0";
+  var BUILT = "2026-10-20 12:45 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -558,9 +558,10 @@
     }).node);
 
     var ai = panel("AI search visibility: results", "One row per answer you check. Pinned competitors: " + (window.WPT_AI_COMPETITORS || []).join(", ") + ".");
+    if (!load("ai-vis-examples-cleared", false)) { save("ai-visibility", (load("ai-visibility", null) || []).filter(function (r) { return !r._ex; })); save("ai-vis-examples-cleared", true); }
     var aiResults = editableTable({
       key: "ai-visibility", csvName: "ai-visibility", addLabel: "Add result",
-      emptyText: "No results yet. Use Log a result on this week's prompts below.",
+      emptyText: "No results yet. Use Log a result on this week's prompts above.",
       columns: [
         { k: "q", label: "Question asked" },
         { k: "engine", label: "Where", type: "select", options: ["ChatGPT", "Google AI Overview", "Gemini", "Perplexity", "Copilot", "Claude"] },
@@ -577,18 +578,84 @@
 
     syncAiPrompts();
     var wk = aiWeekPrompts(getRows("ai-prompts"), new Date());
-    var weekP = panel("AI visibility: this week's prompts", "Week " + wk.week + ". Ask each one in ChatGPT (use a temporary chat), Google, Copilot and Perplexity. All " + wk.total + " prompts get covered every three weeks.");
+    var weekP = panel("AI visibility: this week's prompts", "Week " + wk.week + ". Ten of the " + wk.total + " prompts. All of them get asked every three weeks.");
+    var howOpen = load("ai-how-open", true);
+    var how = el('<details class="ai-how"' + (howOpen ? " open" : "") + '><summary>How to do this week\'s check (about 20 minutes)</summary><ol>' +
+      "<li><b>Copy</b> a prompt. It copies just the question.</li>" +
+      "<li>Paste it, exactly as it is, into <b>ChatGPT</b> (switch on Temporary chat first, top right) and into <b>Google</b>. Add Copilot and Perplexity if you have time. Don't add anything about West Pier.</li>" +
+      "<li>Copy the whole answer. In ChatGPT, use the copy icon under the answer. In Google, select the AI Overview text and copy it.</li>" +
+      "<li>Click <b>Log a result</b>, pick where the answer came from, paste it in and click <b>Score it</b>.</li>" +
+      "<li>Check the scores. Change anything that's wrong, then <b>Save</b>. The ticks show what's done.</li></ol></details>");
+    how.addEventListener("toggle", function () { save("ai-how-open", how.open); });
+    weekP.appendChild(how);
+    var CORE = ["ChatGPT", "Google AI Overview"];
+    var wkStart = (function () { var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoDate(d); })();
+    function doneFor(q) {
+      var rows = getRows("ai-visibility").filter(function (r) { return r.q === q && r.checked >= wkStart && r.named !== "Not checked"; });
+      return rows.map(function (r) { return r.engine; }).filter(function (e, i, a) { return a.indexOf(e) === i; });
+    }
     var wl = el('<div class="panel-body"></div>');
-    wl.innerHTML = wk.list.length ? '<div class="table-wrap"><table><thead><tr><th class="num">#</th><th>Prompt</th><th>Group</th><th>WPT page that should answer</th><th></th></tr></thead><tbody>' + wk.list.map(function (r) {
-      return '<tr data-id="' + esc(r._id) + '"><td class="num">' + esc(r.n) + "</td><td>" + esc(r.q) + "</td><td>" + esc(r.group) + "</td><td>" + esc(r.page) + '</td><td class="row-actions" style="white-space:nowrap"><button type="button" class="btn small" data-aicopy="1">Copy</button> <button type="button" class="btn small" data-ailog="1">Log a result</button></td></tr>';
-    }).join("") + "</tbody></table></div>" : '<div class="empty">No active prompts. Add some in the prompt list.</div>';
+    var logger = el('<div class="ai-logger" hidden></div>');
+    var openId = null;
+    function drawWeek() {
+      if (!wk.list.length) { wl.innerHTML = '<div class="empty">No active prompts. Add some in the prompt list.</div>'; return; }
+      var done = 0;
+      var rowsHtml = wk.list.map(function (r) {
+        var d = doneFor(r.q); done += CORE.filter(function (c) { return d.indexOf(c) > -1; }).length;
+        var ticks = CORE.concat(d.filter(function (e) { return CORE.indexOf(e) < 0; })).map(function (e) {
+          var on = d.indexOf(e) > -1;
+          return '<span class="chip ' + (on ? "good" : "") + '">' + (on ? "✓ " : "") + esc(e === "Google AI Overview" ? "Google" : e) + "</span>";
+        }).join(" ");
+        return '<tr data-id="' + esc(r._id) + '"' + (r._id === openId ? ' class="open"' : "") + '><td class="num">' + esc(r.n) + "</td><td>" + esc(r.q) + '<div class="ai-ticks">' + ticks + "</div></td><td>" + esc(r.group) + "</td><td>" + esc(r.page) +
+          '</td><td class="row-actions" style="white-space:nowrap"><button type="button" class="btn small" data-aicopy="1">Copy</button> <button type="button" class="btn small primary" data-ailog="1">Log a result</button></td></tr>';
+      }).join("");
+      var need = wk.list.length * CORE.length;
+      wl.innerHTML = '<div class="ai-progress"><b>' + done + " of " + need + "</b> ChatGPT and Google checks done this week" + (done >= need ? ". All done." : ".") + "</div>" +
+        '<div class="table-wrap"><table><thead><tr><th class="num">#</th><th>Prompt</th><th>Group</th><th>WPT page that should answer</th><th></th></tr></thead><tbody>' + rowsHtml + "</tbody></table></div>";
+    }
+    function openLogger(r) {
+      openId = r._id;
+      var engines = ["ChatGPT", "Google AI Overview", "Copilot", "Perplexity", "Gemini", "Claude"];
+      var d = doneFor(r.q), next = engines.find(function (e) { return d.indexOf(e) < 0; }) || "ChatGPT";
+      logger.hidden = false;
+      logger.innerHTML = '<h3>Log a result</h3><p class="muted">' + esc(r.q) + '</p>' +
+        '<div class="form-grid"><label class="field" for="ai-eng">Where the answer came from<select id="ai-eng">' + engines.map(function (e) { return "<option" + (e === next ? " selected" : "") + ">" + e + "</option>"; }).join("") + "</select></label></div>" +
+        '<label class="field" for="ai-paste">Paste the whole answer here<textarea id="ai-paste" rows="8" placeholder="Copy the AI\'s full answer and paste it here, links and all."></textarea></label>' +
+        '<div class="row"><button type="button" class="btn primary" id="ai-score">Score it</button><button type="button" class="btn" id="ai-cancel">Cancel</button></div><div id="ai-out"></div>';
+      logger.querySelector("#ai-cancel").addEventListener("click", function () { logger.hidden = true; openId = null; drawWeek(); });
+      logger.querySelector("#ai-score").addEventListener("click", function () {
+        var text = logger.querySelector("#ai-paste").value;
+        if (!text.trim()) { toast("Paste the answer first."); return; }
+        var sc = scoreAiAnswer(text, window.WPT_AI_COMPETITORS || []);
+        var out = logger.querySelector("#ai-out");
+        out.innerHTML = '<div class="notice ' + (sc.named === "Yes" ? "good" : "info") + '">' +
+          (sc.named === "Yes" ? "West Pier is named" + (sc.pos ? ", number " + sc.pos + " of " + sc.of + "." : ".") : sc.named === "Partly" ? "West Pier's website is linked, but the company isn't named." : "West Pier isn't named in this answer.") +
+          (sc.pinned.length ? " Competitors named: " + esc(sc.pinned.join(", ")) + "." : "") + "</div>" +
+          '<p class="muted">Check these and change anything that\'s wrong.</p><div class="form-grid">' +
+          '<label class="field" for="ai-named">WPT named?<select id="ai-named">' + ["Yes", "Partly", "No"].map(function (o) { return "<option" + (o === sc.named ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></label>" +
+          '<label class="field" for="ai-pos">Position<input id="ai-pos" type="number" min="1" value="' + esc(sc.pos) + '"></label>' +
+          '<label class="field" for="ai-cited">WPT page cited<input id="ai-cited" value="' + esc(sc.cited) + '"></label>' +
+          '<label class="field" for="ai-others">Who was named instead<input id="ai-others" value="' + esc(sc.others) + '"></label>' +
+          '<label class="field" for="ai-cothers">Their pages cited<input id="ai-cothers" value="' + esc(sc.citedOthers) + '"></label></div>' +
+          '<div class="row"><button type="button" class="btn primary" id="ai-save">Save</button></div>';
+        out.querySelector("#ai-save").addEventListener("click", function () {
+          var v = function (id) { return out.querySelector(id).value.trim(); };
+          aiResults.add({ q: r.q, engine: logger.querySelector("#ai-eng").value, named: v("#ai-named"), pos: v("#ai-pos"), cited: v("#ai-cited"), others: v("#ai-others"), citedOthers: v("#ai-cothers"), checked: today(), answer: text.slice(0, 6000) });
+          toast("Saved to results"); logger.hidden = true; openId = null; drawWeek();
+        });
+      });
+      drawWeek();
+      logger.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      logger.querySelector("#ai-paste").focus();
+    }
     wl.addEventListener("click", function (e) {
       var tr = e.target.closest("tr"); if (!tr) return;
       var r = getRows("ai-prompts").find(function (x) { return x._id === tr.getAttribute("data-id"); }); if (!r) return;
-      if (e.target.hasAttribute("data-aicopy")) copyText(r.q, "Prompt copied");
-      if (e.target.hasAttribute("data-ailog")) { aiResults.add({ q: r.q, engine: "ChatGPT", named: "Not checked", pos: "", cited: "", others: "", citedOthers: "", checked: today() }); toast("Added to results. Fill in what the answer said."); }
+      if (e.target.hasAttribute("data-aicopy")) copyText(r.q, "Prompt copied. Paste it into ChatGPT or Google.");
+      if (e.target.hasAttribute("data-ailog")) openLogger(r);
     });
-    weekP.appendChild(wl);
+    drawWeek();
+    weekP.appendChild(wl); weekP.appendChild(logger);
     main.appendChild(rank); main.appendChild(weekP); main.appendChild(ai);
 
     var plist = panel("AI visibility: prompt list", "Every buyer question we track, and the page that should win it. Set Active to No to stop asking one.");
@@ -620,6 +687,84 @@
     }).node);
     main.appendChild(plan);
     seoTabs(main);
+  }
+
+  /* ---------- AI visibility: score a pasted answer ----------
+     Paste a whole answer from ChatGPT, Google, Copilot or Perplexity. Works out whether WPT is named,
+     where it comes in the list, who else is named and which websites are cited. */
+  var AI_BRANDS = ["West Pier Technologies", "Focus Group", "Opus", "Yo Telecom", "Wavenet", "Techvu", "8x8", "RingCentral", "Zoom Phone", "Zoom",
+    "Gamma Horizon", "Gamma", "BT Business", "Vodafone Business", "Virgin Media O2 Business", "Microsoft Teams", "Teams Phone", "3CX", "Avaya", "Mitel",
+    "Vonage", "Dialpad", "Aircall", "NFON", "Daisy", "Nasstar", "Babble", "Onecom", "Webex", "Cisco", "Talkdesk", "Five9", "Genesys", "Natterbox", "Giacom"];
+  var AI_NOT_A_NAME = /^(pros|cons|price|pricing|cost|costs|why|best for|key|features?|summary|recommendation|recommended|tips?|notes?|considerations?|things to|questions? to|final|bottom line|support|setup|set-up|reviews?|location|website|contact|overview|conclusion|how to|what to|in short|tl;?dr|local|national|other|also|option|step|sources?|references?|quick|my|our|your|if you|here|for a|for an|ideal)\b/i;
+  function aiMdText(t) { return String(t || "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`/g, "").replace(/\[\d+\]/g, "").trim(); }
+  function aiNoWptLinks(t) { return String(t || "").replace(/(https?:\/\/)?(www\.)?westpierte(ch|le)\.com[^\s)\]]*/gi, " "); }
+  function aiIsWpt(t) { return /west\s*pier/i.test(aiNoWptLinks(t)); }
+  function aiHosts(text) {
+    var urls = [], seen = {};
+    (String(text).match(/https?:\/\/[^\s)\]>"'<]+/g) || []).forEach(function (u) { u = u.replace(/[.,;:!?]+$/, ""); if (!seen[u]) { seen[u] = 1; urls.push(u); } });
+    var bare = String(text).replace(/https?:\/\/[^\s)\]>"'<]+/g, " ").match(/\b(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:co\.uk|org\.uk|com|uk|net|org|io)\b(?:\/[^\s)\]>"'<]*)?/gi) || [];
+    bare.forEach(function (u) { u = "https://" + u.replace(/[.,;:!?]+$/, ""); if (!seen[u]) { seen[u] = 1; urls.push(u); } });
+    var out = urls.map(function (u) {
+      var m = u.match(/^https?:\/\/(?:www\.)?([^\/?#]+)([^?#]*)/i); if (!m) return null;
+      return { host: m[1].toLowerCase(), url: "https://" + m[1].toLowerCase() + (m[2] && m[2] !== "/" ? m[2].replace(/\/+$/, "/") : "/") };
+    }).filter(Boolean);
+    /* A bare "site.com" next to a full link to the same site is just the link's label. */
+    return out.filter(function (h) { return !(h.url === "https://" + h.host + "/" && out.some(function (o) { return o.host === h.host && o.url !== h.url; })); });
+  }
+  function scoreAiAnswer(text, pinned) {
+    text = String(text || "");
+    var known = AI_BRANDS.concat(pinned || []).filter(function (b, i, a) { return a.indexOf(b) === i; });
+    function brandIn(t) {
+      var hits = [];
+      known.forEach(function (b) {
+        var re = new RegExp("(^|[^a-z0-9])" + b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+") + "(?![a-z0-9])", "ig"), m;
+        while ((m = re.exec(t))) hits.push({ name: b, at: m.index + m[1].length, end: m.index + m[0].length });
+      });
+      if (aiIsWpt(t)) { var w = aiNoWptLinks(t).search(/west\s*pier/i); hits.push({ name: "West Pier Technologies", at: w, end: w + 9 }); }
+      return hits.filter(function (h) { return !hits.some(function (o) { return o !== h && o.at <= h.at && o.end >= h.end && (o.end - o.at) > (h.end - h.at); }); });
+    }
+    function canon(n) {
+      n = aiMdText(n).replace(/[.,;:!?]+$/, "").trim();
+      if (aiIsWpt(n)) return "West Pier Technologies";
+      var k = known.find(function (b) { return b.toLowerCase() === n.toLowerCase(); });
+      return k || n;
+    }
+    /* 1. Names at the head of list items and headings, in order. */
+    var listed = [];
+    text.split(/\r?\n/).forEach(function (line) {
+      var m = line.match(/^(?:#{1,6}\s+|\d{1,2}[.)]\s+|[-*•]\s+)?(.*)$/);
+      var marked = /^(#{1,6}\s+|\d{1,2}[.)]\s+)/.test(line), rest = m ? m[1] : "";
+      var bold = rest.match(/^\*\*([^*]{2,80})\*\*/) || rest.match(/^\[\*\*([^*]{2,80})\*\*\]/);
+      var lead = /^[-*•]\s+/.test(line) || marked || /^\*\*/.test(line);
+      if (!lead) return;
+      var name;
+      if (bold) name = bold[1];
+      else if (marked) name = aiMdText(rest).split(/\s[–—-]\s|:|\(|,|\.\s|\s\|\s/)[0];
+      else { var b = brandIn(rest.slice(0, 60)); if (!b.length || b[0].at > 2) return; name = b[0].name; }
+      name = canon(name);
+      var words = name.split(/\s+/).length;
+      if (!name || name.length > 60 || words > 6 || /\?/.test(name) || AI_NOT_A_NAME.test(name) || !/^[A-Z0-9]/.test(name)) return;
+      var inLine = brandIn(name); if (inLine.length) name = inLine[0].name === "West Pier Technologies" || aiIsWpt(name) ? "West Pier Technologies" : (inLine[0].name.length >= name.length - 4 ? inLine[0].name : name);
+      if (!listed.some(function (x) { return x.toLowerCase() === name.toLowerCase(); })) listed.push(name);
+    });
+    /* 2. Every known brand, by first mention. */
+    var mentioned = [];
+    brandIn(text).sort(function (a, b) { return a.at - b.at; }).forEach(function (h) { if (mentioned.indexOf(h.name) < 0) mentioned.push(h.name); });
+    var order = listed.length >= 2 ? listed : mentioned;
+    var all = order.concat(mentioned.filter(function (b) { return !order.some(function (x) { return x.toLowerCase() === b.toLowerCase(); }); }));
+    var hosts = aiHosts(text);
+    var wptUrls = hosts.filter(function (h) { return /westpierte(ch|le)\./.test(h.host); }).map(function (h) { return h.url; });
+    var otherHosts = []; hosts.forEach(function (h) { if (!/westpierte(ch|le)\./.test(h.host) && otherHosts.indexOf(h.host) < 0) otherHosts.push(h.host); });
+    var nameHit = aiIsWpt(text), idx = order.indexOf("West Pier Technologies");
+    return {
+      named: nameHit ? "Yes" : wptUrls.length ? "Partly" : "No",
+      pos: idx > -1 ? String(idx + 1) : "",
+      of: order.length,
+      cited: wptUrls.filter(function (u, i, a) { return a.indexOf(u) === i; }).join(" "),
+      others: all.filter(function (b) { return b !== "West Pier Technologies"; }).join(", "),
+      citedOthers: otherHosts.join(", "),
+      pinned: (pinned || []).filter(function (p) { return all.indexOf(p) > -1; })
+    };
   }
 
   /* ---------- Website & SEO tabs ----------

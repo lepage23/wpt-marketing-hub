@@ -6,6 +6,19 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.26.0 · 2026-10-20 12:45 BST
+
+AI visibility, step 2: paste the answer and the hub scores it. No more filling in columns by hand.
+
+- **How to do this week's check.** A short how-to at the top of the AI visibility tab: what to copy, where to paste it, and what to bring back. Click it to fold it away.
+- **Log a result** now opens a paste box. Pick where the answer came from, paste the whole answer and click **Score it**.
+- The hub works out whether West Pier is named, its position in the list, any westpiertech.com page cited, who else was named and which of their sites were cited. It calls out any of your five pinned competitors.
+- Everything it finds can be changed before you **Save**.
+- **Ticks** under each prompt show which AI tools you've checked this week, and a count shows how many ChatGPT and Google checks are done out of 20.
+- The two old example rows in the results table are removed.
+- User guide updated.
+- 373 tests, all passing.
+
 ## v0.25.0 · 2026-10-20 12:20 BST
 
 Website & SEO is split into tabs, so you don't have to scroll past everything to find a section.
