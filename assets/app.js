@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.24.0";
-  var BUILT = "2026-10-20 12:15 BST";
+  var VERSION = "0.25.0";
+  var BUILT = "2026-10-20 12:20 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -266,7 +266,7 @@
       return '<div class="list-item">' + i.chip + '<div><div class="t">' + esc(i.t) + '</div><div class="s">' + esc(i.s) + "</div></div><span></span></div>";
     }).join("") + "</div>" : '<div class="empty">Nothing due. Good time for SEO work.</div>'));
     var p2 = panel("Website", audit ? "Last audit " + audit.when : "No audit run yet.");
-    p2.appendChild(el('<div class="row"><a class="btn primary" href="#seo">' + (audit ? "Open website & SEO" : "Run the first page audit") + "</a></div>"));
+    p2.appendChild(el('<div class="row"><a class="btn primary" href="#seo" data-seotab="audit">' + (audit ? "Open website & SEO" : "Run the first page audit") + "</a></div>"));
     if (audit) {
       var worst = audit.pages.slice().sort(function (a, b) { return b.issues.length - a.issues.length; }).slice(0, 4);
       p2.appendChild(el('<div class="list">' + worst.map(function (p) {
@@ -541,8 +541,6 @@
       } catch (e) { status.innerHTML = '<div class="notice">That doesn\'t look like the WordPress data. Copy the whole page from the address above, starting with [ and ending with ].</div>'; }
     });
 
-    var grid = el('<div class="grid"></div>');
-
     var rank = panel("Keyword rankings", "Searches we want to win and where we sit in Google. Update weekly.");
     rank.appendChild(editableTable({
       key: "keywords", csvName: "keyword-rankings", addLabel: "Add keyword",
@@ -582,7 +580,7 @@
     var weekP = panel("AI visibility: this week's prompts", "Week " + wk.week + ". Ask each one in ChatGPT (use a temporary chat), Google, Copilot and Perplexity. All " + wk.total + " prompts get covered every three weeks.");
     var wl = el('<div class="panel-body"></div>');
     wl.innerHTML = wk.list.length ? '<div class="table-wrap"><table><thead><tr><th class="num">#</th><th>Prompt</th><th>Group</th><th>WPT page that should answer</th><th></th></tr></thead><tbody>' + wk.list.map(function (r) {
-      return '<tr data-id="' + esc(r._id) + '"><td class="num">' + esc(r.n) + "</td><td>" + esc(r.q) + "</td><td>" + esc(r.group) + "</td><td>" + esc(r.page) + '</td><td class="row-actions"><button type="button" class="btn small" data-aicopy="1">Copy</button> <button type="button" class="btn small" data-ailog="1">Log a result</button></td></tr>';
+      return '<tr data-id="' + esc(r._id) + '"><td class="num">' + esc(r.n) + "</td><td>" + esc(r.q) + "</td><td>" + esc(r.group) + "</td><td>" + esc(r.page) + '</td><td class="row-actions" style="white-space:nowrap"><button type="button" class="btn small" data-aicopy="1">Copy</button> <button type="button" class="btn small" data-ailog="1">Log a result</button></td></tr>';
     }).join("") + "</tbody></table></div>" : '<div class="empty">No active prompts. Add some in the prompt list.</div>';
     wl.addEventListener("click", function (e) {
       var tr = e.target.closest("tr"); if (!tr) return;
@@ -591,8 +589,7 @@
       if (e.target.hasAttribute("data-ailog")) { aiResults.add({ q: r.q, engine: "ChatGPT", named: "Not checked", pos: "", cited: "", others: "", citedOthers: "", checked: today() }); toast("Added to results. Fill in what the answer said."); }
     });
     weekP.appendChild(wl);
-    main.appendChild(weekP);
-    grid.appendChild(rank); grid.appendChild(ai); main.appendChild(grid);
+    main.appendChild(rank); main.appendChild(weekP); main.appendChild(ai);
 
     var plist = panel("AI visibility: prompt list", "Every buyer question we track, and the page that should win it. Set Active to No to stop asking one.");
     plist.appendChild(editableTable({
@@ -622,7 +619,56 @@
       ]
     }).node);
     main.appendChild(plan);
+    seoTabs(main);
   }
+
+  /* ---------- Website & SEO tabs ----------
+     The page has a lot of panels. Group them into tabs so only one group shows at a time.
+     A panel is placed by its heading. Anything without a heading (notices) shows on every tab. */
+  var SEO_TABS = [
+    { id: "audit", label: "Audit", match: /^(Page audit|Find text on the site|Change log)/ },
+    { id: "search", label: "Search and traffic", match: /^(Search performance|Website traffic and leads|Keyword rankings)/ },
+    { id: "ai", label: "AI visibility", match: /^AI (search )?visibility/ },
+    { id: "speed", label: "Speed and display", match: /^(Mobile and speed|Display check)/ },
+    { id: "content", label: "Content plan", match: /^Content plan/ },
+    { id: "wp", label: "WordPress connection", match: /^Connect WordPress/ }
+  ];
+  function seoTabOf(title) {
+    if (!title) return null;
+    var t = SEO_TABS.find(function (x) { return x.match.test(title); });
+    return t ? t.id : "audit";
+  }
+  function seoTabs(main) {
+    var head = main.firstElementChild;
+    var items = Array.prototype.slice.call(main.children, 1).map(function (n) {
+      var h = n.querySelector(".panel-head h2");
+      return { node: n, tab: seoTabOf(h ? h.textContent.trim() : "") };
+    });
+    var cur = load("seo-tab", "audit");
+    if (!SEO_TABS.some(function (t) { return t.id === cur; })) cur = "audit";
+    var bar = el('<nav class="subtabs" aria-label="Website and SEO sections"></nav>');
+    function show(id) {
+      cur = id; save("seo-tab", id);
+      items.forEach(function (it) { it.node.hidden = it.tab !== null && it.tab !== id; });
+      bar.innerHTML = SEO_TABS.map(function (t) {
+        var n = items.filter(function (it) { return it.tab === t.id; }).length;
+        return n ? '<button type="button" data-tab="' + t.id + '"' + (t.id === id ? ' aria-current="true"' : "") + ">" + esc(t.label) + "</button>" : "";
+      }).join("");
+    }
+    bar.addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-tab]"); if (!b) return;
+      show(b.getAttribute("data-tab"));
+      var top = bar.getBoundingClientRect().top + window.scrollY - 8;
+      if (window.scrollY > top) window.scrollTo(0, top);
+    });
+    head.insertAdjacentElement("afterend", bar);
+    show(cur);
+  }
+  /* Links that point at one tab, like "Go to the page audit". */
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[data-seotab]");
+    if (a) save("seo-tab", a.getAttribute("data-seotab"));
+  });
 
 
   /* ---------- Quick add: turn a pasted lead email or a rough note into a lead row ---------- */
@@ -2775,7 +2821,7 @@
     main.appendChild(filt);
     filt.querySelector("select").addEventListener("change", function (e) { area = e.target.value; save("fix-area", area); draw(); });
     var a = wpAuth();
-    if (!a || !a.pass || !a.ok) main.appendChild(el('<div class="notice"><b>WordPress isn\'t connected yet.</b> You can read and edit fixes, but pushing needs the connection set up on the <a href="#seo">Website & SEO</a> page.</div>'));
+    if (!a || !a.pass || !a.ok) main.appendChild(el('<div class="notice"><b>WordPress isn\'t connected yet.</b> You can read and edit fixes, but pushing needs the connection set up on the <a href="#seo" data-seotab="wp">Website & SEO</a> page.</div>'));
     var tabs = el('<div class="row" role="tablist"></div>'); main.appendChild(tabs);
     var list = el('<div style="display:flex;flex-direction:column;gap:14px"></div>'); main.appendChild(list);
 
@@ -3394,7 +3440,7 @@
 
     if (!hist.length) {
       var e = panel("No baseline yet", "Run the page audit on Website & SEO. That first run becomes the starting point every later report is measured against.");
-      e.appendChild(el('<div class="row"><a class="btn primary" href="#seo">Go to the page audit</a></div>'));
+      e.appendChild(el('<div class="row"><a class="btn primary" href="#seo" data-seotab="audit">Go to the page audit</a></div>'));
       main.appendChild(e); renderChangeLog(main); return;
     }
 

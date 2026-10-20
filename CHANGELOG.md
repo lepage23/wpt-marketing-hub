@@ -6,6 +6,19 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.25.0 · 2026-10-20 12:20 BST
+
+Website & SEO is split into tabs, so you don't have to scroll past everything to find a section.
+
+- Tabs along the top: **Audit**, **Search and traffic**, **AI visibility**, **Speed and display**, **Content plan**, **WordPress connection**. Only one shows at a time.
+- The tab bar stays pinned to the top as you scroll.
+- The hub remembers the last tab you had open.
+- Links like "Go to the page audit" open the right tab.
+- Notices (like WordPress not connected) still show on every tab.
+- Copy and Log a result now sit side by side on this week's prompts.
+- User guide updated.
+- 356 tests, all passing.
+
 ## v0.24.0 · 2026-10-20 12:15 BST
 
 AI visibility, step 1 of the spec: the prompt list is in the hub.

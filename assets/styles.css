@@ -244,3 +244,13 @@ tr.open > td { border-bottom-color: transparent; }
 .log-list li { padding: 6px 10px; background: var(--sunk); border-radius: var(--radius); }
 .log-list .mono { font-size: .75rem; margin-right: 6px; }
 .log-add input { font: inherit; font-size: .86rem; padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: inherit; }
+
+/* Website & SEO tabs. Pinned to the top so they stay in reach while you scroll. */
+.subtabs { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+.subtabs button { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 6px 14px; font-size: .88rem; cursor: pointer; }
+.subtabs button:hover { border-color: var(--accent); }
+.subtabs button[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .subtabs button[aria-current="true"] { color: #0E171E; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .subtabs button[aria-current="true"] { color: #0E171E; } }
+@media (max-width: 640px) { .subtabs { flex-wrap: nowrap; overflow-x: auto; } .subtabs button { flex: none; } }
+.page > [hidden] { display: none !important; }
