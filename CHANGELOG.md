@@ -6,7 +6,7 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
-## v0.21.0 · 2026-10-20 10:25 BST
+## v0.21.0 · 2026-10-20 10:10 BST
 
 Progress log on fix cards, with a tab per vendor.
 
