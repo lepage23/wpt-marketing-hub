@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.26.1 · 2026-10-20 13:00 BST
+
+AI visibility scoring fixed for real ChatGPT answers, and a warning about personal accounts.
+
+- The scorer now reads ChatGPT's numbered lists as they really paste ("1\. Name"). It was missing them before.
+- Picture links and site icons ChatGPT adds no longer count as sources. Site icons now count as the site they point to.
+- Brand names only match with the right capitals, so "zoom the map" no longer counts as Zoom.
+- Question headings like "What should it cost?" are no longer read as company names.
+- Local Sussex rivals that showed up in real answers are now recognised anywhere in an answer: Xoomtalk, Chalvington Group, Fluent Group, Start Communications, Octotech, T2K.
+- The how-to now warns that your own ChatGPT knows you work at West Pier. Use a Temporary chat left on Non-personalized, or chatgpt.com logged out in a private window.
+- 382 tests, all passing. Two of them are your real ChatGPT answers from today.
+
 ## v0.26.0 · 2026-10-20 12:45 BST
 
 AI visibility, step 2: paste the answer and the hub scores it. No more filling in columns by hand.

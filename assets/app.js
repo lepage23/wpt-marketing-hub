@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.26.0";
-  var BUILT = "2026-10-20 12:45 BST";
+  var VERSION = "0.26.1";
+  var BUILT = "2026-10-20 13:00 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -582,10 +582,11 @@
     var howOpen = load("ai-how-open", true);
     var how = el('<details class="ai-how"' + (howOpen ? " open" : "") + '><summary>How to do this week\'s check (about 20 minutes)</summary><ol>' +
       "<li><b>Copy</b> a prompt. It copies just the question.</li>" +
-      "<li>Paste it, exactly as it is, into <b>ChatGPT</b> (switch on Temporary chat first, top right) and into <b>Google</b>. Add Copilot and Perplexity if you have time. Don't add anything about West Pier.</li>" +
+      "<li>Paste it, exactly as it is, into <b>ChatGPT</b> and <b>Google</b>. Add Copilot and Perplexity if you have time. Don't add anything about West Pier.</li>" +
+      '<li class="ai-warn"><b>Your own ChatGPT knows you work at West Pier</b>, so it will rank you higher than a buyer would see. Use a <b>Temporary chat</b> and leave it on <b>Non-personalized</b> (the default, top right). Or open chatgpt.com in a private window without logging in.</li>' +
       "<li>Copy the whole answer. In ChatGPT, use the copy icon under the answer. In Google, select the AI Overview text and copy it.</li>" +
       "<li>Click <b>Log a result</b>, pick where the answer came from, paste it in and click <b>Score it</b>.</li>" +
-      "<li>Check the scores. Change anything that's wrong, then <b>Save</b>. The ticks show what's done.</li></ol></details>");
+      "<li>Check the scores. Change anything that's wrong, then <b>Save</b>. The ticks show what's done.</li></ol><p class=\"muted\">Answers change from one go to the next, even for the same question. One answer means little. The pattern over a few weeks is what counts.</p></details>");
     how.addEventListener("toggle", function () { save("ai-how-open", how.open); });
     weekP.appendChild(how);
     var CORE = ["ChatGPT", "Google AI Overview"];
@@ -694,13 +695,17 @@
      where it comes in the list, who else is named and which websites are cited. */
   var AI_BRANDS = ["West Pier Technologies", "Focus Group", "Opus", "Yo Telecom", "Wavenet", "Techvu", "8x8", "RingCentral", "Zoom Phone", "Zoom",
     "Gamma Horizon", "Gamma", "BT Business", "Vodafone Business", "Virgin Media O2 Business", "Microsoft Teams", "Teams Phone", "3CX", "Avaya", "Mitel",
-    "Vonage", "Dialpad", "Aircall", "NFON", "Daisy", "Nasstar", "Babble", "Onecom", "Webex", "Cisco", "Talkdesk", "Five9", "Genesys", "Natterbox", "Giacom"];
-  var AI_NOT_A_NAME = /^(pros|cons|price|pricing|cost|costs|why|best for|key|features?|summary|recommendation|recommended|tips?|notes?|considerations?|things to|questions? to|final|bottom line|support|setup|set-up|reviews?|location|website|contact|overview|conclusion|how to|what to|in short|tl;?dr|local|national|other|also|option|step|sources?|references?|quick|my|our|your|if you|here|for a|for an|ideal)\b/i;
+    "Vonage", "Dialpad", "Aircall", "NFON", "Daisy", "Nasstar", "Babble", "Onecom", "Webex", "Cisco", "Talkdesk", "Five9", "Genesys", "Natterbox", "Giacom",
+    "Xoomtalk", "Chalvington Group", "Chalvington", "Fluent Group", "Start Communications", "Octotech", "T2K"];
+  /* Picture links and site icons ChatGPT adds to its answers. Not sources, and not names. */
+  var AI_JUNK_HOST = /^(images\.openai\.com|google\.com|gstatic\.com|encrypted-tbn\d*\.gstatic\.com)$/;
+  var AI_NOT_A_NAME = /^(what|how|which|who|where|when|one question|pros|cons|price|pricing|cost|costs|why|best for|key|features?|summary|recommendation|recommended|tips?|notes?|considerations?|things to|questions? to|final|bottom line|support|setup|set-up|reviews?|location|website|contact|overview|conclusion|how to|what to|in short|tl;?dr|local|national|other|also|option|step|sources?|references?|quick|my|our|your|if you|here|for a|for an|ideal)\b/i;
   function aiMdText(t) { return String(t || "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`/g, "").replace(/\[\d+\]/g, "").trim(); }
   function aiNoWptLinks(t) { return String(t || "").replace(/(https?:\/\/)?(www\.)?westpierte(ch|le)\.com[^\s)\]]*/gi, " "); }
   function aiIsWpt(t) { return /west\s*pier/i.test(aiNoWptLinks(t)); }
   function aiHosts(text) {
     var urls = [], seen = {};
+    text = String(text).replace(/https?:\/\/www\.google\.com\/s2\/favicons\?domain=(https?:\/\/[^\s&)\\]+)[^\s)]*/g, "$1");
     (String(text).match(/https?:\/\/[^\s)\]>"'<]+/g) || []).forEach(function (u) { u = u.replace(/[.,;:!?]+$/, ""); if (!seen[u]) { seen[u] = 1; urls.push(u); } });
     var bare = String(text).replace(/https?:\/\/[^\s)\]>"'<]+/g, " ").match(/\b(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:co\.uk|org\.uk|com|uk|net|org|io)\b(?:\/[^\s)\]>"'<]*)?/gi) || [];
     bare.forEach(function (u) { u = "https://" + u.replace(/[.,;:!?]+$/, ""); if (!seen[u]) { seen[u] = 1; urls.push(u); } });
@@ -708,6 +713,7 @@
       var m = u.match(/^https?:\/\/(?:www\.)?([^\/?#]+)([^?#]*)/i); if (!m) return null;
       return { host: m[1].toLowerCase(), url: "https://" + m[1].toLowerCase() + (m[2] && m[2] !== "/" ? m[2].replace(/\/+$/, "/") : "/") };
     }).filter(Boolean);
+    out = out.filter(function (h) { return !AI_JUNK_HOST.test(h.host); });
     /* A bare "site.com" next to a full link to the same site is just the link's label. */
     return out.filter(function (h) { return !(h.url === "https://" + h.host + "/" && out.some(function (o) { return o.host === h.host && o.url !== h.url; })); });
   }
@@ -717,7 +723,7 @@
     function brandIn(t) {
       var hits = [];
       known.forEach(function (b) {
-        var re = new RegExp("(^|[^a-z0-9])" + b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+") + "(?![a-z0-9])", "ig"), m;
+        var re = new RegExp("(^|[^a-z0-9])" + b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+") + "(?![A-Za-z0-9])", "g"), m;
         while ((m = re.exec(t))) hits.push({ name: b, at: m.index + m[1].length, end: m.index + m[0].length });
       });
       if (aiIsWpt(t)) { var w = aiNoWptLinks(t).search(/west\s*pier/i); hits.push({ name: "West Pier Technologies", at: w, end: w + 9 }); }
@@ -732,8 +738,9 @@
     /* 1. Names at the head of list items and headings, in order. */
     var listed = [];
     text.split(/\r?\n/).forEach(function (line) {
-      var m = line.match(/^(?:#{1,6}\s+|\d{1,2}[.)]\s+|[-*•]\s+)?(.*)$/);
-      var marked = /^(#{1,6}\s+|\d{1,2}[.)]\s+)/.test(line), rest = m ? m[1] : "";
+      if (/^\s*\[[^\]]*\]\(https?:\/\/(images\.openai\.com|www\.google\.com\/s2)/.test(line)) return;
+      var m = line.match(/^(?:#{1,6}\s+|\d{1,2}\\?[.)]\s+|[-*•]\s+)?(.*)$/);
+      var marked = /^(#{1,6}\s+|\d{1,2}\\?[.)]\s+)/.test(line), rest = m ? m[1] : "";
       var bold = rest.match(/^\*\*([^*]{2,80})\*\*/) || rest.match(/^\[\*\*([^*]{2,80})\*\*\]/);
       var lead = /^[-*•]\s+/.test(line) || marked || /^\*\*/.test(line);
       if (!lead) return;
@@ -741,6 +748,7 @@
       if (bold) name = bold[1];
       else if (marked) name = aiMdText(rest).split(/\s[–—-]\s|:|\(|,|\.\s|\s\|\s/)[0];
       else { var b = brandIn(rest.slice(0, 60)); if (!b.length || b[0].at > 2) return; name = b[0].name; }
+      if (/\?/.test(name)) return;
       name = canon(name);
       var words = name.split(/\s+/).length;
       if (!name || name.length > 60 || words > 6 || /\?/.test(name) || AI_NOT_A_NAME.test(name) || !/^[A-Z0-9]/.test(name)) return;

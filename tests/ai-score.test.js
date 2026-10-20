@@ -2,7 +2,7 @@
 const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(n){const i=src.indexOf('function '+n+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(n){const i=src.indexOf('var '+n+' =');return src.slice(i,src.indexOf(';\n',i)+1);}
-eval(grabVar('AI_BRANDS'));eval(grabVar('AI_NOT_A_NAME'));['aiMdText','aiNoWptLinks','aiIsWpt','aiHosts','scoreAiAnswer'].forEach(f=>eval(grab(f).replace(/^function (\w+)/,'global.$1 = function')));
+eval(grabVar('AI_BRANDS'));eval(grabVar('AI_JUNK_HOST'));eval(grabVar('AI_NOT_A_NAME'));['aiMdText','aiNoWptLinks','aiIsWpt','aiHosts','scoreAiAnswer'].forEach(f=>eval(grab(f).replace(/^function (\w+)/,'global.$1 = function')));
 const fx=n=>fs.readFileSync('tests/fixtures/ai/'+n,'utf8');const P=['Focus Group','Opus','Yo Telecom','Wavenet','Techvu'];
 const ok=(c,m,x)=>{console.log((c?'PASS ':'FAIL ')+m+(c?'':' -> '+JSON.stringify(x)));if(!c)process.exitCode=1;};
 let r=scoreAiAnswer(fx('chatgpt.txt'),P);
@@ -26,3 +26,14 @@ r=scoreAiAnswer(fx('cited-only.txt'),P);
 ok(r.named==='Partly','Linked but not named counts as Partly',r);
 ok(r.cited==='https://westpiertech.com/msteams/','Bare link picked up',r);
 r=scoreAiAnswer('',P);ok(r.named==='No'&&r.others==='','Empty paste is safe',r);
+r=scoreAiAnswer(fx('chatgpt-own.txt'),P);
+ok(r.named==='Yes'&&r.pos==='1'&&r.of===3,'Real ChatGPT (own account): WPT 1st of 3, numbered "1\\." list read',r);
+ok(r.others.indexOf('Chalvington Group, Fluent Group')===0,'Real ChatGPT: local rivals picked up in order',r);
+ok(r.cited==='https://westpiertech.com/business-phone-systems/','Real ChatGPT: WPT page cited',r);
+ok(r.citedOthers==='','Real ChatGPT: picture links are not sources',r);
+r=scoreAiAnswer(fx('chatgpt-friend.txt'),P);
+ok(r.named==='Yes'&&r.pos==='3'&&r.of===5,'Real ChatGPT (friend): WPT 3rd of 5',r);
+ok(r.others.indexOf('Xoomtalk, Chalvington Group, Start Communications, Octotech')===0,'Real ChatGPT (friend): names in list order',r);
+ok(!/\bZoom\b/.test(r.others),'"zoom the map" is not Zoom',r);
+ok(r.citedOthers.split(', ').sort().join()==='octotech.co.uk,startcomms.co.uk,t2kvoip.co.uk,xoomtalk.com','Real ChatGPT (friend): sources from links and site icons',r);
+ok(r.cited==='','Real ChatGPT (friend): no WPT page cited',r);

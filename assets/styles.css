@@ -267,3 +267,4 @@ tr.open > td { border-bottom-color: transparent; }
 .ai-logger textarea { width: 100%; min-height: 160px; }
 tr.open td { background: var(--accent-soft); }
 .notice.good { border-color: var(--good); background: var(--good-soft); }
+.ai-how li.ai-warn { background: var(--flag-soft); border-left: 3px solid var(--flag); padding: 4px 8px; list-style-position: inside; margin-left: -20px; }
