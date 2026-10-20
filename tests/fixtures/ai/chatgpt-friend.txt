@@ -1,0 +1,120 @@
+For a 40-person office in Sussex, I would shortlist five VoIP providers, prioritising local technical support, reliability, straightforward pricing and the ability to manage a complete office telephone system.
+
+My first choices would be Xoomtalk, Chalvington Group and West Pier Technologies.
+
+## Recommended providers
+
+1\. Xoomtalk
+
+Best overall shortlist candidate
+
+Brighton
+
+Business VoIP, managed connectivity and cloud communications. Explicitly supports medium-sized businesses of up to 100 users, making it a strong fit for a 40-person office.
+
+Strength: One supplier for connectivity and telephony, with local technical support.
+
+[Website](https://xoomtalk.com/solutions/small-business/?utm_source=chatgpt.com) · 0333 110 3000
+
+2\. Chalvington Group
+
+Hailsham, East Sussex
+
+Established business telecommunications and IT provider offering cloud phone systems, connectivity, mobile services and unified communications.
+
+Strength: Broad technical capability, particularly where the office needs call routing, CRM integration and managed IT.
+
+[Telecom Dealers - Telephone Trainers](https://images.openai.com/static-rsc-4/1w5UoaSnG2_M0eCrHihp7eJeXZVL5g1wiGpsECnVVXknTfYdv4KO7xTRk_A9VwRyY7HY5b2f5m6xeZap3qusrrLxp3xREGEN-4UhAHwAMIuBxX8L8F63ca9uh928dJcNWmajbfF0arj_orGGdoCU4WvgQpl3zy686MIWfoBbs3w?purpose=inline)
+
+3\. West Pier Technologies Ltd
+
+Brighton
+
+Specialist in hosted telephony, SIP trunks, cloud communications and traditional office phone systems.
+
+Strength: Worth approaching if you want a telecoms specialist rather than a general IT company.
+
+[Start Communications Reviews | Read Customer Service Reviews of startcomms.co.uk](https://images.openai.com/static-rsc-4/zUMYwdqYQ_y3ywfmDgdWTO-Af28cSvIg9QTuPcAt14MRSitZYyBGRMC2jLUWwidl3-v6RB_l4w4bKq1Z6EdjNCt4vkiB-nAOSvUAq53gk2vSxKXviTJpUICM-QRCf5E6E10YZJ7U1Av_FlN_0uXK6ZLWLC-Y61gLywcQWvEL4IQ?purpose=inline)
+
+4\. Start Communications
+
+Hurstpierpoint, West Sussex
+
+Cloud-hosted telephone systems, broadband and business mobile services.
+
+Strength: Local supplier offering managed communications and flexible working capabilities.
+
+[About Octotech IT Support, Horsham | Sussex, Surrey & London](https://images.openai.com/static-rsc-4/E55rUXIoKsZ2tJRL9f1go-aIzu9A50bMqlcMPEHLAjV_-9EjFEReNQom5xyzXi5HFPNutTb9HGBvkgzrl7c4azYLqO4AfnY58suUsCADm7uF-VLViZkEwFvzRIDMXbeFpeVW8ruHKRB68Q3LXPSyVHgMaY_E10OEcrnuE3KnEIE?purpose=inline)
+
+5\. Octotech
+
+Horsham, West Sussex
+
+Managed hosted VoIP through its OctoVoIP service, alongside business broadband and IT support.
+
+Strength: Particularly attractive if you want IT support and the telephone system managed by the same team.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://www.octotech.co.uk\&sz=32)
+
+Octotech
+
+
+
+canvas
+
+5.0
+
+4.8
+
+5.0
+
+5.0
+
+4.9
+
+Use two fingers to move the map
+
+Use ctrl + scroll to zoom the map
+
+## What should a 40-user system cost?
+
+For budgeting, I would use the following indicative figures, not supplier quotations.
+
+| Cost element                 | Estimate           |
+| ---------------------------- | ------------------ |
+| Basic hosted VoIP            | £8–£12/user/month  |
+| Fully featured business VoIP | £12–£20/user/month |
+| 40 users, fully featured     | £480–£800/month    |
+| Annual licence budget        | £5,760–£9,600      |
+
+These estimates exclude VAT, hardware, connectivity and any additional calling charges. A published Sussex-market example is T2K's Gamma Horizon offering from £12.95 per user monthly.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://www.t2kvoip.co.uk\&sz=32)
+
+T2K Voice & Data
+
+
+
+For 40 staff, I would also insist on number porting, call queues, an auto-attendant, desktop and mobile apps, clear service-level agreements and broadband failover arrangements.
+
+## One question that would change my recommendation
+
+Where in Sussex is the office?
+
+Brighton & Hove
+
+Elsewhere in East Sussex
+
+West Sussex
+
+How will the phones mainly be used?
+
+General office calls, reception and extensions
+
+High-volume sales or customer service calls
+
+Microsoft Teams integration and hybrid working
+
+Refine recommendations&#x20;
+
+The distinction matters because a 40-person office with five simultaneous callers needs a substantially different system from a 40-person sales operation making hundreds of calls daily.
