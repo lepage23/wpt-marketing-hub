@@ -1549,6 +1549,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "ai-vis-job-1",
+  "job": "Cost up an automated weekly AI visibility run",
+  "page": "Website & SEO, AI visibility",
+  "details": "For now you run the AI visibility prompts by hand each week. Find out what it would cost to run them automatically through the ChatGPT, Perplexity and Gemini APIs (30 prompts, 3 runs each, weekly). Your ChatGPT subscription doesn't cover API use. Check whether Gemini's free tier is enough on its own, then take a monthly figure to Garry.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "admin-job-1",
   "job": "Get Claude Business Pro for Garry and Kelly",
   "page": "Claude (claude.ai)",
@@ -1657,3 +1665,220 @@ window.WPT_JOBS = [
   ]
  }
 ];
+
+/* AI visibility: buyer questions to ask ChatGPT, Google and the rest each week. Ten a week, all 30 every three weeks. */
+window.WPT_AI_PROMPTS = [
+ {
+  "id": "aip-1",
+  "n": 1,
+  "q": "Who are the best business phone system providers in Brighton?",
+  "group": "Local",
+  "page": "Brighton location page"
+ },
+ {
+  "id": "aip-2",
+  "n": 2,
+  "q": "Can you recommend a VoIP provider in Sussex for a 40-person office?",
+  "group": "Local",
+  "page": "Sussex county page"
+ },
+ {
+  "id": "aip-3",
+  "n": 3,
+  "q": "Business telephone systems Crawley, who should I talk to?",
+  "group": "Local",
+  "page": "Crawley location page"
+ },
+ {
+  "id": "aip-4",
+  "n": 4,
+  "q": "Best IT and telecoms company near Worthing for a small business",
+  "group": "Local",
+  "page": "Worthing location page"
+ },
+ {
+  "id": "aip-5",
+  "n": 5,
+  "q": "Which London companies install cloud phone systems for charities?",
+  "group": "Local",
+  "page": "London county page"
+ },
+ {
+  "id": "aip-6",
+  "n": 6,
+  "q": "Who are the best 8x8 partners in the UK?",
+  "group": "Vendor",
+  "page": "/8x8/"
+ },
+ {
+  "id": "aip-7",
+  "n": 7,
+  "q": "Should I buy 8x8 direct or through a reseller?",
+  "group": "Vendor",
+  "page": "/8x8/ FAQ"
+ },
+ {
+  "id": "aip-8",
+  "n": 8,
+  "q": "Who can install and support 3CX for a UK business?",
+  "group": "Vendor",
+  "page": "3CX hub page"
+ },
+ {
+  "id": "aip-9",
+  "n": 9,
+  "q": "Gamma Horizon reseller recommendations",
+  "group": "Vendor",
+  "page": "Gamma hub page"
+ },
+ {
+  "id": "aip-10",
+  "n": 10,
+  "q": "Who sets up Zoom Phone for UK companies?",
+  "group": "Vendor",
+  "page": "Zoom hub page"
+ },
+ {
+  "id": "aip-11",
+  "n": 11,
+  "q": "Best Microsoft Teams calling provider in the UK",
+  "group": "Vendor",
+  "page": "/msteams/"
+ },
+ {
+  "id": "aip-12",
+  "n": 12,
+  "q": "Avaya is end of life for us, who can migrate us to something else?",
+  "group": "Vendor",
+  "page": "Avaya hub page"
+ },
+ {
+  "id": "aip-13",
+  "n": 13,
+  "q": "Mitel partner for a police control room",
+  "group": "Public sector",
+  "page": "Needs a page"
+ },
+ {
+  "id": "aip-14",
+  "n": 14,
+  "q": "8x8 vs RingCentral vs Zoom Phone for a 100-user company",
+  "group": "Compare",
+  "page": "Comparison blog post"
+ },
+ {
+  "id": "aip-15",
+  "n": 15,
+  "q": "Is 3CX or 8x8 better for a small business?",
+  "group": "Compare",
+  "page": "Comparison blog post"
+ },
+ {
+  "id": "aip-16",
+  "n": 16,
+  "q": "What's the best cloud phone system for a UK SME in 2026?",
+  "group": "Compare",
+  "page": "/the-top-ucaas-platforms-for-2026/"
+ },
+ {
+  "id": "aip-17",
+  "n": 17,
+  "q": "Teams Phone or a separate phone system, which is better?",
+  "group": "Compare",
+  "page": "/msteams/"
+ },
+ {
+  "id": "aip-18",
+  "n": 18,
+  "q": "Our ISDN lines are being switched off, what do we replace them with?",
+  "group": "Problem",
+  "page": "Needs a page"
+ },
+ {
+  "id": "aip-19",
+  "n": 19,
+  "q": "How do I move my office phones to the cloud without losing our numbers?",
+  "group": "Problem",
+  "page": "Needs a page"
+ },
+ {
+  "id": "aip-20",
+  "n": 20,
+  "q": "Our phone system is old and unsupported, where do I start?",
+  "group": "Problem",
+  "page": "Business phone systems hub"
+ },
+ {
+  "id": "aip-21",
+  "n": 21,
+  "q": "How can a small business stop missing customer calls?",
+  "group": "Problem",
+  "page": "8x8 contact centre content"
+ },
+ {
+  "id": "aip-22",
+  "n": 22,
+  "q": "Best contact centre software for a UK housing association",
+  "group": "Sector",
+  "page": "Needs a page"
+ },
+ {
+  "id": "aip-23",
+  "n": 23,
+  "q": "Phone system for a solicitors' firm with call recording",
+  "group": "Sector",
+  "page": "Needs a page (Barwells case study)"
+ },
+ {
+  "id": "aip-24",
+  "n": 24,
+  "q": "Cloud phone system for a local council",
+  "group": "Sector",
+  "page": "Needs a page (Adur & Worthing)"
+ },
+ {
+  "id": "aip-25",
+  "n": 25,
+  "q": "Phone system for a multi-site school or academy trust",
+  "group": "Sector",
+  "page": "Needs a page (Latymer)"
+ },
+ {
+  "id": "aip-26",
+  "n": 26,
+  "q": "Who supplies business mobiles and the phone system together?",
+  "group": "Bundle",
+  "page": "Mobile page"
+ },
+ {
+  "id": "aip-27",
+  "n": 27,
+  "q": "One supplier for broadband, phones and mobiles for a small business UK",
+  "group": "Bundle",
+  "page": "Needs a page"
+ },
+ {
+  "id": "aip-28",
+  "n": 28,
+  "q": "Is West Pier Technologies any good?",
+  "group": "Brand",
+  "page": "Home, Google reviews"
+ },
+ {
+  "id": "aip-29",
+  "n": 29,
+  "q": "What does West Pier Technologies do?",
+  "group": "Brand",
+  "page": "Home, About"
+ },
+ {
+  "id": "aip-30",
+  "n": 30,
+  "q": "West Pier Telecom Brighton reviews",
+  "group": "Brand",
+  "page": "Home, Google reviews"
+ }
+];
+
+/* Competitors that always show in AI visibility, even in a week they aren't named. */
+window.WPT_AI_COMPETITORS = ["Focus Group", "Opus", "Yo Telecom", "Wavenet", "Techvu"];

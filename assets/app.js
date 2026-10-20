@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.23.0";
-  var BUILT = "2026-10-20 10:52 BST";
+  var VERSION = "0.24.0";
+  var BUILT = "2026-10-20 12:15 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -559,22 +559,54 @@
       ]
     }).node);
 
-    var ai = panel("AI search visibility", "Questions buyers ask ChatGPT, Google AI Overviews and others. Does WPT get named?");
-    ai.appendChild(editableTable({
-      key: "ai-visibility", csvName: "ai-visibility", addLabel: "Add question",
+    var ai = panel("AI search visibility: results", "One row per answer you check. Pinned competitors: " + (window.WPT_AI_COMPETITORS || []).join(", ") + ".");
+    var aiResults = editableTable({
+      key: "ai-visibility", csvName: "ai-visibility", addLabel: "Add result",
+      emptyText: "No results yet. Use Log a result on this week's prompts below.",
       columns: [
         { k: "q", label: "Question asked" },
         { k: "engine", label: "Where", type: "select", options: ["ChatGPT", "Google AI Overview", "Gemini", "Perplexity", "Copilot", "Claude"] },
         { k: "named", label: "WPT named?", type: "select", options: ["Not checked", "Yes", "Partly", "No"] },
+        { k: "pos", label: "Position", type: "number", num: true },
+        { k: "cited", label: "WPT page cited" },
         { k: "others", label: "Who was named instead" },
+        { k: "citedOthers", label: "Their pages cited" },
         { k: "checked", label: "Checked", type: "date" }
       ],
-      seed: [
-        { _ex: true, q: "Who are the best 8x8 resellers in the UK?", engine: "ChatGPT", named: "Not checked", others: "", checked: today() },
-        { _ex: true, q: "Hosted phone system for a police control room", engine: "Google AI Overview", named: "Not checked", others: "", checked: today() }
-      ]
-    }).node);
+      seed: []
+    });
+    ai.appendChild(aiResults.node);
+
+    syncAiPrompts();
+    var wk = aiWeekPrompts(getRows("ai-prompts"), new Date());
+    var weekP = panel("AI visibility: this week's prompts", "Week " + wk.week + ". Ask each one in ChatGPT (use a temporary chat), Google, Copilot and Perplexity. All " + wk.total + " prompts get covered every three weeks.");
+    var wl = el('<div class="panel-body"></div>');
+    wl.innerHTML = wk.list.length ? '<div class="table-wrap"><table><thead><tr><th class="num">#</th><th>Prompt</th><th>Group</th><th>WPT page that should answer</th><th></th></tr></thead><tbody>' + wk.list.map(function (r) {
+      return '<tr data-id="' + esc(r._id) + '"><td class="num">' + esc(r.n) + "</td><td>" + esc(r.q) + "</td><td>" + esc(r.group) + "</td><td>" + esc(r.page) + '</td><td class="row-actions"><button type="button" class="btn small" data-aicopy="1">Copy</button> <button type="button" class="btn small" data-ailog="1">Log a result</button></td></tr>';
+    }).join("") + "</tbody></table></div>" : '<div class="empty">No active prompts. Add some in the prompt list.</div>';
+    wl.addEventListener("click", function (e) {
+      var tr = e.target.closest("tr"); if (!tr) return;
+      var r = getRows("ai-prompts").find(function (x) { return x._id === tr.getAttribute("data-id"); }); if (!r) return;
+      if (e.target.hasAttribute("data-aicopy")) copyText(r.q, "Prompt copied");
+      if (e.target.hasAttribute("data-ailog")) { aiResults.add({ q: r.q, engine: "ChatGPT", named: "Not checked", pos: "", cited: "", others: "", citedOthers: "", checked: today() }); toast("Added to results. Fill in what the answer said."); }
+    });
+    weekP.appendChild(wl);
+    main.appendChild(weekP);
     grid.appendChild(rank); grid.appendChild(ai); main.appendChild(grid);
+
+    var plist = panel("AI visibility: prompt list", "Every buyer question we track, and the page that should win it. Set Active to No to stop asking one.");
+    plist.appendChild(editableTable({
+      key: "ai-prompts", csvName: "ai-prompts", addLabel: "Add prompt", compact: true,
+      columns: [
+        { k: "n", label: "#", type: "number", num: true },
+        { k: "q", label: "Prompt" },
+        { k: "group", label: "Group", type: "select", options: AI_GROUPS },
+        { k: "page", label: "WPT page that should answer" },
+        { k: "active", label: "Active", type: "select", options: ["Yes", "No"] }
+      ],
+      newRow: function (r) { r.n = getRows("ai-prompts").reduce(function (m, x) { return Math.max(m, Number(x.n) || 0); }, 0) + 1; r.group = "Local"; r.active = "Yes"; }
+    }).node);
+    main.appendChild(plist);
 
     var plan = panel("Content plan", "New pages, rewrites and blog posts. Blog ideas from the weekly brief land here once approved.");
     plan.appendChild(editableTable({
@@ -3474,6 +3506,34 @@
       applied[j.id] = j.update;
     });
     save("jobs", rows); save("jobs-imported", seen); save("jobs-updates-applied", applied);
+  }
+  /* ---------- AI visibility prompts ----------
+     The prompt list comes from data/proposals.js (WPT_AI_PROMPTS) and is copied in once per prompt,
+     so your edits stay. Ten a week by rotation: prompt n is asked when (n - 1) % 3 matches the week. */
+  var AI_GROUPS = ["Local", "Vendor", "Compare", "Problem", "Sector", "Public sector", "Bundle", "Brand"];
+  function syncAiPrompts() {
+    var rows = load("ai-prompts", null) || [];
+    var seen = load("ai-prompts-imported", []);
+    (window.WPT_AI_PROMPTS || []).forEach(function (p) {
+      if (seen.indexOf(p.id) > -1) return;
+      rows.push({ _id: uid(), _src: p.id, n: p.n, q: p.q, group: p.group, page: p.page, active: "Yes" });
+      seen.push(p.id);
+    });
+    rows.sort(function (a, b) { return (Number(a.n) || 999) - (Number(b.n) || 999); });
+    save("ai-prompts", rows); save("ai-prompts-imported", seen);
+    return rows;
+  }
+  function isoWeek(d) {
+    var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+    var y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y) / 86400000 + 1) / 7);
+  }
+  function aiWeekPrompts(rows, d) {
+    var week = isoWeek(d);
+    var active = (rows || []).filter(function (r) { return r.active !== "No" && r.q; });
+    var list = active.filter(function (r, i) { var n = Number(r.n) || (i + 1); return (n - 1) % 3 === week % 3; });
+    return { week: week, total: active.length, list: list };
   }
   function jobsToDo() { syncJobs(); return getRows("jobs").filter(function (j) { return j.status !== "Done" && !j._ex; }).length; }
   function renderJobs(main) {

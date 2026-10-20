@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.24.0 · 2026-10-20 12:15 BST
+
+AI visibility, step 1 of the spec: the prompt list is in the hub.
+
+- **This week's prompts.** Ten buyer questions a week on Website & SEO, each with Copy and Log a result. All 30 get asked every three weeks.
+- **Prompt list.** All 30 prompts with their group and the WPT page that should answer them. Edit, add or switch one off with Active. Your edits stay put.
+- **Results table** has new columns: position in the answer, WPT page cited, and the pages cited instead.
+- Pinned competitors shown on the results panel: Focus Group, Opus, Yo Telecom, Wavenet, Techvu.
+- New job in **Your jobs**: cost up an automated weekly AI visibility run.
+- User guide updated.
+- 356 tests, all passing.
+
 ## v0.23.0 · 2026-10-20 10:52 BST
 
 More audit fixes now push from the Fix queue instead of being steps.
