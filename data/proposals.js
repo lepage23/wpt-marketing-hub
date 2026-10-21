@@ -1671,6 +1671,22 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "idea-bid-engine-1",
+  "job": "Idea: build a bid engine for tenders and PQQs",
+  "page": "Side project (start with WPT)",
+  "details": "Small resellers like WPT have no bid team, and public sector buyers ask the same questions every time: ISO 27001, Cyber Essentials, NPPV3, social value, case studies. We rewrite the answers from scratch under deadline (Taff, Linney, NS4, the police bids).\n\nThe idea\nA library of approved answers, each with its evidence attached and an expiry date, plus a tracker for frameworks and tenders. AI drafts a response from the library, so a PQQ takes a day, not a week. The valuable part is the checked evidence and knowing what evaluators mark down, not the drafting.\n\nFirst steps\n1. Pull every answer we've already written for Taff, Linney, NS4, GMP and NYP into one place.\n2. Tag each by question type and note the evidence behind it (certificate, policy, case study) and when it runs out.\n3. Build it for WPT first. If it works, see whether other 8x8 or Gamma partners would pay for it.\n\nDecide whether this is a WPT tool or something you own yourself before building past step 3.",
+  "size": "",
+  "alt": ""
+ },
+ {
+  "id": "idea-geo-checker-1",
+  "job": "Idea: AI visibility checker for UCaaS resellers",
+  "page": "Side project, Website & SEO",
+  "details": "Buyers are starting to ask ChatGPT and Claude things like \"who's a good 8x8 partner in Sussex\" instead of Googling. Most resellers run near-identical vendor copy, so AI tools don't name them.\n\nThe idea\nA tool that checks how a reseller shows up in AI answers across their vendors and locations, then tells them what to fix. The hub's AI visibility tab already does this for WPT, so that's the prototype.\n\nFirst steps\n1. Get a few weeks of WPT results from the AI visibility tab and see what actually moves the scores.\n2. Run the same prompts for two or three rivals to see if the gaps are obvious enough to sell.\n3. Cost it against the automated run job (API fees are the main cost).\n\nParked behind the bid engine for now.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "bing-job-1",
   "job": "Check Bing Webmaster Tools is set up, and export the AI Performance report",
   "page": "bing.com/webmasters",

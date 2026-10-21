@@ -6,6 +6,13 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.27.1 · 2026-10-21 11:00 BST
+
+Two new ideas in **Your jobs**.
+
+- **Bid engine:** a library of approved tender answers with their evidence, plus a tender tracker. Built for WPT first, with first steps.
+- **AI visibility checker for resellers:** the hub's AI visibility tab turned into something other UCaaS resellers could use. Parked behind the bid engine.
+
 ## v0.27.0 · 2026-10-20 16:37 BST
 
 Keeping up with search changes, from inside the hub.
