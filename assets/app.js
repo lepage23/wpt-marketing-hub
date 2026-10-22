@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.28.3";
-  var BUILT = "2026-10-22 16:24 BST";
+  var VERSION = "0.28.4";
+  var BUILT = "2026-10-22 16:33 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3303,6 +3303,14 @@
       '<div class="fix-actions row"><button type="button" class="btn primary recheck">Check the site again now</button><button type="button" class="btn rej">Not doing this</button>' +
       '<span class="muted" style="font-size:.86rem">Pages that are now clean drop off. The card goes when none are left.</span></div><div class="fix-msg"></div>';
     var rowsBox = card.querySelector(".claim-rows"), msg = card.querySelector(".fix-msg");
+    /* After a push the site is checked again straight away. Clean pages drop off, and when none are left
+       the card goes and the pushed fixes sit in Done. */
+    function recheckAfterPush() {
+      runClaimsCheck().then(function (left) {
+        toast(left.length ? left.length + " page" + (left.length > 1 ? "s" : "") + " still to fix" : "All clear. Moved to Done.");
+        redraw(); updateNav();
+      }, function () {});
+    }
     pages.forEach(function (pg) {
       var fix = claimFixFor(pg, s);
       var row = el('<div class="claim-row"><div class="claim-what"><a href="' + esc(pg.link) + '" target="_blank" rel="noopener"><b>' + esc(pg.title) + '</b></a><div class="muted" style="font-size:.82rem">' + esc(pg.note) + "</div>" +
@@ -3327,7 +3335,7 @@
             var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
             setFix(o.fix.id, { status: "pushed", before: o.r.before, after: o.r.after, pushedAt: when, pageId: o.r.pageId || o.fix.pageId, backup: o.r.backup || "" });
             logChange({ id: o.fix.id, when: when, page: o.fix.pageTitle, link: o.fix.link, type: TYPE_LABEL[o.fix.type], action: "Pushed live" });
-            act.innerHTML = '<span class="chip good">Done</span>'; toast("Live on the site. Undo is in Done."); updateNav();
+            act.innerHTML = '<span class="chip good">Done</span>'; toast("Live on the site. Checking the page again\u2026"); updateNav(); recheckAfterPush();
           }).catch(function (err) {
             rb.disabled = false; delete rb.dataset.sure; rb.textContent = "Approve and push";
             msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
@@ -3348,7 +3356,7 @@
             setFix(fix.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || fix.pageId, backup: r.backup || "" });
             logChange({ id: fix.id, when: when, page: fix.pageTitle, link: fix.link, type: TYPE_LABEL[fix.type], action: fix.type === "set_status" ? "Unpublished" : "Pushed live" });
             act.innerHTML = '<span class="chip good">Done</span>';
-            toast(fix.type === "set_status" ? "Page unpublished. Undo is in Done." : "Live on the site");
+            toast(fix.type === "set_status" ? "Page unpublished. Undo is in Done." : "Live on the site. Checking the page again\u2026"); recheckAfterPush();
             updateNav();
           }).catch(function (err) {
             b.disabled = false; delete b.dataset.sure; b.textContent = label;
@@ -3389,9 +3397,22 @@
     return out.slice(0, 6);
   }
   /* The phrase exactly as written in the snippet, so the swap matches the page's own capitals. */
+  /* Whole words only, so "Feature" never matches inside "features". */
   function phraseIn(snippet, ph) {
-    var at = String(snippet || "").toLowerCase().indexOf(ph.toLowerCase());
-    return at < 0 ? "" : String(snippet).slice(at, at + ph.length);
+    var sn = String(snippet || ""), low = sn.toLowerCase(), q = String(ph || "").toLowerCase(), at = low.indexOf(q);
+    while (at > -1) {
+      /* Text from blocks is joined with no space ("Contact UsWest Pier"), so a lower-to-capital change counts as a word break too. */
+      var bef = sn.charAt(at - 1) || " ", aft = sn.charAt(at + q.length) || " ", first = sn.charAt(at), last = sn.charAt(at + q.length - 1);
+      var okB = !/[a-z0-9]/i.test(bef) || (/[a-z]/.test(bef) && /[A-Z]/.test(first));
+      var okA = !/[a-z0-9]/i.test(aft) || (/[a-z]/.test(last) && /[A-Z]/.test(aft));
+      if (okB && okA) return sn.slice(at, at + q.length);
+      at = low.indexOf(q, at + 1);
+    }
+    return "";
+  }
+  /* Map widgets look places up by name. The hub doesn't change them, so they don't count as the page saying it. */
+  function textHits(rows) {
+    return (rows || []).map(function (r) { return Object.assign({}, r, { hits: (r.hits || []).filter(function (h) { return h.widget !== "google_maps"; }) }); }).filter(function (r) { return r.hits.length; });
   }
   function linkFix(orphan, row, hit, ph) {
     var exact = phraseIn(hit.snippet, ph), id = "link-" + autoKey(orphan.link) + "-" + autoKey(row.link);
@@ -3438,7 +3459,7 @@
       '<div class="fix-actions row"><button type="button" class="btn primary all">Approve and push all</button><button type="button" class="btn rej">Not doing this</button>' +
       '<span class="muted" style="font-size:.86rem">The next audit clears pages that now have a link.</span></div><div class="fix-msg"></div>';
     var rowsBox = card.querySelector(".claim-rows"), msg = card.querySelector(".fix-msg");
-    var sugs = load("auto-fixes-links", []), queue = [];
+    var sugs = load("auto-fixes-links", []), queue = [], rowShows = [];
     function pushOne(fix, act) {
       var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
       return pushFix(fix, fix.proposed).then(function (r) {
@@ -3454,7 +3475,10 @@
         var s = fixState(), mine = linksFor(pg);
         var live = mine.filter(function (x) { return s[x.id] && s[x.id].status === "pushed"; });
         var open = mine.filter(function (x) { return !(s[x.id] && s[x.id].status); });
-        box.innerHTML = ""; rowAct.innerHTML = live.length ? '<span class="chip good">' + live.length + " link" + (live.length > 1 ? "s" : "") + " live</span>" : "";
+        box.innerHTML = ""; rowAct.innerHTML = live.length ? '<span class="chip good">Fixed: ' + live.length + " link" + (live.length > 1 ? "s" : "") + " live</span>" : "";
+        /* One link from a live page is enough to stop it being hidden, so a fixed page folds away. */
+        row.classList.toggle("is-fixed", live.length > 0);
+        if (live.length) { box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">Linked from ' + live.map(function (x) { return esc(x.pageTitle); }).join(", ") + ".</div>"; return live.length; }
         open.forEach(function (fix) {
           var f = el('<div class="row" style="justify-content:space-between;gap:8px;margin-top:6px;font-size:.84rem"><div><b>From</b> <a href="' + esc(fix.link) + '" target="_blank" rel="noopener">' + esc(fix.pageTitle) + "</a>: " +
             (fix.snippet ? "…" + esc(fix.snippet).replace(esc(fix.find), "<u>" + esc(fix.find) + "</u>") + "…" : esc(fix.issue)) + '</div><div class="row" style="gap:6px"><button type="button" class="btn small primary">Approve and push</button><button type="button" class="btn small skip">Skip</button></div></div>');
@@ -3462,7 +3486,7 @@
           queue.push({ fix: fix, act: act });
           b.addEventListener("click", function () {
             b.disabled = true; b.textContent = "Pushing…";
-            pushOne(fix, act).then(function () { toast("Link live"); updateNav(); }, function (err) {
+            pushOne(fix, act).then(function () { toast("Link live"); show(); allDone(); updateNav(); }, function (err) {
               b.disabled = false; b.textContent = "Approve and push";
               msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + (fix.auto ? " Click Skip and the hub will look for another spot." : "") + "</div>";
             });
@@ -3486,8 +3510,20 @@
         }, function (err) { box.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
       }
       rowsBox.appendChild(row);
+      rowShows.push(show);
       find(false);
     });
+    /* When every page has a live link the card moves to Done by itself. The next audit reopens it if
+       Google's view of the site disagrees. */
+    function allDone() {
+      var s = fixState(), left = pages.filter(function (pg) { return !linksFor(pg).some(function (x) { return s[x.id] && s[x.id].status === "pushed"; }); });
+      if (left.length) return false;
+      var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now(), reopened: false });
+      logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Add a link", action: "Every hidden page now has a link" });
+      toast("Every page now has a link. Moved to Done."); redraw(); updateNav();
+      return true;
+    }
     var allBtn = card.querySelector(".all");
     allBtn.addEventListener("click", function () {
       var s = fixState(), todo = queue.filter(function (q) { return !(s[q.fix.id] && s[q.fix.id].status) && q.act.isConnected; });
@@ -3498,10 +3534,12 @@
         return pr.then(function () { allBtn.textContent = "Pushing " + (okN + bad.length + 1) + " of " + todo.length + "…"; return pushOne(q.fix, q.act).then(function () { okN++; }, function (e) { bad.push(q.fix.pageTitle + ": " + e.message); }); });
       }, Promise.resolve()).then(function () {
         allBtn.disabled = false; delete allBtn.dataset.sure; allBtn.textContent = "Approve and push all";
-        toast(okN + " link" + (okN === 1 ? "" : "s") + " live"); updateNav();
+        toast(okN + " link" + (okN === 1 ? "" : "s") + " live"); rowShows.forEach(function (f) { f(); }); updateNav();
+        if (allDone()) return;
         if (bad.length) msg.innerHTML = '<div class="notice"><b>' + bad.length + " not pushed.</b> " + bad.map(esc).join("<br>") + " Click Skip on those and the hub will find another spot.</div>";
       });
     });
+    Array.prototype.slice.call(rowsBox.querySelectorAll(".is-fixed")).forEach(function (r) { rowsBox.appendChild(r); });
     var copy = el('<button type="button" class="btn small">Copy list for Claude</button>');
     card.querySelector(".fix-actions").insertBefore(copy, card.querySelector(".fix-actions span"));
     copy.addEventListener("click", function () {
@@ -3653,7 +3691,7 @@
     return rules.reduce(function (pr, rule) {
       return pr.then(function () {
         return findText(rule.find).then(function (rows) {
-          rows.forEach(function (r) {
+          textHits(rows).forEach(function (r) {
             if (claude[norm(r.link) + "|" + rule.find.toLowerCase()]) return;
             var hit = r.hits[0] || {};
             /* Use the phrase exactly as the page writes it, and match its capitals in the new wording. */
@@ -3678,7 +3716,7 @@
   function runClaimsCheck() {
     var terms = claimTerms(), found = {};
     return terms.reduce(function (pr, t) {
-      return pr.then(function () { return findText(t).then(function (rows) { rows.forEach(function (r) { (found[r.link] = found[r.link] || { r: r, terms: [] }).terms.push(t); }); }); });
+      return pr.then(function () { return findText(t).then(function (rows) { textHits(rows).forEach(function (r) { (found[r.link] = found[r.link] || { r: r, terms: [] }).terms.push(t); }); }); });
     }, Promise.resolve()).then(function () {
       var today = new Date().toISOString().slice(0, 10), fixes = [];
       var pages = Object.keys(found).map(function (k) { var x = found[k]; return { title: x.r.title, link: x.r.link, terms: x.terms, note: "says: " + x.terms.join(", ") + " · " + x.r.hits.map(function (h) { return "\u201c" + h.snippet.slice(0, 120) + "\u201d"; }).join(" ") }; });

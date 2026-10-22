@@ -6,6 +6,14 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.28.4 · 2026-10-22 16:45 BST
+
+Cards now finish themselves instead of waiting for a recheck.
+
+- **Claims check.** After a push the site is checked again straight away. Clean pages drop off and the card goes when none are left, with the pushed fix in Done. The Google Map on Contact still looks the business up as "West Pier Telecom". The hub doesn't change maps, so that no longer counts as the page making the claim.
+- **Pages with no links.** A page with a live link folds away as Fixed. When every page has one, the card moves to Done by itself.
+- **Better link spots.** Topic words only match whole words, so "Feature" no longer matches inside "features".
+
 ## v0.28.3 · 2026-10-22 16:28 BST
 
 - **Replacement fixes rebuild before they push.** The Contact fix was saved by the older version, still in lower case, so v0.28.2 couldn't reach it. Any fix from a replacement rule is now rebuilt from the live page at the moment you click push.

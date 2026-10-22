@@ -5,7 +5,7 @@ const i0=src.indexOf('var LINK_STOP');const LS=src.slice(i0,src.indexOf(';\n',i0
 let STORE={};function load(k,f){return k in STORE?JSON.parse(JSON.stringify(STORE[k])):f;}function save(k,v){STORE[k]=v;}
 function today(){return '2026-10-22';}function shortPath(u){return u.replace(/^https?:\/\/[^\/]+/,'');}
 let PROPS=[];function proposals(){return PROPS.concat(load('auto-fixes-rules',[]));}
-eval(LS+['norm','autoKey','linkPhrases','phraseIn','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
+eval(LS+['norm','autoKey','linkPhrases','phraseIn','textHits','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
 function updateNav(){}global.window={};
 const H='https://westpiertech.com';
 /* Topic phrases from a title */
@@ -60,4 +60,9 @@ const orphan={title:'Top 10 UCaaS Providers for 2026',link:H+'/top-10-ucaas/'};
  const ids=(await ruleFixes()).map(f=>f.id);stale.id=ids[0];
  await pushFix2(stale,stale.proposed);
  ok(sent&&sent.find==='West Pier Telecom'&&sent.replace==='West Pier Technologies'&&sent.every===1,'a fix saved before the update is rebuilt before pushing');
+})();
+(async()=>{await new Promise(r=>setTimeout(r,150));
+ ok(phraseIn('some features sit in tiers','Feature')==='','no match inside a longer word');
+ ok(phraseIn('Contact UsWest Pier Telecom LtdMocatta','west pier telecom')==='West Pier Telecom','joined-up block text still matches');
+ ok(textHits([{hits:[{widget:'google_maps',snippet:'West Pier Telecom'}]}]).length===0,'map widgets do not count as the page saying it');
 })();

@@ -3,7 +3,7 @@ function grab(n){const i=src.indexOf('function '+n+'(');let d=0,j=src.indexOf('{
 const store={};const load=(k,f)=>k in store?JSON.parse(store[k]):f;const save=(k,v)=>store[k]=JSON.stringify(v);const updateNav=()=>{};
 global.window={WPT_PROPOSALS:[{link:'https://westpiertech.com/',find:'an assured BPF supplier to the NHS'}]};
 const findText=async(q)=>[{post_id:7,title:'Home',link:'https://westpiertech.com/',type:'page',elementor:true,hits:[{snippet:'West Pier is an assured BPF supplier to the NHS and'}]},{post_id:9,title:'A post',link:'https://westpiertech.com/blog/x/',type:'post',elementor:false,hits:[{snippet:'an assured BPF supplier'}]}];
-eval(grab('norm')+grab('claimRules')+grab('parseRules')+grab('phraseIn')+grab('matchCase')+grab('ruleFixes'));
+eval(grab('norm')+grab('claimRules')+grab('parseRules')+grab('phraseIn')+grab('textHits')+grab('matchCase')+grab('ruleFixes'));
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const r=parseRules("an assured BPF supplier => a long-standing supplier\nnot a rule\nab => x");
 ok(r.length===1&&r[0].replace==='a long-standing supplier','rules parsed, junk lines ignored');
