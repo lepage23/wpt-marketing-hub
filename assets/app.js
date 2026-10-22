@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.30.0";
-  var BUILT = "2026-10-22 17:48 BST";
+  var VERSION = "0.30.1";
+  var BUILT = "2026-10-22 17:59 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3224,11 +3224,11 @@
     go.then(function (id) {
       return wpFetch("/wpt-hub/v1/elementor-revisions?post_id=" + id).then(function (d) {
         if (!d.revisions || !d.revisions.length) { wrap.innerHTML = "WordPress has no earlier versions of this page with an Elementor layout. Ask Matt whether SiteGround has a backup from before " + esc(new Date().toLocaleDateString("en-GB")) + "."; return; }
-        wrap.innerHTML = "<b>Saved versions of this page</b>, newest first. The page has " + d.current.embeds + " embedded item" + (d.current.embeds === 1 ? "" : "s") + " now (PDF viewers, videos, forms). Pick the newest one from before the change went wrong. The version on the page now is kept, so this can be undone too." +
+        wrap.innerHTML = "<b>Saved versions of this page</b>, newest first. Versions marked <b>has what's missing</b> have embedded content or page code the page has lost. Pick the newest one from before the change went wrong. The version on the page now is kept, so this can be undone too." +
           '<div class="rev-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>';
         var list = wrap.querySelector(".rev-list");
         d.revisions.forEach(function (r) {
-          var more = r.embeds > d.current.embeds;
+          var more = r.embeds > d.current.embeds || (r.slashes || 0) > (d.current.slashes || 0);
           var row = el('<div class="row" style="justify-content:space-between;gap:8px"><span>' + esc(new Date(r.date.replace(" ", "T")).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (r.author ? " \u00b7 " + esc(r.author) : "") +
             " \u00b7 " + r.embeds + " embedded" + (more ? ' <span class="chip good">has what\'s missing</span>' : "") + '</span><button type="button" class="btn small">Restore this version</button></div>');
           var b = row.querySelector("button");
@@ -3243,12 +3243,12 @@
                 wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: id, backup: res.backup, force: 1 } }).then(function () { wrap.innerHTML = "Restore undone."; }, function (e) { wrap.innerHTML = '<span class="notice">' + esc(e.message) + "</span>"; });
               });
               toast("Earlier version restored");
-            }, function (e) { b.disabled = false; delete b.dataset.sure; b.textContent = "Restore this version"; wrap.appendChild(el('<div class="notice">' + esc(/no route/i.test(e.message) ? "Restoring needs version 14 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message) + "</div>")); });
+            }, function (e) { b.disabled = false; delete b.dataset.sure; b.textContent = "Restore this version"; wrap.appendChild(el('<div class="notice">' + esc(/no route/i.test(e.message) ? "Restoring needs version 15 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message) + "</div>")); });
           });
           list.appendChild(row);
         });
       });
-    }).catch(function (e) { wrap.className = "notice"; wrap.innerHTML = esc(/no route/i.test(e.message) ? "Restoring needs version 14 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message); });
+    }).catch(function (e) { wrap.className = "notice"; wrap.innerHTML = esc(/no route/i.test(e.message) ? "Restoring needs version 15 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message); });
   }
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
@@ -3291,6 +3291,16 @@
     filt.querySelector("select").addEventListener("change", function (e) { area = e.target.value; save("fix-area", area); draw(); });
     var a = wpAuth();
     if (!a || !a.pass || !a.ok) main.appendChild(el('<div class="notice"><b>WordPress isn\'t connected yet.</b> You can read and edit fixes, but pushing needs the connection set up on the <a href="#seo" data-seotab="wp">Website & SEO</a> page.</div>'));
+    /* Something broken on a page? Put back an earlier saved version, from right here. */
+    var rt = el('<details class="panel" style="padding:10px 14px"><summary style="cursor:pointer;font-size:.9rem"><b>Something broken on a page?</b> Restore an earlier version</summary>' +
+      '<div class="row" style="margin-top:8px"><label class="field" style="flex:1;min-width:220px">Page address<input class="rt-url" placeholder="https://westpiertech.com/feature-comparison/"></label><button type="button" class="btn primary rt-go" style="align-self:flex-end">Show saved versions</button></div><div class="rt-out"></div></details>');
+    main.appendChild(rt);
+    rt.querySelector(".rt-go").addEventListener("click", function () {
+      var u = rt.querySelector(".rt-url").value.trim(), out = rt.querySelector(".rt-out");
+      if (!/^https?:\/\//.test(u)) { out.innerHTML = '<div class="notice">Paste the full page address, starting https://</div>'; return; }
+      out.innerHTML = "";
+      revisionTool({ id: "restore-" + autoKey(u), link: u, postType: "pages", pageId: 0, pageTitle: shortPath(u) }, out);
+    });
     var tabs = el('<div class="row" role="tablist"></div>'); main.appendChild(tabs);
     var list = el('<div style="display:flex;flex-direction:column;gap:14px"></div>'); main.appendChild(list);
 
@@ -4166,7 +4176,7 @@
       actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "undone" ? "Undone " + esc(st.undoneAt || "") : "Pushed " + esc(st.pushedAt || "")) + "</span>" +
         (st.editLink ? '<a class="btn small" href="' + esc(st.editLink) + '" target="_blank" rel="noopener">Open draft in WordPress</a>' : "") +
         (st.status === "pushed" && p.type !== "new_draft" ? '<button type="button" class="btn small danger undo">Undo</button>' : "") +
-        (/^elementor_|^text_swap$/.test(p.type) || (st.backup && /^b\d/.test(st.backup)) ? '<button type="button" class="btn small revs">Page not right? Restore an earlier version</button>' : "");
+        (!p.siteWide && !/^(meta_title|meta_description|set_status|new_draft)$/.test(p.type) ? '<button type="button" class="btn small revs">Page not right? Restore an earlier version</button>' : "");
       var rv = actions.querySelector(".revs");
       if (rv) rv.addEventListener("click", function () { rv.remove(); revisionTool(Object.assign({}, p, { pageId: p.pageId || st.pageId }), msg); });
       var u = actions.querySelector(".undo");

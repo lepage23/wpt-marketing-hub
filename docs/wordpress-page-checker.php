@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 14: Elementor changes are written exactly, without re-saving the whole page, and a page can be restored from its Elementor revisions).
+ * WPT Marketing Hub: page checker (version 15: every change is written exactly, and any page can be restored from its saved revisions).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -20,6 +20,25 @@
  * Replace everything in the code box with everything below this comment block,
  * then Save Changes. (New install: Snippets > Add New, type PHP, Run everywhere.)
  */
+
+/* Write a page's text exactly as given (version 15). Saving through wp_update_post strips backslashes
+ * (and, for some accounts, scripts), which broke the Feature Comparison tool's code. A revision of the
+ * text as it was is saved first, so WordPress's own Revisions screen can always put it back. */
+if ( ! function_exists( 'wpt_hub_write_content' ) ) {
+	function wpt_hub_write_content( $id, $content ) {
+		global $wpdb;
+		if ( function_exists( 'wp_save_post_revision' ) ) {
+			wp_save_post_revision( $id );
+		}
+		$wpdb->update( $wpdb->posts, array( 'post_content' => (string) $content, 'post_modified' => current_time( 'mysql' ), 'post_modified_gmt' => current_time( 'mysql', 1 ) ), array( 'ID' => (int) $id ) );
+		if ( function_exists( 'clean_post_cache' ) ) {
+			clean_post_cache( $id );
+		}
+		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+			sg_cachepress_purge_cache( get_permalink( $id ) );
+		}
+	}
+}
 
 /* Write a page's Elementor data exactly as given (version 14), then make Elementor rebuild that page's
  * styles and clear the page from SiteGround's cache. Nothing else on the page is touched. */
@@ -305,7 +324,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 14, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 15, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -1085,18 +1104,20 @@ add_action( 'rest_api_init', function () {
 			'permission_callback' => $can_post,
 			'callback'            => function ( WP_REST_Request $r ) {
 				$id   = (int) $r->get_param( 'post_id' );
-				$now  = (string) get_post_meta( $id, '_elementor_data', true );
+				$el   = '' !== (string) get_post_meta( $id, '_elementor_data', true );
+				$now  = $el ? (string) get_post_meta( $id, '_elementor_data', true ) : (string) get_post_field( 'post_content', $id );
 				$count = function ( $raw ) {
 					return preg_match_all( '#<(iframe|embed|object|script|video)\b|\[[a-z_-]+[\s\]]#i', (string) $raw );
 				};
-				$out  = array( 'current' => array( 'embeds' => $count( $now ), 'size' => strlen( $now ) ), 'revisions' => array() );
+				/* Code on the page (like the Feature Comparison tool) relies on backslashes, so count those too. */
+				$out  = array( 'mode' => $el ? 'elementor' : 'content', 'current' => array( 'embeds' => $count( $now ), 'slashes' => substr_count( $now, '\\' ), 'size' => strlen( $now ) ), 'revisions' => array() );
 				foreach ( wp_get_post_revisions( $id, array( 'posts_per_page' => 30 ) ) as $rev ) {
-					$raw = (string) get_post_meta( $rev->ID, '_elementor_data', true );
+					$raw = $el ? (string) get_post_meta( $rev->ID, '_elementor_data', true ) : (string) $rev->post_content;
 					if ( '' === $raw ) {
 						continue;
 					}
 					$u = get_userdata( (int) $rev->post_author );
-					$out['revisions'][] = array( 'id' => (int) $rev->ID, 'date' => $rev->post_modified, 'author' => $u ? $u->display_name : '', 'embeds' => $count( $raw ), 'size' => strlen( $raw ) );
+					$out['revisions'][] = array( 'id' => (int) $rev->ID, 'date' => $rev->post_modified, 'author' => $u ? $u->display_name : '', 'embeds' => $count( $raw ), 'slashes' => substr_count( $raw, '\\' ), 'size' => strlen( $raw ) );
 				}
 				return $out;
 			},
@@ -1110,6 +1131,14 @@ add_action( 'rest_api_init', function () {
 				$rev = get_post( $rid );
 				if ( ! $rev || 'revision' !== $rev->post_type || (int) $rev->post_parent !== $id ) {
 					return new WP_Error( 'wpt_rev', 'That isn\'t a saved version of this page. Nothing was changed.', array( 'status' => 400 ) );
+				}
+				if ( '' === (string) get_post_meta( $id, '_elementor_data', true ) ) {
+					/* A page that isn't built with Elementor: put the revision's text back, exactly. */
+					$cur = (string) get_post_field( 'post_content', $id );
+					$bid = 'b' . time() . wp_rand( 100, 999 );
+					update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'content' => $cur, 'after' => md5( (string) $rev->post_content ), 'time' => time() ) );
+					wpt_hub_write_content( $id, (string) $rev->post_content );
+					return array( 'ok' => true, 'backup' => $bid, 'before' => 'Version before the restore', 'after' => 'Restored the version saved ' . $rev->post_modified );
 				}
 				$raw = (string) get_post_meta( $rid, '_elementor_data', true );
 				if ( '' === $raw || ! is_array( json_decode( $raw, true ) ) ) {
@@ -1131,6 +1160,14 @@ add_action( 'rest_api_init', function () {
 			$id  = (int) $r->get_param( 'post_id' );
 			$bid = preg_replace( '/[^a-z0-9]/i', '', (string) $r->get_param( 'backup' ) );
 			$bk  = get_post_meta( $id, '_wpt_hub_bk_' . $bid, true );
+			if ( $bk && isset( $bk['content'] ) ) {
+				if ( md5( (string) get_post_field( 'post_content', $id ) ) !== $bk['after'] && ! $r->get_param( 'force' ) ) {
+					return new WP_Error( 'wpt_undo_changed', 'The page has been edited since. Undoing would also wipe those later edits. Undo anyway from the hub, or use Revisions in WordPress.', array( 'status' => 409 ) );
+				}
+				wpt_hub_write_content( $id, $bk['content'] );
+				delete_post_meta( $id, '_wpt_hub_bk_' . $bid );
+				return array( 'ok' => true );
+			}
 			if ( ! $bk || empty( $bk['data'] ) ) {
 				return new WP_Error( 'wpt_undo', 'The saved copy of this page wasn\'t found. Use Revisions in Elementor to roll back.', array( 'status' => 404 ) );
 			}
@@ -1871,7 +1908,7 @@ add_action( 'rest_api_init', function () {
 					$after = 'New H1 at the top: ' . $title;
 				}
 				$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
-				wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+				wpt_hub_write_content( $id, $new );
 				$purge( $id );
 				return array( 'ok' => true, 'backup' => $bid, 'before' => $label, 'after' => $after );
 			}
@@ -1956,7 +1993,7 @@ add_action( 'rest_api_init', function () {
 					$demoted[] = trim( wp_strip_all_tags( $m[3][0] ) );
 				}
 				$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
-				wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+				wpt_hub_write_content( $id, $new );
 				$purge( $id );
 				return array( 'ok' => true, 'backup' => $bid, 'before' => count( $h1s ) . ' H1s', 'after' => 'One H1. Now H2: ' . implode( ' / ', array_reverse( $demoted ) ) );
 			}
@@ -2008,7 +2045,7 @@ add_action( 'rest_api_init', function () {
 				}
 				$bid = $keep( array( 'kind' => 'alt', 'post_id' => $id, 'alts' => $was, 'content' => $new !== $c ? $c : null, 'after' => md5( $new ) ) );
 				if ( $new !== $c ) {
-					wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+					wpt_hub_write_content( $id, $new );
 				}
 				$purge( $id );
 				return array( 'ok' => true, 'backup' => $bid, 'before' => count( $done ) . ' images with no alt text', 'after' => count( $done ) . ' images described', 'skipped' => $skip );
@@ -2055,7 +2092,7 @@ add_action( 'rest_api_init', function () {
 						return $err( 'That link isn\'t on the page any more. Nothing was changed.' );
 					}
 					$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
-					wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+					wpt_hub_write_content( $id, $new );
 				}
 				$purge( $id );
 				return array( 'ok' => true, 'backup' => $bid, 'before' => $from, 'after' => $to . ( $n > 1 ? ' (' . $n . ' links)' : '' ) );
@@ -2220,7 +2257,7 @@ add_action( 'rest_api_init', function () {
 				if ( md5( $now ) !== $b['after'] && ! $force ) {
 					return $err( 'The page has been edited since this fix went live. Undoing would also wipe those later edits. Use Revisions in WordPress instead, or undo anyway from the hub.' );
 				}
-				wp_update_post( array( 'ID' => $id, 'post_content' => $b['content'] ) );
+				wpt_hub_write_content( $id, $b['content'] );
 			}
 			if ( 'alt' === $b['kind'] ) {
 				foreach ( (array) $b['alts'] as $aid => $alt ) {

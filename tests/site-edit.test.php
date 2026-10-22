@@ -9,7 +9,7 @@ function sanitize_text_field($s){return trim($s);} function sanitize_textarea_fi
 function get_post_meta($id,$k,$single=true){global $META;return isset($META[$id][$k])?$META[$id][$k]:'';}
 function update_post_meta($id,$k,$v){global $META;$META[$id][$k]=$v;} function delete_post_meta($id,$k){global $META;unset($META[$id][$k]);}
 function get_option($k,$d=false){global $OPT;return array_key_exists($k,$OPT)?$OPT[$k]:$d;} function update_option($k,$v,$a=null){global $OPT;$OPT[$k]=$v;} function delete_option($k){global $OPT;unset($OPT[$k]);}
-function get_post_field($f,$id){global $POSTS;return isset($POSTS[$id])?$POSTS[$id]:'';} function wp_update_post($a){global $POSTS;if(isset($a['post_content']))$POSTS[$a['ID']]=$a['post_content'];return $a['ID'];}
+function get_post_field($f,$id){global $POSTS;return isset($POSTS[$id])?$POSTS[$id]:'';}
 function get_the_title($id){return $id==30?'News':'Page '.$id;} function get_permalink($id){return 'https://westpiertech.com/p'.$id.'/';}
 function attachment_url_to_postid($u){return strpos($u,'/uploads/team.jpg')!==false?501:(strpos($u,'/uploads/logo.png')!==false?502:0);}
 function is_wp_error($x){return $x instanceof WP_Error;} function wp_get_attachment_url($id){return $id==502?'https://westpiertech.com/uploads/logo.png':'';}
@@ -18,6 +18,10 @@ function wp_get_nav_menu_items($t){global $MENUS;return $MENUS;}
 function wp_update_nav_menu_item($m,$i,$a){global $MENUS;$o=(object)array('ID'=>900,'title'=>$a['menu-item-title'],'url'=>$a['menu-item-url'],'menu_order'=>$a['menu-item-position'],'menu_item_parent'=>$a['menu-item-parent-id']);$MENUS[]=$o;return 900;}
 function wp_delete_post($id,$f){global $MENUS;$MENUS=array_values(array_filter($MENUS,function($o)use($id){return $o->ID!=$id;}));}
 function get_post($id){global $MENUS;foreach($MENUS as $o)if($o->ID==$id)return $o;return null;}
+function current_time($t,$g=0){return '2026-10-22 18:00:00';}
+class FakeDb{public $posts='wp_posts';public $prefix='wp_';function update($tb,$d,$w){global $POSTS;if($tb==='wp_posts'&&isset($d['post_content']))$POSTS[$w['ID']]=$d['post_content'];}}
+$wpdb=new FakeDb();
+function wp_update_post($a){if(isset($a['post_content']))throw new Exception('wp_update_post must not be used for page text: it strips backslashes');return $a['ID'];}
 class WP_Error{public $m;function __construct($c,$m,$d=null){$this->m=$m;}}
 class WP_REST_Request{public $p;function __construct($p){$this->p=$p;}function get_param($k){return isset($this->p[$k])?$this->p[$k]:null;}}
 require $argv[1]; foreach($actions['rest_api_init'] as $f)$f();
@@ -103,3 +107,9 @@ $POSTS[50]='<p>a</p>'; $r=e(array('op'=>'h1','post_id'=>50)); $POSTS[50].='<p>la
 ok(is_wp_error(u($r['backup'])),'undo refuses if the page changed since'); ok(!is_wp_error(u($r['backup'],1)),'unless forced');
 $r=e(array('op'=>'option','key'=>'og_image','value'=>' https://westpiertech.com/uploads/logo.png'));
 ok(!is_wp_error($r)&&$OPT['rank-math-options-titles']['open_graph_image_id']===502,'option: social image can be given as its Media Library address');
+
+/* The Feature Comparison case: code with backslashes must come through untouched */
+$POSTS[60]=$o60="<h2>Feature Comparison</h2>\n<script>var re=/\\d+/; var s=\"a\\nb\"; document.querySelector('select');</script>";
+$r=e(array('op'=>'h1','post_id'=>60));
+ok(!is_wp_error($r)&&strpos($POSTS[60],'<h1>Feature Comparison</h1>')===0&&strpos($POSTS[60],'/\\d+/')!==false&&strpos($POSTS[60],'"a\\nb"')!==false,'h1: page code keeps every backslash');
+u($r['backup']); ok($POSTS[60]===$o60,'undo: page code back exactly');

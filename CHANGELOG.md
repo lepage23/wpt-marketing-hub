@@ -6,6 +6,20 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.30.1 · 2026-10-22 18:20 BST
+
+Fix for the Feature Comparison tool breaking.
+
+- **What went wrong.** Changes to pages not built with Elementor (like the H1 fix on Feature Comparison) were saved with WordPress's standard update. That strips every backslash from the page, and the comparison tool's code depends on them, so the dropdowns stopped filling. Undo saved the same way.
+- **Now the hub writes page text exactly**, byte for byte, and saves a WordPress revision of the page as it was first.
+- **Restore any page** from the top of the Fix queue: paste the page address under "Something broken on a page?". It lists saved versions and flags the ones with code or embedded content the page has lost. Restores can be undone.
+- **Needs page checker version 15.**
+- 497 tests, all passing, including code with backslashes surviving a push and an undo.
+
+## Backup · 2026-10-22 17:56 BST
+
+`backup/v0.30.0-2026-10-22-1756`, taken before v0.30.1.
+
 ## v0.30.0 · 2026-10-22 18:05 BST
 
 Fix for the 8x8 Feature Matrix page losing its PDF viewer.
