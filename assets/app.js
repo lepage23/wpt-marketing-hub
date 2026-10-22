@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.28.2";
-  var BUILT = "2026-10-22 16:21 BST";
+  var VERSION = "0.28.3";
+  var BUILT = "2026-10-22 16:24 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2916,6 +2916,15 @@
 
   function pushFix(p, text) {
     if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
+    /* Replacement-rule fixes are rebuilt from the live page just before pushing, so a fix saved by an
+       older version of the hub (or before the page changed) can't push stale wording. */
+    if (p.batch === "Automatic replacement" && !p._fresh) {
+      return ruleFixes().then(function (list) {
+        var f = list.filter(function (x) { return x.id === p.id; })[0];
+        if (!f) throw new Error("That phrase isn't on the page any more, so there's nothing to change. Click Check the site again now.");
+        return pushFix(Object.assign({}, f, { _fresh: true }), text == null || text === p.proposed ? f.proposed : text);
+      });
+    }
     if (p.type !== "new_draft" && !p.keepRedirect && p.link && !p._liveChecked && hasChecker()) {
       return checkUrls([p.link]).then(function (live) {
         var r = live[norm(p.link)];
