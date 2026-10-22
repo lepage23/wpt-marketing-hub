@@ -6,6 +6,10 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.28.1 · 2026-10-22 16:20 BST
+
+- **New job:** check out last30days, a free Claude skill that searches Reddit, X, YouTube and the web. Could feed the weekly brief and spot lead signals.
+
 ## v0.28.0 · 2026-10-22 16:30 BST
 
 Two fixes that should have been push-ready from the start.

@@ -1694,6 +1694,14 @@ window.WPT_JOBS = [
   "size": "",
   "alt": ""
  },
+{
+  "id": "last30days-1",
+  "job": "Check out last30days for the weekly brief and lead signals",
+  "page": "Weekly brief, Leads",
+  "details": "last30days is a free, open source Claude skill (github.com/mvanhorn/last30days-skill, MIT licence, about 64k stars). Give it a topic and it searches Reddit, X, YouTube, Hacker News, GitHub and the web, then ranks what it finds by real engagement (upvotes, likes, views) rather than search position. It writes a short cited brief. Reddit, Hacker News and GitHub work with no API keys. X, YouTube and the others need your own keys.\n\nWhy it could help\n- Weekly brief: a \"What people are saying\" section on what buyers actually complain about (Teams Phone, 8x8, the analogue switch-off).\n- Lead signals: UK businesses on Reddit asking for phone system or contact centre recommendations.\n- Competitors: what people say about Wavenet, Focus Group, Opus, Yo Telecom and Techvu.\n\nTo check\n1. Read the README on GitHub. Note which sources need keys and whether any of them cost money.\n2. Try it once in Claude on a WPT topic, for example \"business phone system UK\" or \"8x8 vs Teams Phone\".\n3. Decide if the results are useful enough to add to the weekly brief. If yes, tell Claude and it will build it in.\n\nCheck it only reads public posts and doesn't store names of the people posting. If we ever act on a Reddit post, reply in public as WPT, never scrape the person's details.",
+  "size": "",
+  "alt": ""
+ },
  {
   "id": "bing-job-1",
   "job": "Check Bing Webmaster Tools is set up, and export the AI Performance report",

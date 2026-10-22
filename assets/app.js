@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.28.0";
-  var BUILT = "2026-10-22 16:06 BST";
+  var VERSION = "0.28.1";
+  var BUILT = "2026-10-22 16:18 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
