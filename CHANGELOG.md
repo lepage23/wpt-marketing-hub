@@ -6,6 +6,14 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.29.1 · 2026-10-22 17:50 BST
+
+Link suggestions fixed after the 8x8 Feature Matrix card.
+
+- **No more single plain words as link text.** The hub had offered "feature" as the link to 8x8 Feature Matrix. One word is now only used when it's a product name (3CX, UCaaS, VoIP), and pairs like "Phone Systems" that don't say which page they lead to are skipped.
+- **Phrases used more than once on a page.** The link now includes a few words either side, so the hub changes that exact spot. Before, it refused when the phrase appeared anywhere else on the page.
+- Suggestions made by the older version are dropped and searched again. Links already live are kept.
+
 ## v0.29.0 · 2026-10-22 18:15 BST
 
 No more Mark as done in the Fix queue. Every card is now one of four kinds, and none of them is a tick box.

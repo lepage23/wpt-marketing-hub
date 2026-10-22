@@ -2,10 +2,10 @@ const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(n){const i=src.indexOf('function '+n+'(');if(i<0)throw n;let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const i0=src.indexOf('var LINK_STOP');const LS=src.slice(i0,src.indexOf(';\n',i0)+1);
-let STORE={};function load(k,f){return k in STORE?JSON.parse(JSON.stringify(STORE[k])):f;}function save(k,v){STORE[k]=v;}
+const LINK_V=2;let STORE={};function load(k,f){return k in STORE?JSON.parse(JSON.stringify(STORE[k])):f;}function save(k,v){STORE[k]=v;}
 function today(){return '2026-10-22';}function shortPath(u){return u.replace(/^https?:\/\/[^\/]+/,'');}
 let PROPS=[];function proposals(){return PROPS.concat(load('auto-fixes-rules',[]));}
-eval(LS+['norm','autoKey','linkPhrases','phraseIn','textHits','linkHit','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
+eval(LS+['norm','autoKey','linkPhrases','phraseAt','linkContext','phraseIn','textHits','linkHit','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
 function updateNav(){}global.window={};
 const H='https://westpiertech.com';
 /* Topic phrases from a title */
@@ -23,7 +23,7 @@ const orphan={title:'Top 10 UCaaS Providers for 2026',link:H+'/top-10-ucaas/'};
 (async()=>{
  const f=await suggestLinks(orphan,{[norm(H+'/hidden/')]:1},[]);
  ok(f.length===1&&f[0].pageId===7,'spot found on another page, not the page itself or another hidden page');
- ok(f[0].type==='elementor_swap'&&f[0].find==='UCaaS providers'&&f[0].proposed==='<a href="'+H+'/top-10-ucaas/">UCaaS providers</a>','fix links the words exactly as written on the page');
+ ok(f[0].type==='elementor_swap'&&f[0].anchor==='UCaaS providers'&&f[0].proposed.indexOf('<a href="'+H+'/top-10-ucaas/">UCaaS providers</a>')>-1&&f[0].find.indexOf('UCaaS providers')>-1,'fix links the words exactly as written on the page');
  ok(f[0].parent==='auto-orphans','link fixes live inside the hidden pages card');
  const f2=await suggestLinks(orphan,{},[norm(H+'/unified-communications/')]);
  ok(f2.every(x=>x.pageId!==7),'a skipped spot is not offered again');
@@ -65,4 +65,20 @@ const orphan={title:'Top 10 UCaaS Providers for 2026',link:H+'/top-10-ucaas/'};
  ok(phraseIn('some features sit in tiers','Feature')==='','no match inside a longer word');
  ok(phraseIn('Contact UsWest Pier Telecom LtdMocatta','west pier telecom')==='West Pier Telecom','joined-up block text still matches');
  ok(textHits([{hits:[{widget:'google_maps',snippet:'West Pier Telecom'}]}]).length===0,'map widgets do not count as the page saying it');
+})();
+(async()=>{await new Promise(r=>setTimeout(r,250));
+ eval(grab('phraseAt')+grab('linkContext'));
+ const LINK_V=2;
+ const ph2=linkPhrases('8x8 Feature Matrix with Engage Voice');
+ ok(ph2.indexOf('Feature')===-1&&ph2.indexOf('Engage')===-1,'single plain words like "Feature" are never link text');
+ ok(linkPhrases('3CX Phone Systems in Brighton').indexOf('3CX')>-1,'product names like 3CX still can be');
+ const sn='...for your business, and most buying guides skip straight past them in favour of feature lists. In the industry, what you are';
+ const at=phraseAt(sn,'buying guides'),c=linkContext(sn,at,13);
+ ok(c.before==='and most '||/most $/.test(c.before),'context: a few words before, from a clean word start ('+JSON.stringify(c.before)+')');
+ ok(/^ skip straight past/.test(c.after)&&!/\./.test(c.after),'context: stops at the end of the sentence ('+JSON.stringify(c.after)+')');
+ const sn2='Business CommunicationsFeature Comparison Compare 8x8, 3CX';
+ const c2=linkContext(sn2,phraseAt(sn2,'Feature Comparison'),18);
+ ok(c2.before==='','context: never runs across two blocks of text joined together');
+ const f=linkFix({title:'Guide',link:'https://westpiertech.com/g/'},{post_id:3,title:'Post',link:'https://westpiertech.com/p/',type:'post',elementor:true},{snippet:sn},'buying guides');
+ ok(f.find===c.before+'buying guides'+c.after&&f.proposed===c.before+'<a href="https://westpiertech.com/g/">buying guides</a>'+c.after&&f.anchor==='buying guides','fix swaps the phrase with its surrounding words, so a repeat elsewhere on the page doesn\'t block it');
 })();

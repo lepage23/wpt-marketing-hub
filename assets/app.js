@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.29.0";
-  var BUILT = "2026-10-22 17:23 BST";
+  var VERSION = "0.29.1";
+  var BUILT = "2026-10-22 17:37 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3573,20 +3573,53 @@
   function linkPhrases(title) {
     var t = String(title || "").replace(/\s*[|–—-]\s*West Pier.*$/i, "").replace(/\b(19|20)\d\d\b/g, "").replace(/[:?!.,()‘’“”"']/g, " ").replace(/\s+/g, " ").trim();
     var w = t.split(" ").filter(Boolean), out = [];
-    function keep(ph) { ph = ph.trim(); if (ph.length >= 4 && out.indexOf(ph) === -1) out.push(ph); }
+    function keep(ph) { ph = ph.trim(); if (ph.length >= 3 && out.indexOf(ph) === -1) out.push(ph); }
+    /* "Phone Systems" on its own says nothing about which page it leads to. */
+    function generic(g) { return g.every(function (x) { return /^(phone|phones|system|systems|business|businesses|services?|solutions?|software|support|brighton|sussex|uk)$/i.test(x); }); }
     if (w.length >= 2 && w.length <= 6) keep(t);
     /* Short phrases first: two words like "Engage Voice" turn up in body text far more often than long ones. */
-    [2, 3, 4].forEach(function (n) {
+    function grams(n) {
       for (var i = 0; i + n <= w.length && n < w.length; i++) {
         var g = w.slice(i, i + n);
-        if (LINK_STOP[g[0].toLowerCase()] || LINK_STOP[g[n - 1].toLowerCase()]) continue;
+        if (LINK_STOP[g[0].toLowerCase()] || LINK_STOP[g[n - 1].toLowerCase()] || generic(g)) continue;
         keep(g.join(" "));
       }
-    });
-    w.forEach(function (x) { if (x.length >= 4 && !LINK_STOP[x.toLowerCase()]) keep(x); });
+    }
+    grams(2);
+    /* One word only when it's a product name (3CX, UCaaS, VoIP), never a plain word like "feature". */
+    w.forEach(function (x) { if (x.length >= 3 && !LINK_STOP[x.toLowerCase()] && (/\d/.test(x) || /^[A-Za-z][a-z]*[A-Z]/.test(x) || /^[A-Z]{2,}$/.test(x))) keep(x); });
+    grams(3); grams(4);
     return out.slice(0, 10);
   }
   /* The phrase exactly as written in the snippet, so the swap matches the page's own capitals. */
+  /* Where the phrase starts in the snippet, whole words only (-1 if it isn't there). */
+  function phraseAt(snippet, ph) {
+    var sn = String(snippet || ""), low = sn.toLowerCase(), q = String(ph || "").toLowerCase(), at = low.indexOf(q);
+    while (at > -1) {
+      var bef = sn.charAt(at - 1) || " ", aft = sn.charAt(at + q.length) || " ", first = sn.charAt(at), last = sn.charAt(at + q.length - 1);
+      var okB = !/[a-z0-9]/i.test(bef) || (/[a-z]/.test(bef) && /[A-Z]/.test(first));
+      var okA = !/[a-z0-9]/i.test(aft) || (/[a-z]/.test(last) && /[A-Z]/.test(aft));
+      if (okB && okA) return at;
+      at = low.indexOf(q, at + 1);
+    }
+    return -1;
+  }
+  /* A few words either side of the phrase, so the swap finds this exact spot even when the phrase is
+     used elsewhere on the page. Stops at a sentence end or where two blocks of text join, as the page's
+     own markup may sit there. */
+  function linkContext(snippet, at, len) {
+    var sn = String(snippet || ""), L = at, R = at + len;
+    function stopAt(i) { var a = sn.charAt(i - 1), b = sn.charAt(i); return /[.!?:;]/.test(a) || (/[a-z0-9)]/.test(a) && /[A-Z]/.test(b)); }
+    var l = at;
+    while (l > 0 && at - l < 45 && !stopAt(l)) l--;
+    if (l === 0 && at > 0) { var sp = sn.indexOf(" ", 0); l = sp > -1 && sp < at ? sp + 1 : at; }
+    else if (l > 0 && at - l >= 45) { var sp2 = sn.indexOf(" ", l); l = sp2 > -1 && sp2 < at ? sp2 + 1 : at; }
+    var r = R;
+    while (r < sn.length && r - R < 45 && !stopAt(r) && !/[.!?:;]/.test(sn.charAt(r))) r++;
+    if (r >= sn.length && R < sn.length) { var sp3 = sn.lastIndexOf(" ", sn.length - 1); r = sp3 > R ? sp3 : R; }
+    else if (r - R >= 45) { var sp4 = sn.lastIndexOf(" ", r); r = sp4 > R ? sp4 : R; }
+    return { before: sn.slice(l, at).replace(/^\s+/, ""), after: sn.slice(R, r).replace(/\s+$/, "") };
+  }
   /* Whole words only, so "Feature" never matches inside "features". */
   function phraseIn(snippet, ph) {
     var sn = String(snippet || ""), low = sn.toLowerCase(), q = String(ph || "").toLowerCase(), at = low.indexOf(q);
@@ -3604,13 +3637,16 @@
   function textHits(rows) {
     return (rows || []).map(function (r) { return Object.assign({}, r, { hits: (r.hits || []).filter(function (h) { return h.widget !== "google_maps"; }) }); }).filter(function (r) { return r.hits.length; });
   }
+  var LINK_V = 2;
   function linkFix(orphan, row, hit, ph) {
-    var exact = phraseIn(hit.snippet, ph), id = "link-" + autoKey(orphan.link) + "-" + autoKey(row.link);
-    var a = '<a href="' + orphan.link + '">' + exact + "</a>";
+    var at = phraseAt(hit.snippet, ph), exact = phraseIn(hit.snippet, ph), id = "link-" + autoKey(orphan.link) + "-" + autoKey(row.link);
+    var c = linkContext(hit.snippet, at, exact.length);
+    var a = c.before + '<a href="' + orphan.link + '">' + exact + "</a>" + c.after;
+    exact = c.before + exact + c.after;
     return { id: id, auto: true, parent: "auto-orphans", target: orphan.link, created: today(), batch: "Links to hidden pages", type: row.elementor ? "elementor_swap" : "content_replace",
       size: "small", priority: "high", category: "Structure", postType: row.type === "post" ? "posts" : "pages", pageId: row.post_id, pageTitle: row.title, link: row.link,
-      find: exact, current: row.elementor ? exact : exact, proposed: a, snippet: hit.snippet,
-      issue: "Link “" + exact + "” to " + (orphan.title || shortPath(orphan.link)),
+      find: exact, current: exact, proposed: a, snippet: hit.snippet, lv: LINK_V, anchor: phraseIn(hit.snippet, ph),
+      issue: "Link “" + phraseIn(hit.snippet, ph) + "” to " + (orphan.title || shortPath(orphan.link)),
       why: "Gives " + (orphan.title || "this page") + " a link from a page Google already reads. Only those words become a link; nothing else on " + row.title + " changes." };
   }
   /* Up to two spots per hidden page, each on a different page, never the page itself or another hidden page. */
@@ -3632,7 +3668,9 @@
     }, Promise.resolve()).then(function () { return found; });
   }
   function linksFor(orphan) {
+    var st0 = fixState();
     return proposals().filter(function (x) {
+      if (x.parent && x.auto && x.lv !== LINK_V && !(st0[x.id] && st0[x.id].status)) return false;
       return !x.example && x.type !== "manual" && (norm(x.target || "") === norm(orphan.link) || String(x.proposed || "").indexOf('href="' + orphan.link + '"') > -1 || String(x.proposed || "").indexOf('href="' + orphan.link.replace(/\/$/, "") + '"') > -1);
     });
   }
@@ -3717,7 +3755,7 @@
         if (live.length) { box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">Linked from ' + live.map(function (x) { return esc(x.pageTitle); }).join(", ") + ".</div>"; return live.length; }
         open.forEach(function (fix) {
           var f = el('<div class="row" style="justify-content:space-between;gap:8px;margin-top:6px;font-size:.84rem"><div><b>From</b> <a href="' + esc(fix.link) + '" target="_blank" rel="noopener">' + esc(fix.pageTitle) + "</a>: " +
-            (fix.snippet ? "…" + esc(fix.snippet).replace(esc(fix.find), "<u>" + esc(fix.find) + "</u>") + "…" : esc(fix.issue)) + '</div><div class="row" style="gap:6px"><button type="button" class="btn small primary">Approve and push</button><button type="button" class="btn small skip">Skip</button></div></div>');
+            (fix.snippet ? "…" + esc(fix.snippet).replace(esc(fix.anchor || fix.find), "<u>" + esc(fix.anchor || fix.find) + "</u>") + "…" : esc(fix.issue)) + '</div><div class="row" style="gap:6px"><button type="button" class="btn small primary">Approve and push</button><button type="button" class="btn small skip">Skip</button></div></div>');
           var b = f.querySelector(".primary"), act = f.querySelector(".row");
           queue.push({ fix: fix, act: act });
           b.addEventListener("click", function () {
@@ -3853,7 +3891,10 @@
 
   /* A group card holds a list of small fixes for one problem (titles, alt text, extra H1s and so on).
      Push them one by one or all at once. Skip any you don't want. When none are left, the card moves to Done. */
-  function groupKids(p) { return proposals().filter(function (x) { return x.parent === p.id; }); }
+  function groupKids(p) {
+    var st0 = fixState();
+    return proposals().filter(function (x) { return x.parent === p.id && !(x.target && x.lv !== LINK_V && !(st0[x.id] && st0[x.id].status)); });
+  }
   function editableKid(k) { return k.type === "meta_title" || k.type === "meta_description" || k.op === "alt"; }
   function groupCard(p, st, redraw) {
     var card = el('<article class="panel fix"></article>');
@@ -3980,10 +4021,10 @@
                 var hit = linkHit(r, ph); if (!hit) return;
                 var f = linkFix(t, r, hit, ph);
                 f.id = "pl-" + autoKey(r.link) + "-" + autoKey(t.link); f.parent = p.id; f.batch = "Links from blog posts"; f.priority = "medium";
-                f.issue = "Link “" + f.find + "” to " + t.title;
+                f.issue = "Link “" + f.anchor + "” to " + t.title;
                 f.why = "Passes ranking strength from the post to a service page and gives readers a next step. Only those words become a link.";
                 f.current = "…" + hit.snippet + "…";
-                f.display = "“" + f.find + "” becomes a link to " + shortPath(t.link);
+                f.display = "“" + f.anchor + "” becomes a link to " + shortPath(t.link);
                 out.push(f); per[key] = (per[key] || 0) + 1;
               });
             }, function () {});
