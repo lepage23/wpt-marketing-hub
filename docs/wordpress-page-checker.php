@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 12: H1 fixes also work when the top heading sits in a text or HTML block, and wrong phrases can be swapped everywhere on a page).
+ * WPT Marketing Hub: page checker (version 13: site-wide fixes the hub can push and undo, for pages that aren't built with Elementor, alt text, links, llms.txt, site settings and more).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -105,6 +105,8 @@ add_action( 'rest_api_init', function () {
 			$row['h1'][] = trim( preg_replace( '/\s+/u', ' ', $n->textContent ) );
 		}
 		$row['h2']     = $xp->query( '//h2' )->length;
+		/* Version 13: password-protected pages show only a form, so the audit leaves them out. */
+		$row['protected'] = $xp->query( '//form[contains(@class,"post-password-form")]' )->length > 0;
 		$row['schema'] = array();
 		foreach ( $xp->query( '//script[@type="application/ld+json"]' ) as $n ) {
 			$j = json_decode( $n->textContent, true );
@@ -127,11 +129,17 @@ add_action( 'rest_api_init', function () {
 		$imgs                 = $xp->query( '//body//img' );
 		$row['images']        = $imgs->length;
 		$row['images_no_alt'] = 0;
+		$row['imgs_no_alt']   = array();
 		foreach ( $imgs as $i ) {
 			if ( '' === trim( $i->getAttribute( 'alt' ) ) ) {
 				$row['images_no_alt']++;
+				$src = $i->getAttribute( 'data-src' ) ? $i->getAttribute( 'data-src' ) : $i->getAttribute( 'src' );
+				if ( $src && count( $row['imgs_no_alt'] ) < 40 && 0 !== strpos( $src, 'data:' ) ) {
+					$row['imgs_no_alt'][] = $abs( $src, $url );
+				}
 			}
 		}
+		$row['imgs_no_alt'] = array_values( array_unique( $row['imgs_no_alt'] ) );
 		return $row;
 	};
 
@@ -273,7 +281,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 12, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 13, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -1697,3 +1705,539 @@ add_action( 'wp_footer', function () {
 WPTJS;
 	echo "\n</script>\n";
 }, 999 );
+
+
+/* Site fixes the hub can push and undo (version 13).
+ * /wpt-hub/v1/site-edit POST op=...  One change. Every change keeps a copy first and returns a backup id.
+ *   h1            Make the top heading the H1 on a page that isn't built with Elementor. On the blog
+ *                 page (Settings, Reading, Posts page) it shows the page name as an H1 above the posts.
+ *   h1_one        Keep the first H1 on a page and turn any others into H2s. Elementor or not.
+ *   alt           Give images alt text: items=[{src, alt}]. Sets it in the Media Library and on the page.
+ *   relink        Point links on a page at a new address: from, to.
+ *   menu_add      Add a link to a WordPress menu, after an existing item: after, title, url.
+ *   css           Small site-wide style fixes the hub adds (shown in the page head).
+ *   llms          The text served at /llms.txt.
+ *   option        bing_verify, og_image (url and id) or blog_public.
+ *   meta          rank_math_robots or rank_math_canonical_url on one page.
+ *   redirect_code Change a Rank Math redirect to a 301.
+ * /wpt-hub/v1/site-undo POST backup=...  Put it back exactly as it was. */
+add_action( 'rest_api_init', function () {
+	$load = function ( $id ) {
+		$raw = get_post_meta( $id, '_elementor_data', true );
+		if ( ! $raw ) {
+			return null;
+		}
+		$d = is_array( $raw ) ? $raw : json_decode( $raw, true );
+		return is_array( $d ) ? $d : null;
+	};
+	$save_el = function ( $id, $data ) {
+		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->documents ) ) {
+			$doc = \Elementor\Plugin::$instance->documents->get( $id, false );
+			if ( $doc ) {
+				$doc->save( array( 'elements' => $data ) );
+				return;
+			}
+		}
+		update_post_meta( $id, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
+	};
+	$purge = function ( $id ) {
+		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+			sg_cachepress_purge_cache( $id ? get_permalink( $id ) : null );
+		}
+	};
+	$keep = function ( $rec ) {
+		$all = get_option( 'wpt_hub_site_bk', array() );
+		$all = is_array( $all ) ? $all : array();
+		$bid = 's' . time() . wp_rand( 100, 999 );
+		$rec['time'] = time();
+		$all[ $bid ] = $rec;
+		if ( count( $all ) > 300 ) {
+			$all = array_slice( $all, -300, null, true );
+		}
+		update_option( 'wpt_hub_site_bk', $all, false );
+		return $bid;
+	};
+	$err = function ( $m, $code = 409 ) {
+		return new WP_Error( 'wpt_site', $m, array( 'status' => $code ) );
+	};
+	/* Turn the tag of one heading match into h1 or h2, and fix a block editor heading comment in front of it. */
+	$retag = function ( $html, $m, $to ) {
+		$whole = $m[0][0];
+		$at    = $m[0][1];
+		$new   = preg_replace( '#^(<!-- wp:heading)(?: (\{.*?\}))?( -->)#s', '$1__ATTR__$3', $whole );
+		if ( false !== strpos( $new, '__ATTR__' ) ) {
+			preg_match( '#^<!-- wp:heading(?: (\{.*?\}))? -->#s', $whole, $cm );
+			$attrs = isset( $cm[1] ) && $cm[1] ? json_decode( $cm[1], true ) : array();
+			$attrs = is_array( $attrs ) ? $attrs : array();
+			if ( 'h2' === $to ) {
+				unset( $attrs['level'] );
+			} else {
+				$attrs['level'] = (int) substr( $to, 1 );
+			}
+			$new = str_replace( '__ATTR__', $attrs ? ' ' . wp_json_encode( $attrs ) : '', $new );
+		}
+		$new = preg_replace( '#<h[1-6](\s|>)#i', '<' . $to . '$1', $new, 1 );
+		$new = preg_replace( '#</h[1-6]>\s*$#i', '</' . $to . '>', $new );
+		return substr_replace( $html, $new, $at, strlen( $whole ) );
+	};
+	$heading_re = '#(?:<!-- wp:heading(?: \{.*?\})? -->\s*)?<h([1-6])(\s[^>]*)?>(.*?)</h\1>#is';
+
+	register_rest_route( 'wpt-hub/v1', '/site-edit', array(
+		'methods'             => 'POST',
+		'permission_callback' => function ( WP_REST_Request $r ) {
+			$id = (int) $r->get_param( 'post_id' );
+			return $id > 0 ? current_user_can( 'edit_post', $id ) : current_user_can( 'manage_options' );
+		},
+		'callback'            => function ( WP_REST_Request $r ) use ( $load, $save_el, $purge, $keep, $err, $retag, $heading_re ) {
+			global $wpdb;
+			$op = (string) $r->get_param( 'op' );
+			$id = (int) $r->get_param( 'post_id' );
+
+			if ( 'h1' === $op ) {
+				$title = wp_strip_all_tags( get_the_title( $id ) );
+				if ( $id && (int) get_option( 'page_for_posts' ) === $id ) {
+					$old = get_option( 'wpt_hub_blog_h1', '' );
+					update_option( 'wpt_hub_blog_h1', $title );
+					$purge( $id );
+					return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'option', 'name' => 'wpt_hub_blog_h1', 'value' => $old ) ), 'before' => '(no H1 on the blog page)', 'after' => 'H1: ' . $title );
+				}
+				if ( $load( $id ) ) {
+					return $err( 'This page is built with Elementor. Use the Elementor H1 fix.', 400 );
+				}
+				$c = (string) get_post_field( 'post_content', $id );
+				if ( preg_match( '#<h1[\s>]#i', $c ) ) {
+					return $err( 'This page already has an H1 in its text, but it isn\'t showing to visitors. Nothing was changed. Tell Claude and it will look into it.' );
+				}
+				if ( preg_match( $heading_re, $c, $m, PREG_OFFSET_CAPTURE ) && strlen( trim( wp_strip_all_tags( $m[3][0] ) ) ) >= 3 ) {
+					$new   = $retag( $c, $m, 'h1' );
+					$label = 'H' . $m[1][0] . ': ' . trim( wp_strip_all_tags( $m[3][0] ) );
+					$after = 'H1: ' . trim( wp_strip_all_tags( $m[3][0] ) );
+				} else {
+					$new   = '<h1>' . esc_html( $title ) . "</h1>\n" . $c;
+					$label = '(no heading on the page)';
+					$after = 'New H1 at the top: ' . $title;
+				}
+				$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
+				wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+				$purge( $id );
+				return array( 'ok' => true, 'backup' => $bid, 'before' => $label, 'after' => $after );
+			}
+
+			if ( 'h1_one' === $op ) {
+				$data = $load( $id );
+				if ( $data ) {
+					/* Every H1 in page order: heading widgets, then any <h1> inside text or HTML blocks. */
+					$spots = array();
+					$walk  = function ( $els, $path ) use ( &$walk, &$spots ) {
+						foreach ( $els as $i => $el ) {
+							$p = array_merge( $path, array( $i ) );
+							$w = isset( $el['widgetType'] ) ? $el['widgetType'] : '';
+							$st = isset( $el['settings'] ) && is_array( $el['settings'] ) ? $el['settings'] : array();
+							if ( 'heading' === $w && isset( $st['header_size'] ) && 'h1' === $st['header_size'] ) {
+								$spots[] = array( 'path' => $p, 'kind' => 'heading', 'text' => isset( $st['title'] ) ? $st['title'] : '' );
+							}
+							foreach ( array( 'editor', 'html' ) as $k ) {
+								if ( isset( $st[ $k ] ) && preg_match_all( '#<h1[\s>]#i', (string) $st[ $k ] ) ) {
+									$spots[] = array( 'path' => $p, 'kind' => 'html', 'key' => $k, 'text' => wp_strip_all_tags( (string) $st[ $k ] ) );
+								}
+							}
+							if ( ( 'icon-box' === $w || 'image-box' === $w ) && isset( $st['title_size'] ) && 'h1' === $st['title_size'] ) {
+								$spots[] = array( 'path' => $p, 'kind' => 'box', 'text' => isset( $st['title_text'] ) ? $st['title_text'] : '' );
+							}
+							if ( ! empty( $el['elements'] ) ) {
+								$walk( $el['elements'], array_merge( $p, array( 'elements' ) ) );
+							}
+						}
+					};
+					$walk( $data, array() );
+					if ( count( $spots ) < 1 || ( 1 === count( $spots ) && 'html' !== $spots[0]['kind'] ) ) {
+						return $err( 'The page itself has only one H1. The other one comes from the theme\'s page title, so this needs a theme setting. Nothing was changed.' );
+					}
+					$before = wp_json_encode( $data );
+					$first  = true;
+					$demoted = array();
+					foreach ( $spots as $sp ) {
+						$node = &$data;
+						foreach ( $sp['path'] as $k ) {
+							$node = &$node[ $k ];
+						}
+						if ( 'html' === $sp['kind'] ) {
+							$html = (string) $node['settings'][ $sp['key'] ];
+							$out  = preg_replace_callback( '#<h1(\s[^>]*)?>(.*?)</h1>#is', function ( $mm ) use ( &$first, &$demoted ) {
+								if ( $first ) {
+									$first = false;
+									return $mm[0];
+								}
+								$demoted[] = trim( wp_strip_all_tags( $mm[2] ) );
+								return '<h2' . $mm[1] . '>' . $mm[2] . '</h2>';
+							}, $html );
+							$node['settings'][ $sp['key'] ] = $out;
+						} elseif ( $first ) {
+							$first = false;
+						} else {
+							$node['settings'][ 'box' === $sp['kind'] ? 'title_size' : 'header_size' ] = 'h2';
+							$demoted[] = trim( wp_strip_all_tags( $sp['text'] ) );
+						}
+						unset( $node );
+					}
+					if ( ! $demoted ) {
+						return $err( 'The page itself has only one H1. The other one comes from the theme\'s page title, so this needs a theme setting. Nothing was changed.' );
+					}
+					$bid = $keep( array( 'kind' => 'elementor', 'post_id' => $id, 'data' => $before, 'after' => md5( wp_json_encode( $data ) ) ) );
+					$save_el( $id, $data );
+					$purge( $id );
+					return array( 'ok' => true, 'backup' => $bid, 'before' => ( count( $demoted ) + 1 ) . ' H1s', 'after' => 'One H1. Now H2: ' . implode( ' / ', $demoted ) );
+				}
+				$c = (string) get_post_field( 'post_content', $id );
+				preg_match_all( $heading_re, $c, $all, PREG_SET_ORDER | PREG_OFFSET_CAPTURE );
+				$h1s = array_values( array_filter( $all, function ( $m ) {
+					return '1' === $m[1][0];
+				} ) );
+				if ( count( $h1s ) < 2 ) {
+					return $err( 'The page itself has only one H1. The other one comes from the theme\'s page title, so this needs a theme setting. Nothing was changed.' );
+				}
+				$new     = $c;
+				$demoted = array();
+				foreach ( array_reverse( array_slice( $h1s, 1 ) ) as $m ) {
+					$new       = $retag( $new, $m, 'h2' );
+					$demoted[] = trim( wp_strip_all_tags( $m[3][0] ) );
+				}
+				$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
+				wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+				$purge( $id );
+				return array( 'ok' => true, 'backup' => $bid, 'before' => count( $h1s ) . ' H1s', 'after' => 'One H1. Now H2: ' . implode( ' / ', array_reverse( $demoted ) ) );
+			}
+
+			if ( 'alt' === $op ) {
+				$items = (array) $r->get_param( 'items' );
+				$c     = (string) get_post_field( 'post_content', $id );
+				$new   = $c;
+				$was   = array();
+				$done  = array();
+				$skip  = array();
+				foreach ( $items as $it ) {
+					$src = isset( $it['src'] ) ? esc_url_raw( (string) $it['src'] ) : '';
+					$alt = isset( $it['alt'] ) ? sanitize_text_field( (string) $it['alt'] ) : '';
+					if ( ! $src || strlen( $alt ) < 3 ) {
+						continue;
+					}
+					$aid = attachment_url_to_postid( $src );
+					if ( ! $aid ) {
+						$aid = attachment_url_to_postid( preg_replace( '#-\d+x\d+(\.[a-z0-9]+)$#i', '$1', $src ) );
+					}
+					if ( ! $aid ) {
+						$aid = attachment_url_to_postid( preg_replace( '#(\.[a-z0-9]+)$#i', '-scaled$1', preg_replace( '#-\d+x\d+(\.[a-z0-9]+)$#i', '$1', $src ) ) );
+					}
+					if ( ! $aid ) {
+						$skip[] = $src;
+						continue;
+					}
+					if ( ! isset( $was[ $aid ] ) ) {
+						$was[ $aid ] = (string) get_post_meta( $aid, '_wp_attachment_image_alt', true );
+					}
+					update_post_meta( $aid, '_wp_attachment_image_alt', $alt );
+					/* Images in the page text keep their own copy of the alt text, so set it there too. */
+					$base = preg_quote( preg_replace( '#-\d+x\d+(\.[a-z0-9]+)$#i', '', basename( wp_parse_url( $src, PHP_URL_PATH ) ) ), '#' );
+					$new  = preg_replace_callback( '#<img\b[^>]*>#i', function ( $mm ) use ( $aid, $base, $alt ) {
+						$tag = $mm[0];
+						if ( false === strpos( $tag, 'wp-image-' . $aid . '"' ) && false === strpos( $tag, 'wp-image-' . $aid . ' ' ) && ! preg_match( '#src="[^"]*' . $base . '#i', $tag ) ) {
+							return $tag;
+						}
+						if ( preg_match( '#\salt="([^"]*)"#i', $tag, $am ) ) {
+							return '' === trim( $am[1] ) ? str_replace( $am[0], ' alt="' . esc_attr( $alt ) . '"', $tag ) : $tag;
+						}
+						return preg_replace( '#^<img\b#i', '<img alt="' . esc_attr( $alt ) . '"', $tag );
+					}, $new );
+					$done[] = $aid;
+				}
+				if ( ! $done ) {
+					return $err( 'None of these images are in the Media Library (they may come from the theme or another site), so the hub can\'t set their alt text. Nothing was changed.' );
+				}
+				$bid = $keep( array( 'kind' => 'alt', 'post_id' => $id, 'alts' => $was, 'content' => $new !== $c ? $c : null, 'after' => md5( $new ) ) );
+				if ( $new !== $c ) {
+					wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+				}
+				$purge( $id );
+				return array( 'ok' => true, 'backup' => $bid, 'before' => count( $done ) . ' images with no alt text', 'after' => count( $done ) . ' images described', 'skipped' => $skip );
+			}
+
+			if ( 'relink' === $op ) {
+				$from = untrailingslashit( esc_url_raw( (string) $r->get_param( 'from' ) ) );
+				$to   = esc_url_raw( (string) $r->get_param( 'to' ) );
+				$path = untrailingslashit( (string) wp_parse_url( $from, PHP_URL_PATH ) );
+				if ( strlen( $from ) < 8 || ! $to ) {
+					return $err( 'The fix doesn\'t say which link to change.', 400 );
+				}
+				$n    = 0;
+				$swap = function ( $s ) use ( $from, $path, $to, &$n ) {
+					return preg_replace_callback( '#(href=["\']|^)(' . preg_quote( $from, '#' ) . '|' . preg_quote( $path, '#' ) . ')/?(["\']|$)#i', function ( $mm ) use ( $to, &$n ) {
+						$n++;
+						return $mm[1] . $to . $mm[3];
+					}, $s );
+				};
+				$data = $load( $id );
+				if ( $data ) {
+					$before = wp_json_encode( $data );
+					$fix    = function ( &$v ) use ( &$fix, $swap ) {
+						if ( is_string( $v ) ) {
+							$v = $swap( $v );
+						} elseif ( is_array( $v ) ) {
+							foreach ( $v as $k => &$vv ) {
+								if ( '__globals__' !== $k && '__dynamic__' !== $k ) {
+									$fix( $vv );
+								}
+							}
+						}
+					};
+					$fix( $data );
+					if ( ! $n ) {
+						return $err( 'That link isn\'t on the page any more. Nothing was changed.' );
+					}
+					$bid = $keep( array( 'kind' => 'elementor', 'post_id' => $id, 'data' => $before, 'after' => md5( wp_json_encode( $data ) ) ) );
+					$save_el( $id, $data );
+				} else {
+					$c   = (string) get_post_field( 'post_content', $id );
+					$new = $swap( $c );
+					if ( ! $n ) {
+						return $err( 'That link isn\'t on the page any more. Nothing was changed.' );
+					}
+					$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
+					wp_update_post( array( 'ID' => $id, 'post_content' => $new ) );
+				}
+				$purge( $id );
+				return array( 'ok' => true, 'backup' => $bid, 'before' => $from, 'after' => $to . ( $n > 1 ? ' (' . $n . ' links)' : '' ) );
+			}
+
+			if ( 'menu_add' === $op ) {
+				$after = strtolower( trim( (string) $r->get_param( 'after' ) ) );
+				$title = sanitize_text_field( (string) $r->get_param( 'title' ) );
+				$url   = esc_url_raw( (string) $r->get_param( 'url' ) );
+				foreach ( wp_get_nav_menus() as $menu ) {
+					foreach ( (array) wp_get_nav_menu_items( $menu->term_id ) as $item ) {
+						if ( untrailingslashit( $item->url ) === untrailingslashit( $url ) ) {
+							return $err( 'That link is already in the ' . $menu->name . ' menu. Nothing was changed.' );
+						}
+					}
+				}
+				foreach ( wp_get_nav_menus() as $menu ) {
+					$items = (array) wp_get_nav_menu_items( $menu->term_id );
+					foreach ( $items as $item ) {
+						if ( false === strpos( strtolower( wp_strip_all_tags( $item->title ) ), $after ) ) {
+							continue;
+						}
+						$shift = array();
+						foreach ( $items as $o ) {
+							if ( (int) $o->menu_order > (int) $item->menu_order ) {
+								$shift[] = (int) $o->ID;
+								wp_update_post( array( 'ID' => $o->ID, 'menu_order' => (int) $o->menu_order + 1 ) );
+							}
+						}
+						$nid = wp_update_nav_menu_item( $menu->term_id, 0, array(
+							'menu-item-title'     => $title,
+							'menu-item-url'       => $url,
+							'menu-item-type'      => 'custom',
+							'menu-item-status'    => 'publish',
+							'menu-item-parent-id' => (int) $item->menu_item_parent,
+							'menu-item-position'  => (int) $item->menu_order + 1,
+						) );
+						if ( is_wp_error( $nid ) ) {
+							return $err( 'WordPress wouldn\'t add the menu item: ' . $nid->get_error_message() );
+						}
+						$purge( 0 );
+						return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'menu', 'item' => (int) $nid, 'shift' => $shift ) ), 'before' => '(not in the ' . $menu->name . ' menu)', 'after' => $title . ' added after ' . wp_strip_all_tags( $item->title ) . ' in the ' . $menu->name . ' menu' );
+					}
+				}
+				return $err( 'No WordPress menu has an item called "' . $after . '". The footer is probably built in Elementor, so this one needs doing there. Nothing was changed.' );
+			}
+
+			if ( 'css' === $op || 'llms' === $op ) {
+				$name  = 'css' === $op ? 'wpt_hub_css' : 'wpt_hub_llms';
+				$value = (string) $r->get_param( 'value' );
+				$value = 'css' === $op ? wp_strip_all_tags( $value ) : sanitize_textarea_field( $value );
+				$old   = get_option( $name, '' );
+				update_option( $name, $value );
+				$purge( 0 );
+				return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'option', 'name' => $name, 'value' => $old ) ), 'before' => $old ? $old : '(none)', 'after' => $value );
+			}
+
+			if ( 'option' === $op ) {
+				$key = (string) $r->get_param( 'key' );
+				$val = $r->get_param( 'value' );
+				if ( 'blog_public' === $key ) {
+					$old = get_option( 'blog_public' );
+					update_option( 'blog_public', 1 );
+					return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'option', 'name' => 'blog_public', 'value' => $old ) ), 'before' => 'Search engines discouraged', 'after' => 'Search engines allowed' );
+				}
+				$map = array( 'bing_verify' => array( 'rank-math-options-general', array( 'bing_verify' ) ), 'og_image' => array( 'rank-math-options-titles', array( 'open_graph_image', 'open_graph_image_id' ) ) );
+				if ( ! isset( $map[ $key ] ) ) {
+					return $err( 'The hub can\'t change that setting.', 400 );
+				}
+				$name = $map[ $key ][0];
+				$opt  = get_option( $name, array() );
+				$opt  = is_array( $opt ) ? $opt : array();
+				$old  = $opt;
+				if ( 'bing_verify' === $key ) {
+					$code = (string) $val;
+					if ( preg_match( '#content=["\']([^"\']+)#', $code, $cm ) ) {
+						$code = $cm[1];
+					}
+					$code = preg_replace( '/[^A-Za-z0-9]/', '', $code );
+					if ( strlen( $code ) < 10 ) {
+						return $err( 'That doesn\'t look like a Bing code. Paste the code (or the whole meta tag) Bing shows you. Nothing was changed.', 400 );
+					}
+					$opt['bing_verify'] = $code;
+					$after              = 'Bing code ' . $code;
+				} else {
+					$aid = (int) ( is_array( $val ) && isset( $val['id'] ) ? $val['id'] : 0 );
+					if ( ! $aid && is_string( $val ) ) {
+						$aid = attachment_url_to_postid( esc_url_raw( trim( $val ) ) );
+					}
+					$u   = $aid ? wp_get_attachment_url( $aid ) : '';
+					if ( ! $u ) {
+						return $err( 'That image isn\'t in the Media Library. Nothing was changed.', 400 );
+					}
+					$opt['open_graph_image']    = $u;
+					$opt['open_graph_image_id'] = $aid;
+					$after                      = $u;
+				}
+				update_option( $name, $opt );
+				$purge( 0 );
+				return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'option', 'name' => $name, 'value' => $old ) ), 'before' => '(not set)', 'after' => $after );
+			}
+
+			if ( 'meta' === $op ) {
+				$key = (string) $r->get_param( 'key' );
+				if ( ! in_array( $key, array( 'rank_math_robots', 'rank_math_canonical_url' ), true ) ) {
+					return $err( 'The hub can\'t change that setting.', 400 );
+				}
+				$old = get_post_meta( $id, $key, true );
+				$val = $r->get_param( 'value' );
+				if ( 'rank_math_robots' === $key ) {
+					$val = array_values( array_diff( (array) ( $old ? $old : array() ), array( 'noindex' ) ) );
+					if ( ! in_array( 'index', $val, true ) ) {
+						$val[] = 'index';
+					}
+				} else {
+					$val = esc_url_raw( (string) $val );
+				}
+				if ( '' === $val ) {
+					delete_post_meta( $id, $key );
+				} else {
+					update_post_meta( $id, $key, $val );
+				}
+				$purge( $id );
+				return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'meta', 'post_id' => $id, 'key' => $key, 'value' => $old ) ), 'before' => is_array( $old ) ? implode( ', ', $old ) : (string) $old, 'after' => is_array( $val ) ? implode( ', ', $val ) : ( '' === $val ? '(cleared)' : $val ) );
+			}
+
+			if ( 'redirect_code' === $op ) {
+				$rid = (int) $r->get_param( 'redirect_id' );
+				$t   = $wpdb->prefix . 'rank_math_redirections';
+				$old = $wpdb->get_var( $wpdb->prepare( "SELECT header_code FROM `{$t}` WHERE id = %d", $rid ) );
+				if ( null === $old ) {
+					return $err( 'That redirect isn\'t in Rank Math any more. Nothing was changed.' );
+				}
+				$wpdb->update( $t, array( 'header_code' => 301 ), array( 'id' => $rid ) );
+				return array( 'ok' => true, 'backup' => $keep( array( 'kind' => 'redirect', 'id' => $rid, 'value' => $old ) ), 'before' => (string) $old, 'after' => '301' );
+			}
+
+			return $err( 'Unknown edit type.', 400 );
+		},
+	) );
+
+	register_rest_route( 'wpt-hub/v1', '/site-undo', array(
+		'methods'             => 'POST',
+		'permission_callback' => function () {
+			return current_user_can( 'edit_pages' );
+		},
+		'callback'            => function ( WP_REST_Request $r ) use ( $load, $save_el, $purge, $err ) {
+			global $wpdb;
+			$bid = preg_replace( '/[^a-z0-9]/i', '', (string) $r->get_param( 'backup' ) );
+			$all = get_option( 'wpt_hub_site_bk', array() );
+			if ( ! is_array( $all ) || empty( $all[ $bid ] ) ) {
+				return $err( 'The saved copy for this change wasn\'t found, so it can\'t be undone from the hub. Use Revisions in WordPress.', 404 );
+			}
+			$b     = $all[ $bid ];
+			$force = (bool) $r->get_param( 'force' );
+			$id    = isset( $b['post_id'] ) ? (int) $b['post_id'] : 0;
+			if ( $id && ! current_user_can( 'edit_post', $id ) ) {
+				return $err( 'You can\'t edit that page.', 403 );
+			}
+			if ( 'content' === $b['kind'] || ( 'alt' === $b['kind'] && null !== $b['content'] ) ) {
+				$now = (string) get_post_field( 'post_content', $id );
+				if ( md5( $now ) !== $b['after'] && ! $force ) {
+					return $err( 'The page has been edited since this fix went live. Undoing would also wipe those later edits. Use Revisions in WordPress instead, or undo anyway from the hub.' );
+				}
+				wp_update_post( array( 'ID' => $id, 'post_content' => $b['content'] ) );
+			}
+			if ( 'alt' === $b['kind'] ) {
+				foreach ( (array) $b['alts'] as $aid => $alt ) {
+					update_post_meta( (int) $aid, '_wp_attachment_image_alt', $alt );
+				}
+			}
+			if ( 'elementor' === $b['kind'] ) {
+				$now = $load( $id );
+				if ( md5( wp_json_encode( $now ) ) !== $b['after'] && ! $force ) {
+					return $err( 'The page has been edited since this fix went live. Undoing would also wipe those later edits. Use Revisions in Elementor instead, or undo anyway from the hub.' );
+				}
+				$save_el( $id, json_decode( $b['data'], true ) );
+			}
+			if ( 'option' === $b['kind'] ) {
+				if ( '' === $b['value'] || null === $b['value'] ) {
+					delete_option( $b['name'] );
+				} else {
+					update_option( $b['name'], $b['value'] );
+				}
+			}
+			if ( 'meta' === $b['kind'] ) {
+				if ( '' === $b['value'] || array() === $b['value'] ) {
+					delete_post_meta( $id, $b['key'] );
+				} else {
+					update_post_meta( $id, $b['key'], $b['value'] );
+				}
+			}
+			if ( 'menu' === $b['kind'] ) {
+				wp_delete_post( (int) $b['item'], true );
+				foreach ( (array) $b['shift'] as $sid ) {
+					$p = get_post( (int) $sid );
+					if ( $p ) {
+						wp_update_post( array( 'ID' => $p->ID, 'menu_order' => max( 0, (int) $p->menu_order - 1 ) ) );
+					}
+				}
+			}
+			if ( 'redirect' === $b['kind'] ) {
+				$wpdb->update( $wpdb->prefix . 'rank_math_redirections', array( 'header_code' => (int) $b['value'] ), array( 'id' => (int) $b['id'] ) );
+			}
+			unset( $all[ $bid ] );
+			update_option( 'wpt_hub_site_bk', $all, false );
+			$purge( $id );
+			return array( 'ok' => true );
+		},
+	) );
+} );
+
+/* What the site fixes above show to visitors. */
+add_action( 'init', function () {
+	$path = isset( $_SERVER['REQUEST_URI'] ) ? strtok( wp_unslash( $_SERVER['REQUEST_URI'] ), '?' ) : '';
+	if ( '/llms.txt' === $path ) {
+		$txt = get_option( 'wpt_hub_llms', '' );
+		if ( $txt ) {
+			header( 'Content-Type: text/plain; charset=utf-8' );
+			echo $txt; // phpcs:ignore WordPress.Security.EscapeOutput -- plain text, cleaned when saved.
+			exit;
+		}
+	}
+} );
+add_action( 'wp_head', function () {
+	$css = get_option( 'wpt_hub_css', '' );
+	if ( $css ) {
+		echo "\n<style id=\"wpt-hub-css\">\n" . wp_strip_all_tags( $css ) . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput
+	}
+}, 99 );
+add_action( 'loop_start', function ( $q ) {
+	static $shown = false;
+	$h = get_option( 'wpt_hub_blog_h1', '' );
+	if ( ! $shown && $h && is_home() && $q->is_main_query() ) {
+		$shown = true;
+		echo '<h1 class="wpt-hub-blog-h1">' . esc_html( $h ) . '</h1>';
+	}
+} );

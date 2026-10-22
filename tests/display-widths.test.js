@@ -3,7 +3,7 @@ const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(name){const i=src.indexOf('function '+name+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(name){const i=src.indexOf('var '+name+' =');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+2);}}}
 global.window={WPT_PROPOSALS:[]};
-eval(['norm','shortPath','modeOf','describeModes','buildDisplayFixes'].map(grab).join('\n')+grabVar('DISPLAY_KIND')+grabVar('FIT_SET')+grabVar('SFX'));
+eval(['norm','shortPath','modeOf','describeModes','displayCss','buildDisplayFixes'].map(grab).join('\n')+grabVar('DISPLAY_KIND')+grabVar('FIT_SET')+grabVar('SFX')+grabVar('CSS_KINDS'));
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const d=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 const f=buildDisplayFixes(d);

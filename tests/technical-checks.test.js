@@ -2,7 +2,7 @@ const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');const f
 function grab(n){const i=src.indexOf('function '+n+'(');if(i<0)throw n;let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(n){const m=src.match(new RegExp('var '+n+' = [^;]*;'));return m[0];}
 const store={};const load=(k,f)=>k in store?JSON.parse(store[k]):f;const save=(k,v)=>store[k]=JSON.stringify(v);
-eval(['norm','shortPath','copyLive','isRedirect','liveIssues','applyLive','liveOnlyRow','robotsBlocks','titleWords','overlap','indexable','autoKey','pageRef','buildAutoFixes','storeAutoFixes','fixState','setFix','proposals','syncFixProgress','parkFix','localDay'].map(grab).join('\n')+'\n'+['PRI_ORDER','AI_BOTS','STOP','API_ONLY_ISSUE'].map(grabVar).join('\n'));
+eval(['norm','shortPath','copyLive','isRedirect','liveIssues','applyLive','liveOnlyRow','robotsBlocks','titleWords','overlap','indexable','autoKey','pageRef','competes','aboutWords','townOf','shortTitle','trimDesc','autoGroups','altFromFile','altFile','buildAutoFixes','storeAutoFixes','fixState','setFix','proposals','syncFixProgress','parkFix','localDay'].map(grab).join('\n')+'\n'+['PRI_ORDER','AI_BOTS','STOP','API_ONLY_ISSUE','BOILER','LINK_TARGET_SKIP'].map(grabVar).join('\n'));
 global.window={WPT_PROPOSALS:[]};
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const live={};fx.check.forEach(r=>{if(r.url)live[norm(r.url)]=r;});
@@ -28,7 +28,7 @@ ok(has('auto-noindex-westpiertech-com-8x8'),'noindex page gets its own dismissab
 ok(has('auto-links-broken')&&/3cx/.test(has('auto-links-broken').pages[0].note),'broken link found on a live page');
 ok(has('auto-schema-org'),'home missing Organisation schema');
 ok(has('auto-slow')&&has('auto-slow').pages[0].link==='https://westpiertech.com/','slow home flagged');
-ok(fixes.every(f=>(f.type==='manual'?f.steps&&f.steps.length:f.proposed&&f.link)&&f.why&&f.priority&&f.category),'every fix has steps (or a pushable change), why, priority, area');
+ok(fixes.every(f=>(f.type==='group'?true:f.type==='manual'?f.steps&&(f.steps.length||f.pages):(f.proposed||f.placeholder)&&f.link)&&f.why&&f.priority&&f.category),'every fix has steps (or a pushable change), why, priority, area');
 ok(fixes.filter(f=>f.type==='elementor_h1').every(f=>f.pageTitle&&f.id.indexOf('auto-h1-')===0),'missing H1: one pushable fix per page, named');
 // done-then-still-found reopens
 setFix('auto-llms',{status:'done',doneTs:1});storeAutoFixes(fixes,Date.now());ok(!fixState()['auto-llms'].status&&fixState()['auto-llms'].reopened,'fix marked done but still found is reopened');

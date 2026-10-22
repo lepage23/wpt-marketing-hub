@@ -6,6 +6,38 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.29.0 · 2026-10-22 18:15 BST
+
+No more Mark as done in the Fix queue. Every card is now one of four kinds, and none of them is a tick box.
+
+- **Approve and push.** The hub makes the change and keeps a copy for Undo.
+- **Your call.** A decision only you can make. The button is the decision (for example "Keep both, they're different").
+- **Claude writes.** New wording is needed. Copy for Claude; the card closes itself once the audit stops finding the problem.
+- **Off the website** (listings, hosting, Matt's templates) moves to Your jobs.
+
+Now push-ready:
+
+- **Hidden pages card** reaches Done: Leave this page on any you don't want linked, password-protected pages count as sorted, and there's a button to undo the link already added to Feature Comparison. Link search tries short phrases first, so more pages get a spot.
+- **H1 on pages not built with Elementor** (the News page and Feature Comparison error). The top heading in the page text becomes the H1. The blog page gets its name as the H1.
+- **Long titles:** page name plus "| West Pier", pushed one by one or all at once. Ones too long to shorten go to Claude.
+- **Long descriptions:** trimmed to whole sentences under 160 characters. Missing ones go to Claude.
+- **Pages with more than one H1:** keeps the first, makes the rest H2.
+- **Alt text:** starting text from each image's file name, editable in the card, set in the Media Library and on the page.
+- **Blog posts with few links:** the hub finds where a post mentions a service page and links it.
+- **Links to redirected addresses, temporary redirects, wrong canonicals, noindex, the "discourage search engines" box:** all push-ready.
+- **llms.txt:** written and ready to publish. **Bing verification:** paste Bing's code and push. **Default social image:** paste the image's Media Library address and push.
+- **Display check:** words breaking, loose heading lines and wrapping buttons become one small style fix, only on the pages affected.
+- **Footer training link** and **Feature Comparison to Draft:** push-ready. **Repeated words in two headings:** rewritten, push-ready.
+- **Competing pages:** the check no longer flags town pages against the national page or different systems' Brighton pages. Ten flagged before, two real ones left.
+- Off-website steps (Bing Places, directories, author bios, case studies, Matt's Brighton template and Teams page move, SiteGround speed settings) are in Your jobs.
+- **Needs page checker version 13.** Copy page checker code on Website & SEO, replace it in WordPress, save, then Save and test.
+- Existing cards are rebuilt from your saved audit the first time this version opens, so nothing needs running again. Re-run the audit after updating the page checker to get alt text lists and password-protected pages.
+- 479 tests, all passing.
+
+## Backup · 2026-10-22 17:02 BST
+
+`backup/v0.28.4-2026-10-22-1702`, taken before v0.29.0.
+
 ## v0.28.4 · 2026-10-22 16:45 BST
 
 Cards now finish themselves instead of waiting for a recheck.

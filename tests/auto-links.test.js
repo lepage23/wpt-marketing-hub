@@ -5,14 +5,14 @@ const i0=src.indexOf('var LINK_STOP');const LS=src.slice(i0,src.indexOf(';\n',i0
 let STORE={};function load(k,f){return k in STORE?JSON.parse(JSON.stringify(STORE[k])):f;}function save(k,v){STORE[k]=v;}
 function today(){return '2026-10-22';}function shortPath(u){return u.replace(/^https?:\/\/[^\/]+/,'');}
 let PROPS=[];function proposals(){return PROPS.concat(load('auto-fixes-rules',[]));}
-eval(LS+['norm','autoKey','linkPhrases','phraseIn','textHits','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
+eval(LS+['norm','autoKey','linkPhrases','phraseIn','textHits','linkHit','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
 function updateNav(){}global.window={};
 const H='https://westpiertech.com';
 /* Topic phrases from a title */
 const ph=linkPhrases('Top 10 UCaaS Providers for 2026: The Complete UK Comparison');
 ok(ph.indexOf('UCaaS Providers')>-1,'phrases: picks "UCaaS Providers"');
 ok(ph.every(p=>!/2026/.test(p)),'phrases: years dropped');
-ok(ph.length<=6,'phrases: at most six searches per page');
+ok(ph.length<=10,'phrases: at most ten searches per page');
 /* Finding a spot */
 let searched=[];
 global.findText=async(q)=>{searched.push(q);return q==='UCaaS Providers'?[

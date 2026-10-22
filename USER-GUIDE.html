@@ -144,7 +144,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td><span class="btn primary">Approve and unpublish</span></td><td>Turns a page into a draft. Nothing is deleted. Undo republishes it.</td></tr>
     <tr><td><span class="btn primary">Push new page build for review</span></td><td>Makes a new <b>draft</b> page. Never live until you publish it in WordPress.</td></tr>
     <tr><td><span class="btn">Run audit now</span>, <span class="btn">Check every page</span>, <span class="btn">Run speed check on all pages</span>, <span class="btn">Refresh</span>, <span class="btn">Check the look</span></td><td>Read-only. Safe any time.</td></tr>
-    <tr><td><span class="btn">Mark as done</span>, <span class="btn">Not doing this</span>, <span class="btn">In progress</span>, <span class="btn">Reject</span></td><td>Only tidies the hub. Nothing on the website changes. <span class="btn">Put back in the queue</span> reverses it.</td></tr>
+    <tr><td><span class="btn">Skip</span>, <span class="btn">Not doing this</span>, <span class="btn">In progress</span>, <span class="btn">Reject</span></td><td>Only tidies the hub. Nothing on the website changes. <span class="btn">Put back in the queue</span> reverses it.</td></tr>
     <tr><td><span class="btn">Remove</span> (Leads)</td><td>Deletes that lead from the hub after you confirm. Use Download CSV first if you want a copy.</td></tr>
   </tbody>
 </table>
@@ -225,7 +225,10 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td>H1 fix</td><td>Makes the first heading on a page its main H1. The wording doesn't change. The card shows which heading before you approve. It may look bigger afterwards, so check the page. Undo puts it back. Needs page checker version 11.</td></tr>
     <tr><td>Punctuation fix</td><td>Removes a space or line break before a full stop, question mark or similar. The words don't change.</td></tr>
     <tr><td>New page build</td><td>Copies an existing page's design into a new draft and fills it with new text. Gives you a preview link.</td></tr>
-    <tr><td>Steps</td><td>Things the hub can't do itself yet. Follow the steps, then <span class="btn">Mark as done</span>.</td></tr>
+    <tr><td>Fixes (group)</td><td>A list of small fixes for one problem, such as long titles or extra H1s. Push them one at a time or with <span class="btn">Approve and push all</span>. <span class="btn">Skip</span> any you don't want. When none are left the card moves to Done by itself.</td></tr>
+    <tr><td>Your call</td><td>A decision only you can make, such as two pages competing. The button is the decision.</td></tr>
+    <tr><td>Claude writes</td><td>Needs new wording. <span class="btn">Copy for Claude</span>, paste it into Claude, and the fixes come back ready to push. The card closes itself once the audit stops finding the problem.</td></tr>
+    <tr><td>Off the website</td><td>Listings, hosting settings and Matt's templates aren't in the Fix queue. They're in Your jobs.</td></tr>
   </tbody>
 </table>
 <h3>Tabs and filter</h3>
@@ -370,7 +373,7 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0
     <tr><td>"Check the username and application password"</td><td>Retype the username exactly as in WordPress, and paste a fresh application password.</td></tr>
     <tr><td>"Couldn't reach the site" or a 403 error</td><td>A security plugin or the host is blocking it. Ask Matt to allow application passwords.</td></tr>
     <tr><td>"needs version 11" (or an earlier number), "Pages aren't reporting back", or "can only change image size and cropping settings"</td><td><a href="#snippet">Update the WordPress code</a>, then try again.</td></tr>
-    <tr><td>"The text this fix looks for isn't on the page any more"</td><td>Someone has already changed that text. If it's sorted, use Mark as done. If not, ask Claude to rewrite the fix.</td></tr>
+    <tr><td>"The text this fix looks for isn't on the page any more"</td><td>Someone has already changed that text. If it's sorted, use Close it, already sorted. If not, ask Claude to rewrite the fix.</td></tr>
     <tr><td>"The page has been edited since this fix went live"</td><td>Undo would also remove the later edits. Undo anyway, or roll back with Revisions in Elementor.</td></tr>
     <tr><td>Found it, but "built with a different Elementor widget"</td><td>Send Claude the message. It will rewrite the fix for that widget.</td></tr>
     <tr><td>A lead comes in with the wrong name or company</td><td>Edit the cell. If it keeps happening with a certain kind of email, paste that email to Claude.</td></tr>

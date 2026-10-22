@@ -1601,19 +1601,22 @@ window.WPT_PROPOSALS = [
   "id": "b8-04",
   "created": "2026-10-20",
   "batch": "Batch 8: pages with no links",
-  "type": "manual",
+  "type": "site_edit",
+  "op": "menu_add",
+  "siteWide": true,
+  "params": {
+   "after": "Maintenance",
+   "title": "Business Telecoms Training",
+   "url": "https://westpiertech.com/business-telecoms-training/"
+  },
   "priority": "medium",
   "category": "Structure",
-  "pageTitle": "Business Telecoms Training",
+  "pageTitle": "Footer menu",
   "link": "https://westpiertech.com/business-telecoms-training/",
   "issue": "Add the training page to the footer Our Solutions list",
-  "why": "One link from the Unified Communications page helps, but the audit wants at least two. A footer link puts it on every page in one go. Training is a real service, so it belongs there.",
-  "steps": [
-   "WordPress, then Appearance, then Menus (or the Elementor footer template, if the footer is built there).",
-   "Find the Our Solutions list in the footer.",
-   "Add Business Telecoms Training, pointing at /business-telecoms-training/, under Maintenance & Support.",
-   "Save, then run the audit again."
-  ]
+  "current": "Our Solutions in the footer lists Maintenance & Support but not training.",
+  "proposed": "Adds Business Telecoms Training straight after Maintenance & Support, linking to /business-telecoms-training/. Undo takes it out again.",
+  "why": "A footer link puts the training page on every page in one go, which is the quickest way for Google to treat it as a real service page."
  },
  {
   "id": "b8-05",
@@ -1653,18 +1656,54 @@ window.WPT_PROPOSALS = [
   "id": "b8-07",
   "created": "2026-10-20",
   "batch": "Batch 8: pages with no links",
-  "type": "manual",
+  "type": "set_status",
+  "status": "draft",
+  "postType": "pages",
+  "pageId": 0,
   "priority": "medium",
   "category": "Indexing",
   "pageTitle": "Feature Comparison",
   "link": "https://westpiertech.com/feature-comparison/",
-  "issue": "Feature Comparison page is password-protected, so don't link to it. Hide it from Google instead",
-  "why": "Visitors and Google only see a password box. Linking to it would send people to a locked page. It looks like a working copy of the comparison table that now lives on the manufacturer pages and the Sussex page.",
-  "steps": [
-   "Decide if it's still needed. If not, move it to Draft.",
-   "If you need to keep it, set Visibility to Private, or set it to noindex in Rank Math so it leaves the sitemap.",
-   "Run the audit again."
-  ]
+  "issue": "Feature Comparison is password-protected. Move it to Draft so Google stops finding a locked page",
+  "current": "Published, but visitors and Google only see a password box.",
+  "proposed": "Moves the page to Draft. Nothing is deleted, you can still open it in WordPress, and Undo publishes it again.",
+  "why": "It looks like a working copy of the comparison table that now lives on the manufacturer pages and the Sussex page. A locked page in Google's index looks broken."
+ },
+ {
+  "id": "b9-01",
+  "created": "2026-10-22",
+  "batch": "Batch 9: headings",
+  "type": "text_swap",
+  "size": "small",
+  "priority": "medium",
+  "category": "Content",
+  "postType": "posts",
+  "pageId": 0,
+  "pageTitle": "Top 10 UCaaS Providers for 2026",
+  "link": "https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/",
+  "find": "Feature-by-Feature Comparison: All 10 Platforms Side by Side",
+  "issue": "“Feature” twice in one heading",
+  "current": "Feature-by-Feature Comparison: All 10 Platforms Side by Side",
+  "proposed": "Side-by-Side Feature Comparison: All 10 Platforms",
+  "why": "Same meaning, no repeated word, and “feature comparison” stays in the heading for search. Only this heading changes."
+ },
+ {
+  "id": "b9-02",
+  "created": "2026-10-22",
+  "batch": "Batch 9: headings",
+  "type": "text_swap",
+  "size": "small",
+  "priority": "medium",
+  "category": "Content",
+  "postType": "posts",
+  "pageId": 0,
+  "pageTitle": "Top 10 UCaaS Providers for 2026",
+  "link": "https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/",
+  "find": "Can different departments or sites use different UCaaS providers?",
+  "issue": "“Different” twice in one heading",
+  "current": "Can different departments or sites use different UCaaS providers?",
+  "proposed": "Can different departments or sites use separate UCaaS providers?",
+  "why": "Reads more cleanly and still matches the question people search for. Only this heading changes."
  }
 ];
 
@@ -1699,6 +1738,14 @@ window.WPT_JOBS = [
   "job": "Check out last30days for the weekly brief and lead signals",
   "page": "Weekly brief, Leads",
   "details": "last30days is a free, open source Claude skill (github.com/mvanhorn/last30days-skill, MIT licence, about 64k stars). Give it a topic and it searches Reddit, X, YouTube, Hacker News, GitHub and the web, then ranks what it finds by real engagement (upvotes, likes, views) rather than search position. It writes a short cited brief. Reddit, Hacker News and GitHub work with no API keys. X, YouTube and the others need your own keys.\n\nWhy it could help\n- Weekly brief: a \"What people are saying\" section on what buyers actually complain about (Teams Phone, 8x8, the analogue switch-off).\n- Lead signals: UK businesses on Reddit asking for phone system or contact centre recommendations.\n- Competitors: what people say about Wavenet, Focus Group, Opus, Yo Telecom and Techvu.\n\nTo check\n1. Read the README on GitHub. Note which sources need keys and whether any of them cost money.\n2. Try it once in Claude on a WPT topic, for example \"business phone system UK\" or \"8x8 vs Teams Phone\".\n3. Decide if the results are useful enough to add to the weekly brief. If yes, tell Claude and it will build it in.\n\nCheck it only reads public posts and doesn't store names of the people posting. If we ever act on a Reddit post, reply in public as WPT, never scrape the person's details.",
+  "size": "",
+  "alt": ""
+ },
+{
+  "id": "sg-optimizer-1",
+  "job": "Switch on SiteGround Optimizer for speed and images",
+  "page": "SiteGround Site Tools, Speed",
+  "details": "Covers three Fix queue cards at once: pages under 50 for mobile speed, images much bigger than they need to be, and the page that's slow from the server. These are hosting settings the hub can't reach.\n\n1. SiteGround Site Tools, then Speed, then Caching: Dynamic Caching and Memcached on.\n2. WordPress, then SG Optimizer, then Frontend: minify CSS and JavaScript, and combine CSS, on.\n3. SG Optimizer, then Media: Image Compression (lossless is fine), WebP and Lazy Load on. The existing images are compressed in the background.\n4. Wait an hour, then run the mobile check on Website & SEO. The cards clear themselves once the scores pass.\n\nIf a page looks wrong after step 2, switch combine CSS off again. That's the setting most likely to upset a theme.",
   "size": "",
   "alt": ""
  },
@@ -2052,3 +2099,26 @@ window.WPT_AI_PROMPTS = [
 
 /* Competitors that always show in AI visibility, even in a week they aren't named. */
 window.WPT_AI_COMPETITORS = ["Focus Group", "Opus", "Yo Telecom", "Wavenet", "Techvu"];
+
+/* The llms.txt the hub can publish (Fix queue). Plain text for AI tools: who WPT is and the pages that matter. */
+window.WPT_LLMS = [
+ "# West Pier Technologies",
+ "",
+ "> Brighton-based business telecoms provider. We supply, install and support phone systems, unified communications, contact centre, connectivity and mobile for UK organisations, from small businesses to public sector and police.",
+ "",
+ "West Pier Technologies (WPT) is an independent reseller and support partner for 8x8, 3CX, Zoom Phone, Gamma (Webex for Gamma) and Microsoft Teams Phone, and supports Avaya and Mitel systems. Engineers cover the whole of the UK. Head office: Mocatta House, Trafalgar Place, Brighton BN1 4DU. Phone 01273 391200. Company number 07589250.",
+ "",
+ "## Services",
+ "- [Business phone systems](https://westpiertech.com/business-phone-systems/): cloud and on-premise phone systems, set up, number porting and support",
+ "- [Unified communications](https://westpiertech.com/unified-communications/): calling, meetings and messaging in one platform",
+ "- [Connectivity](https://westpiertech.com/connectivity/): business broadband, leased lines and SIP",
+ "- [Maintenance and support](https://westpiertech.com/maintenance-support-services/): support contracts for existing phone systems",
+ "- [Business telecoms training](https://westpiertech.com/business-telecoms-training/): training for staff on new systems",
+ "",
+ "## Guides",
+ "- [Top 10 UCaaS providers for 2026](https://westpiertech.com/top-10-ucaas-providers-for-2026-the-complete-uk-comparison/): UK comparison of cloud phone platforms",
+ "- [What is 8x8 Engage?](https://westpiertech.com/what-is-8x8-engage-a-practical-guide-for-uk-businesses/): contact centre tools for customer-facing teams",
+ "",
+ "## Contact",
+ "- [Contact West Pier Technologies](https://westpiertech.com/contact/)"
+].join("\n");

@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.28.4";
-  var BUILT = "2026-10-22 16:33 BST";
+  var VERSION = "0.29.0";
+  var BUILT = "2026-10-22 17:23 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1303,6 +1303,7 @@
     p.linksAll = r.links_all || []; p.linksContent = r.links_content || []; p.h1 = Array.isArray(r.h1) ? r.h1 : []; p.canonical = r.canonical || "";
     p.schema = r.schema || []; p.ogImage = r.og_image || ""; p.googleVerify = !!r.google_verify; p.bingVerify = !!r.bing_verify;
     p.images = r.images || 0; p.imagesNoAlt = r.images_no_alt || 0; p.ms = r.ms || 0; p.noindex = !!r.noindex;
+    p.protected = !!r.protected; p.imgsNoAltList = r.imgs_no_alt || null;
     return p;
   }
   function isRedirect(r) { return r && r.status >= 300 && r.status < 400; }
@@ -1508,10 +1509,106 @@
     });
   }
 
-  function indexable(p) { return !p.redirectTo && p.live && !p.noindex; }
+  /* Password-protected pages only show a form, so the audit leaves them out (page checker 13). */
+  function indexable(p) { return !p.redirectTo && p.live && !p.noindex && !p.protected && load("protected-pages", {})[norm(p.link)] !== true; }
   function autoKey(u) { return norm(u).replace(/^[^\/]*/, "").replace(/\W+/g, "-").replace(/^-|-$/g, "") || "home"; }
   function pageRef(p, note) { return { title: String(p.title || "").trim() || shortPath(p.link), link: p.link, note: note || "" }; }
 
+  /* Two pages compete when they share at least two words that say what they're about, once the company
+     name and generic words are taken out. A town page and the national page don't compete: one is local. */
+  var BOILER = { west: 1, pier: 1, technologies: 1, tech: 1, telecom: 1, telecoms: 1, business: 1, businesses: 1, phone: 1, phones: 1, system: 1, systems: 1, uk: 1, solutions: 1, services: 1, provider: 1, providers: 1, guide: 1, complete: 1, best: 1, top: 1 };
+  function aboutWords(t) { return titleWords(t).filter(function (w) { return !BOILER[w] && !/^(19|20)\d\d$/.test(w); }); }
+  function townOf(t) { var m = String(t || "").replace(/\|.*$/, "").match(/\bin ([A-Z][\w&' -]+?)\s*$/); return m ? m[1].trim().toLowerCase() : ""; }
+  function competes(ta, tb) {
+    if (townOf(ta) !== townOf(tb)) return false;
+    var a = aboutWords(ta), b = aboutWords(tb);
+    if (a.length < 2 || b.length < 2) return false;
+    var shared = a.filter(function (w) { return b.indexOf(w) > -1; }).length;
+    return shared >= 2 && shared / Math.min(a.length, b.length) >= 0.75;
+  }
+  /* Titles: page name plus " | West Pier" when it fits, otherwise the page name on its own. */
+  function shortTitle(p) {
+    var name = String(p.title || "").replace(/\s*[|\u2013\u2014-]\s*West Pier.*$/i, "").trim();
+    if (name.length < 15) return "";
+    if ((name + " | West Pier").length <= 60) return name + " | West Pier";
+    return name.length <= 60 ? name : "";
+  }
+  /* Long descriptions: keep whole sentences up to 160 characters. */
+  function trimDesc(d) {
+    var parts = String(d || "").split(/(?<=[.!?])\s+/), acc = "";
+    for (var i = 0; i < parts.length; i++) { var next = acc ? acc + " " + parts[i] : parts[i]; if (next.length > 160) break; acc = next; }
+    return acc.length >= 70 ? acc : "";
+  }
+  var LINK_TARGET_SKIP = /privacy|cookie|terms|contact|about|news|get-started|thank|careers|sitemap|feature-comparison/;
+  function autoGroups(out, idx, ctx) {
+    var kids = [], today = ctx.today;
+    function parent(id) { return out.filter(function (x) { return x.id === id; })[0]; }
+    function pt(p) { return p.type === "Post" ? "posts" : "pages"; }
+    function group(id, label, list, left, leftWhy) {
+      var par = parent(id); if (!par) return;
+      if ((left || []).length) {
+        kids.push({ id: id + "-claude", auto: true, type: "manual", created: today, batch: par.batch, category: par.category, priority: par.priority, pageTitle: "Whole site", link: par.link,
+          issue: left.length + " page" + (left.length > 1 ? "s" : "") + " where the hub can't write the " + label.toLowerCase() + " itself", pages: left,
+          why: leftWhy || "These need new wording rather than a trim, so Claude writes them. Copy the list and paste it to Claude; the fixes come back here ready to push.", steps: [] });
+      }
+      if (!list.length) { par._drop = true; return; }
+      par.type = "group"; par.groupLabel = label;
+      list.forEach(function (k) {
+        kids.push(Object.assign({ parent: id, auto: true, created: today, batch: par.batch, category: par.category, priority: par.priority, size: "small", postType: "pages", pageId: 0, why: par.why }, k));
+      });
+    }
+    var tl = [], tleft = [];
+    idx.filter(function (p) { return (p.metaTitle || "").length > 60 && !ctx.claude["meta_title|" + norm(p.link)]; }).forEach(function (p) {
+      var t = shortTitle(p);
+      if (t) tl.push({ id: "t-" + autoKey(p.link), type: "meta_title", postType: pt(p), pageId: p.id || 0, pageTitle: p.title, link: p.link, issue: "Title is " + p.metaTitle.length + " characters", current: p.metaTitle, proposed: t,
+        why: "Google shows about 60 characters. This keeps the page name, which is what people search for, and drops the long company name." });
+      else tleft.push(pageRef(p, p.metaTitle.length + " characters, page name too long to use on its own"));
+    });
+    group("auto-titles-long", "Titles", tl, tleft);
+    var dl = [], dleft = [];
+    idx.filter(function (p) { var d = p.metaDesc || ""; return (d.length < 70 || d.length > 160) && !ctx.claude["meta_description|" + norm(p.link)]; }).forEach(function (p) {
+      var t = (p.metaDesc || "").length > 160 ? trimDesc(p.metaDesc) : "";
+      if (t) dl.push({ id: "d-" + autoKey(p.link), type: "meta_description", postType: pt(p), pageId: p.id || 0, pageTitle: p.title, link: p.link, issue: "Description is " + p.metaDesc.length + " characters", current: p.metaDesc, proposed: t,
+        why: "Google cuts descriptions off around 160 characters. This keeps your own wording and ends on a full sentence." });
+      else dleft.push(pageRef(p, (p.metaDesc || "").length ? p.metaDesc.length + " characters" : "no description"));
+    });
+    group("auto-desc-gap", "Descriptions", dl, dleft);
+    group("auto-h1-multiple", "One H1", idx.filter(function (p) { return (p.h1 || []).length > 1; }).map(function (p) {
+      return { id: "h1one-" + autoKey(p.link), type: "site_edit", op: "h1_one", postType: pt(p), pageId: p.id || 0, pageTitle: p.title, link: p.link, issue: p.h1.length + " H1s on the page",
+        current: "H1s: " + p.h1.join(" / "), proposed: "Keeps \u201c" + p.h1[0] + "\u201d as the H1 and makes the others H2. The wording stays the same; those headings may look a little smaller. Undo puts them back." };
+    }), []);
+    var al = [], aleft = [];
+    idx.filter(function (p) { return p.imagesNoAlt > 0; }).forEach(function (p) {
+      if (!p.imgsNoAltList) { aleft.push(pageRef(p, "run the audit again with page checker 13 to list the images")); return; }
+      if (!p.imgsNoAltList.length) return;
+      al.push({ id: "alt-" + autoKey(p.link), type: "site_edit", op: "alt", postType: pt(p), pageId: p.id || 0, pageTitle: p.title, link: p.link, issue: p.imgsNoAltList.length + " images with no alt text",
+        items: p.imgsNoAltList.map(function (src) { return { src: src, alt: altFromFile(src, p.title) }; }), current: p.imgsNoAltList.map(altFile).join("\n"),
+        why: "Starting points come from each image's file name. Fix any that don't describe the picture, and blank out any you'd rather leave. Images that aren't in the Media Library (theme or other sites) are skipped." });
+    });
+    group("auto-alt", "Alt text", al, aleft, "Update the page checker to version 13 (Website & SEO, Copy page checker code), then run the audit again. The hub will list each image and write starting alt text you can push.");
+    group("auto-links-redirected", "Link fixes", (ctx.toRedirect || []).map(function (r) {
+      return { id: "relink-" + autoKey(r.link) + "-" + autoKey(r._from), type: "site_edit", op: "relink", params: { from: r._from, to: r._to }, postType: pt(r._page), pageId: r._page.id || 0, pageTitle: r.title, link: r.link,
+        issue: "Links to an old address", current: r._from, proposed: "Points the link straight at " + r._to + ". The link text stays the same. Undo puts the old address back." };
+    }), []);
+    group("auto-redirect-temp", "Redirect fixes", (ctx.temp || []).filter(function (r) { return r._rid; }).map(function (r) {
+      return { id: "redir301-" + r._rid, type: "site_edit", op: "redirect_code", siteWide: true, params: { redirect_id: r._rid }, pageTitle: r.title, link: r.link, issue: "Redirect " + r.note,
+        current: r.title + " (" + r.note + ")", proposed: "Makes it a 301 permanent redirect in Rank Math. Undo sets it back." };
+    }), []);
+    group("auto-canonical", "Canonical fixes", idx.filter(function (p) { return p.canonical && norm(p.canonical) !== norm(p.link); }).map(function (p) {
+      return { id: "canon-" + autoKey(p.link), type: "site_edit", op: "meta", params: { key: "rank_math_canonical_url", value: "" }, postType: pt(p), pageId: p.id || 0, pageTitle: p.title, link: p.link,
+        issue: "Tells Google " + shortPath(p.canonical) + " is the real page", current: "Canonical: " + p.canonical, proposed: "Clears the canonical in Rank Math, so this page counts as itself. Skip it if the other page really is the one you want to rank. Undo puts it back." };
+    }), []);
+    /* Blog posts with few links: suggestions are found when the card opens (they need a search of the site). */
+    var few = parent("auto-posts-few-links");
+    if (few) {
+      few.type = "group"; few.groupLabel = "Add links"; few.producer = "fewLinks";
+      few.targets = idx.filter(function (p) { var path = shortPath(p.link); return p.type !== "Post" && path !== "/" && path.split("/").length <= 4 && !LINK_TARGET_SKIP.test(path) && !townOf(p.title); })
+        .map(function (p) { return { title: p.title, link: p.link }; }).slice(0, 40);
+      few.posts = idx.filter(function (p) { return (few.pages || []).some(function (x) { return norm(x.link) === norm(p.link); }); })
+        .map(function (p) { return { title: p.title, link: p.link, links: (p.linksContent || []).map(norm) }; });
+    }
+    return kids;
+  }
   function buildAutoFixes(audit) {
     var out = [], site = audit.siteData, status = audit.status || {}, pages = audit.pages, today = new Date().toISOString().slice(0, 10);
     if (!site) return out;
@@ -1525,8 +1622,9 @@
     }
 
     /* Indexing */
-    if (site.blog_public === 0) add({ id: "auto-blog-public", priority: "critical", category: "Indexing", issue: "WordPress is telling search engines not to index the site",
-      why: "The 'Discourage search engines' box is ticked. Google may drop the whole site from results.", steps: ["In WordPress go to Settings, then Reading.", "Untick 'Discourage search engines from indexing this site'.", "Save Changes."] });
+    if (site.blog_public === 0) out.push({ id: "auto-blog-public", auto: true, created: today, batch: "Found by audit", type: "site_edit", op: "option", siteWide: true, params: { key: "blog_public" }, size: "small", link: home, pageTitle: "Whole site",
+      priority: "critical", category: "Indexing", issue: "WordPress is telling search engines not to index the site", current: "Settings, Reading: 'Discourage search engines' is ticked.", proposed: "Unticks it, so Google can index the site again. Undo ticks it again.",
+      why: "Google may drop the whole site from results while this is ticked." });
     var rb = site.robots;
     if (!rb || rb.status !== 200) add({ id: "auto-robots-missing", priority: "high", category: "Indexing", issue: "No robots.txt file",
       why: "Search engines check robots.txt first. Without one they can still crawl, but you lose the chance to point them at your sitemap.", steps: ["In WordPress go to Rank Math, then General Settings, then Edit robots.txt.", "Make sure it contains: User-agent: * / Allow: / and a Sitemap: line pointing at https://westpiertech.com/sitemap_index.xml.", "Save, then run the audit again."] });
@@ -1576,14 +1674,17 @@
     if (homeRow && homeRow.live) {
       if (!homeRow.googleVerify) add({ id: "auto-verify-google", priority: "medium", category: "Indexing", issue: "Can't see Google Search Console verification on the home page",
         why: "Search Console is where Google tells you which pages it has indexed, which searches you appear for and what's broken. If it's already verified another way (for example through DNS), mark this done.", steps: ["Go to search.google.com/search-console and add westpiertech.com (Domain property).", "Verify through DNS (Matt) or copy the HTML tag into Rank Math, then General Settings, then Webmaster Tools, then Google Search Console.", "Submit https://westpiertech.com/sitemap_index.xml under Sitemaps."] });
-      if (!homeRow.bingVerify) add({ id: "auto-verify-bing", priority: "medium", category: "AI search", issue: "Can't see Bing Webmaster Tools verification",
-        why: "Bing's index feeds Microsoft Copilot and is used by other AI search tools. Being set up properly in Bing matters more now than it used to. If it's verified another way, mark this done.", steps: ["Go to bing.com/webmasters and sign in.", "Use 'Import from Google Search Console' (quickest) or add the site and copy the meta tag into Rank Math, then General Settings, then Webmaster Tools, then Bing.", "Submit the sitemap.", "In Rank Math, switch on Instant Indexing (IndexNow) so Bing hears about changes straight away."] });
+      if (!homeRow.bingVerify) out.push({ id: "auto-verify-bing", auto: true, created: today, batch: "Found by audit", type: "site_edit", op: "option", siteWide: true, params: { key: "bing_verify" }, textParam: "value", size: "small", link: home, pageTitle: "Whole site",
+        priority: "medium", category: "AI search", issue: "Can't see Bing Webmaster Tools verification", current: "No Bing code on the site.", proposed: "", inputLabel: "Bing's verification code",
+        placeholder: "At bing.com/webmasters, add westpiertech.com, choose the HTML Meta Tag option and paste the tag or code here",
+        why: "Bing's index feeds Microsoft Copilot. Paste the code and push: the hub puts it in Rank Math and Bing can verify straight away. If you verify by importing from Google Search Console instead, just Reject this." });
       var hs = homeRow.schema || [];
       if (!hs.some(function (t) { return /Organization|LocalBusiness|Corporation|ProfessionalService/.test(t); })) add({ id: "auto-schema-org", priority: "high", category: "AI search", issue: "Home page has no Organisation or LocalBusiness schema", link: homeRow.link,
         why: "This is the structured data that tells Google and AI tools who WPT is, where you are and how to contact you. It feeds the knowledge panel and AI answers about the business.", steps: ["Rank Math, then Titles & Meta, then Local SEO.", "Set 'Person or Company' to Company, fill in name, logo, address, phone 01273 391200 and opening hours.", "Save, purge the cache and run the audit again."] });
     }
-    if (site.llms !== 200) add({ id: "auto-llms", priority: "low", category: "AI search", issue: "No llms.txt file",
-      why: "llms.txt is a short plain-text summary of the site for AI tools: what you do, your key pages and how to contact you. It's new and not every AI tool reads it yet, but it's cheap to add.", steps: ["Ask Claude to write the llms.txt for WPT.", "Rank Math has an llms.txt option under General Settings in recent versions. If yours doesn't, Matt uploads the file to the site root.", "Check https://westpiertech.com/llms.txt loads, then run the audit again."] });
+    if (site.llms !== 200) out.push({ id: "auto-llms", auto: true, created: today, batch: "Found by audit", type: "site_edit", op: "llms", siteWide: true, textParam: "value", size: "small", link: home, pageTitle: "Whole site",
+      priority: "low", category: "AI search", issue: "No llms.txt file", current: "(no llms.txt)", proposed: window.WPT_LLMS || "", placeholder: "The text for llms.txt",
+      why: "llms.txt is a short plain-text summary of the site for AI tools: what you do, your key pages and how to contact you. Edit anything in the box, then publish. It goes live at westpiertech.com/llms.txt and Undo takes it down." });
 
     /* Redirect rules */
     var rules = (site.redirections || []).filter(function (r) { return r.status === "active"; });
@@ -1594,7 +1695,7 @@
       var t = status[norm(abs(r.url_to))];
       if (t && t.status >= 300 && t.status < 400) chains.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "which redirects again to " + shortPath(t.location) });
       else if (t && t.status >= 400) dead.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "target answers " + t.status });
-      if (String(r.header_code) === "302" || String(r.header_code) === "307") temp.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "uses " + r.header_code });
+      if (String(r.header_code) === "302" || String(r.header_code) === "307") temp.push({ title: src + " → " + shortPath(r.url_to), link: abs(r.url_to), note: "uses " + r.header_code, _rid: r.id });
     });
     if (dead.length) add({ id: "auto-redirect-dead", priority: "high", category: "Structure", issue: dead.length + " redirects send visitors to a page that doesn't exist", pages: dead,
       why: "Anyone following an old link lands on an error, and Google drops the ranking the old page had.", steps: ["Rank Math, then Redirections.", "Edit each rule listed to point at the right live page.", "Run the audit again."] });
@@ -1611,7 +1712,7 @@
       (p.linksContent || []).forEach(function (u) {
         var s = status[norm(u)]; if (!s) return;
         if (s.status >= 400 || s.status === 0) broken.push({ title: p.title, link: p.link, note: "links to " + shortPath(u) + " (" + (s.status || "no answer") + ")" });
-        else if (s.status >= 300 && s.status < 400) toRedirect.push({ title: p.title, link: p.link, note: "links to " + shortPath(u) + ", which redirects to " + shortPath(s.location) });
+        else if (s.status >= 300 && s.status < 400) toRedirect.push({ title: p.title, link: p.link, note: "links to " + shortPath(u) + ", which redirects to " + shortPath(s.location), _page: p, _from: u, _to: s.location });
       });
     });
     if (broken.length) add({ id: "auto-links-broken", priority: "high", category: "Structure", issue: broken.length + " broken links in page content", pages: broken,
@@ -1640,8 +1741,10 @@
     if (canon.length) add({ id: "auto-canonical", priority: "high", category: "Indexing", issue: canon.length + " pages tell Google a different address is the real one", pages: canon,
       why: "A canonical pointing elsewhere tells Google to ignore this page and rank the other address instead.", steps: ["Open each page, then Rank Math, then Advanced.", "Clear the Canonical URL box (or set it to the page's own address).", "Save and run the audit again."] });
     idx.concat(pages.filter(function (p) { return p.live && p.noindex; })).filter(function (p) { return p.noindex; }).forEach(function (p) {
-      add({ id: "auto-noindex-" + norm(p.link).replace(/\W+/g, "-"), priority: "high", category: "Indexing", pageTitle: p.title, link: p.link, issue: "Set to noindex, so it won't appear in Google",
-        why: "If this is deliberate, choose 'Not doing this' and it won't come back. If not, the page is invisible in search.", steps: ["Open the page, then Rank Math, then Advanced.", "Untick No Index.", "Save and run the audit again."] });
+      out.push({ id: "auto-noindex-" + norm(p.link).replace(/\W+/g, "-"), auto: true, created: today, batch: "Found by audit", type: "site_edit", op: "meta", params: { key: "rank_math_robots" }, size: "small",
+        postType: p.type === "Post" ? "posts" : "pages", pageId: p.id || 0, priority: "high", category: "Indexing", pageTitle: p.title, link: p.link, issue: "Set to noindex, so it won't appear in Google",
+        current: "Rank Math tells Google not to show this page.", proposed: "Removes noindex in Rank Math so Google can list the page. Its other robots settings stay as they are. Undo puts noindex back.",
+        why: "If this is deliberate, choose Reject and it won't come back. If not, the page is invisible in search." });
     });
     function dupes(field, label, pri) {
       var groups = {};
@@ -1656,12 +1759,12 @@
     var pairs = [];
     for (var i = 0; i < idx.length; i++) for (var j = i + 1; j < idx.length; j++) {
       var a = idx[i], b = idx[j];
-      if (overlap(titleWords(a.title), titleWords(b.title)) >= 0.75 && titleWords(a.title).length >= 2) pairs.push([a, b]);
+      if (competes(a.title, b.title)) pairs.push([a, b]);
     }
     pairs.slice(0, 15).forEach(function (pr) {
       add({ id: "auto-cannibal-" + (norm(pr[0].link) + "-" + norm(pr[1].link)).replace(/\W+/g, "-").slice(0, 90), priority: "medium", category: "Content", pageTitle: pr[0].title, link: pr[0].link,
         issue: "May compete with \"" + pr[1].title + "\" for the same searches", pages: [pageRef(pr[0]), pageRef(pr[1])],
-        why: "Two pages chasing the same search split the ranking between them, so often neither makes page one. If they really cover different things, choose 'Not doing this'.", steps: ["Decide which page should rank for this topic.", "Either merge the other into it and redirect the old address (Rank Math, then Redirections, 301), or rewrite one so it targets a clearly different search.", "Tell Claude which, and it can write the changes."] });
+        why: "Two pages chasing the same search split the ranking between them, so often neither makes page one.", steps: ["Decide which page should rank for this topic.", "Either merge the other into it and redirect the old address (Rank Math, then Redirections, 301), or rewrite one so it targets a clearly different search.", "Tell Claude which, and it can write the changes."] });
     });
 
     /* Content and AEO */
@@ -1675,8 +1778,10 @@
     if (postsNoArticle.length) add({ id: "auto-schema-article", priority: "medium", category: "AI search", issue: postsNoArticle.length + " blog posts aren't marked up as articles", pages: postsNoArticle,
       why: "Article schema tells Google and AI tools it's an article, who wrote it and when. That feeds Top Stories, AI answers and the 'last updated' date people see.", steps: ["Rank Math, then Titles & Meta, then Posts: set Schema Type to Article (BlogPosting).", "For existing posts, open each one, then Rank Math, then Schema, and switch to Article.", "Run the audit again."] });
     var noOg = idx.filter(function (p) { return !p.ogImage; }).map(function (p) { return pageRef(p); });
-    if (noOg.length) add({ id: "auto-og-image", priority: "low", category: "Content", issue: noOg.length + " pages have no social sharing image", pages: noOg,
-      why: "When someone shares the page on LinkedIn, Teams or WhatsApp, it shows a blank box instead of an image. Fewer clicks.", steps: ["Rank Math, then Titles & Meta, then Global Meta: set a default OpenGraph image (your logo on brand colours works).", "For key pages, set their own image in Rank Math, then Social.", "Run the audit again."] });
+    if (noOg.length) out.push({ id: "auto-og-image", auto: true, created: today, batch: "Found by audit", type: "site_edit", op: "option", siteWide: true, params: { key: "og_image" }, textParam: "value", size: "small", link: home, pageTitle: "Whole site",
+      priority: "low", category: "Content", issue: noOg.length + " pages have no social sharing image", current: "No default image in Rank Math, so shares show a blank box.", proposed: "", inputLabel: "Address of the image to use",
+      placeholder: "Media, then Library, open the image (your logo on brand colours works), click Copy URL to clipboard, paste it here",
+      why: "One default image covers every page without its own. You choose the image; the hub sets it in Rank Math. Undo takes it off again." });
     var noAlt = idx.filter(function (p) { return p.imagesNoAlt > 0; }).map(function (p) { return pageRef(p, p.imagesNoAlt + " of " + p.images + " images"); });
     if (noAlt.length) add({ id: "auto-alt", priority: "medium", category: "Content", issue: noAlt.length + " pages have images with no alt text", pages: noAlt,
       why: "Alt text is how Google Images, screen readers and AI tools understand a picture. Missing alt text also counts against accessibility, which public sector buyers check.", steps: ["Go to Media, then Library, open each image used on these pages and fill in Alt Text.", "Describe what the image shows in a short sentence. Claude can draft these if you send the image file names.", "Run the audit again."] });
@@ -1689,6 +1794,10 @@
     var descGap = idx.filter(function (p) { var d = p.metaDesc || ""; return (d.length < 70 || d.length > 160) && !claude["meta_description|" + norm(p.link)]; }).map(function (p) { return pageRef(p, (p.metaDesc || "").length + " characters"); });
     if (descGap.length) add({ id: "auto-desc-gap", priority: "medium", category: "Content", issue: descGap.length + " more pages have descriptions that are missing, too short or too long", pages: descGap,
       why: "These aren't in a Claude batch yet.", steps: ["Ask Claude for the next batch of descriptions, which will cover these.", "Or write them yourself in Rank Math, then Edit Snippet."] });
+
+    /* Push-ready fixes for the cards above. Each card becomes a group the hub can push in one go. */
+    var groupKids = autoGroups(out, idx, { toRedirect: toRedirect, temp: temp, today: today, claude: claude });
+    out = out.filter(function (x) { return !x._drop; }).concat(groupKids);
     return out;
   }
 
@@ -2438,6 +2547,27 @@
     return list.length === 3 ? "desktop, tablets and phones" : list.length === 2 ? list.join(" and ") : list[0] + " only";
   }
   var SFX = { desktop: "", tablet: "_tablet", phone: "_mobile" };
+  var CSS_KINDS = { broken_word: 1, loose_lines: 1, button_wrap: 1 };
+  function displayCss(groups, today) {
+    var ids = {}, link = "";
+    Object.keys(CSS_KINDS).forEach(function (k) {
+      var g = groups[k] || [];
+      ids[k] = g.filter(function (x) { return x._pid > 0; }).map(function (x) { return x._pid; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+      if (ids[k].length) link = link || g[0].link;
+      groups[k] = g.filter(function (x) { return !(x._pid > 0); });
+    });
+    function sel(list, parts) { return list.map(function (id) { return parts.map(function (pt) { return "body.page-id-" + id + " " + pt + ", body.postid-" + id + " " + pt; }).join(",\n"); }).join(",\n"); }
+    var css = [];
+    if (ids.broken_word.length) css.push("/* Words breaking in half on phones: slightly smaller headings */\n@media (max-width: 767px) {\n" + sel(ids.broken_word, ["h1", "h2", "h3", ".elementor-heading-title"]) + " {\n  font-size: clamp(1.4rem, 6.4vw, 2.1rem);\n  overflow-wrap: normal;\n  word-break: normal;\n  hyphens: none;\n}\n}");
+    if (ids.loose_lines.length) css.push("/* Big gaps between heading lines */\n" + sel(ids.loose_lines, ["h1", "h2", "h3", "h4", ".elementor-heading-title"]) + " {\n  line-height: 1.2;\n}");
+    if (ids.button_wrap.length) css.push("/* Button text wrapping on phones */\n@media (max-width: 767px) {\n" + sel(ids.button_wrap, [".elementor-button", ".wp-block-button__link", ".ct-button"]) + " {\n  padding-left: 14px;\n  padding-right: 14px;\n  font-size: 15px;\n  letter-spacing: 0;\n}\n}");
+    if (!css.length) return null;
+    var n = ids.broken_word.length + ids.loose_lines.length + ids.button_wrap.length;
+    return { id: "disp-css", auto: true, created: today, batch: "Found by display check", category: "Mobile", priority: "medium", type: "site_edit", op: "css", siteWide: true, textParam: "value", size: "small",
+      pageTitle: "Display fixes", link: link, issue: "Words breaking, loose heading lines and wrapping buttons on " + n + " page" + (n > 1 ? "s" : ""),
+      current: "Seen by the display check on these pages, in places the hub can't edit one widget at a time.", proposed: css.join("\n\n"),
+      why: "Small style rules, only on the pages where the problem was seen: headings a touch smaller on phones so words fit, tighter heading line spacing, and slimmer button padding on phones. The words don't change. Undo removes the rules." };
+  }
   function buildDisplayFixes(d) {
     var out = []; if (!d || !d.pages) return out;
     var today = new Date().toISOString().slice(0, 10), groups = {};
@@ -2548,8 +2678,9 @@
             why: "Found by the display check, which looks at each page the way a visitor sees it. Cut-off or squashed images look careless, especially logos and badges, which are trust signals." });
           return;
         }
+        if (it.kind === "repeat_word" && claudeText[norm(u) + "|" + String(it.text || "").toLowerCase()]) return;
         var g = groups[it.kind] = groups[it.kind] || [];
-        g.push({ title: shortPath(u) + (it.at && it.at.near ? " · near “" + it.at.near + "”" : ""), link: u,
+        g.push({ _pid: pg.pageId || 0, title: shortPath(u) + (it.at && it.at.near ? " · near “" + it.at.near + "”" : ""), link: u,
           note: [it.file || (it.text ? "“" + it.text + "”" : ""), it.detail || "", onWhat, wtype ? "Elementor " + wtype : ""].filter(Boolean).join(" · ") });
       });
     });
@@ -2572,8 +2703,13 @@
       no_alt: ["Open the image in the Media Library.", "Fill in Alternative Text with a short description of what it shows (or the company name for a logo).", "Save. Google and AI tools use this to understand the image."]
     };
     var PRI = { broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
+    /* Words breaking, loose heading lines and wrapping buttons outside Elementor widgets the hub can edit:
+       one small style fix, scoped to the pages where they were seen. */
+    var cssFix = displayCss(groups, today);
+    if (cssFix) out.push(cssFix);
     Object.keys(groups).forEach(function (k) {
       var g = groups[k];
+      if (!g.length) return;
       out.push({ id: "disp-" + k, auto: true, type: "manual", created: today, batch: "Found by display check", category: k === "no_alt" ? "AI search" : "Mobile", priority: PRI[k],
         pageTitle: "Display check", link: g[0].link, issue: g.length + " × " + DISPLAY_KIND[k].toLowerCase(), pages: g,
         why: "Found by the display check, which looks at each page the way a visitor sees it, on desktop and on a phone.", steps: STEPS[k] });
@@ -2694,6 +2830,15 @@
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
     elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix" };
+  var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
+  function typeLabel(p) { return p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
+  /* The button says what pushing does. */
+  function goLabel(p) {
+    if (p.type === "site_edit") return { h1: "Approve and make it the H1", h1_one: "Approve and keep one H1", alt: "Approve and add the alt text", relink: "Approve and fix the link", menu_add: "Approve and add to the menu", css: "Approve and fix the display", llms: "Approve and publish llms.txt", option: p.params && p.params.key === "blog_public" ? "Approve and let Google index the site" : "Approve and save the setting", meta: p.params && p.params.key === "rank_math_robots" ? "Approve and let Google index it" : "Approve and clear it", redirect_code: "Approve and make it permanent" }[p.op] || "Approve and push";
+    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live";
+  }
+  /* Fixes whose box only describes what happens, rather than holding text to edit. */
+  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
   function parseFaq(text) {
@@ -2713,6 +2858,10 @@
   }
   function needsV11(err) {
     if (/no route|unknown edit type|doesn't say which text/i.test(err.message)) throw new Error("FAQ blocks need version 11 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then click Save and test: it should say version 11. Then try again.");
+    throw err;
+  }
+  function needsV13(err) {
+    if (/no route|unknown edit type/i.test(err.message)) throw new Error("This fix needs version 13 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then click Save and test: it should say version 13. Then push again.");
     throw err;
   }
   function needsV12(err) {
@@ -2746,7 +2895,7 @@
   function setFix(id, patch) { var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s); }
   function pendingFixes() {
     var s = fixState();
-    return proposals().filter(function (p) { return !p.example && !p.parent && isOpenFix(s[p.id]); });
+    return proposals().filter(function (p) { return !p.example && !p.parent && cardMode(p) !== "job" && isOpenFix(s[p.id]); });
   }
   /* In progress: a fix you've started, parked until its next action date.
      On that date it comes back to the top of Waiting for you. */
@@ -2916,6 +3065,7 @@
 
   function pushFix(p, text) {
     if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
+    if (p.type === "site_edit" && p.siteWide) return pushSite(p, text);
     /* Replacement-rule fixes are rebuilt from the live page just before pushing, so a fix saved by an
        older version of the hub (or before the page changed) can't push stale wording. */
     if (p.batch === "Automatic replacement" && !p._fresh) {
@@ -2961,9 +3111,20 @@
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_tidy" ? "tidy" : p.type === "elementor_type" ? "type" : "layout", element: p.element, set: p.set || {}, clear_negative_margin: p.clearNeg ? 1 : 0 } })
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV9);
     }
+    if (p.type === "site_edit") return pushSite(p, text);
+    if (p.type === "text_swap") {
+      /* Elementor pages swap inside the widget; anything else changes the page text. */
+      return pushFix(Object.assign({}, p, { type: "elementor_swap" }), text).catch(function (err) {
+        if (!/isn't built with Elementor/.test(err.message)) throw err;
+        return pushFix(Object.assign({}, p, { type: "content_replace", current: p.find }), text);
+      });
+    }
     if (p.type === "elementor_h1") {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "h1", element: p.element || "" } })
-        .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, needsV12);
+        .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, function (err) {
+          if (/isn't built with Elementor/.test(err.message)) return pushSite(Object.assign({}, p, { type: "site_edit", op: "h1" }), "");
+          return needsV12(err);
+        });
     }
     if (p.type === "elementor_faq") {
       var faq;
@@ -3020,17 +3181,45 @@
     });
   }
   /* Ask WordPress which heading would become the H1, without changing anything. */
+  function pushSite(p, text) {
+    var body = Object.assign({ op: p.op, post_id: p.siteWide ? 0 : p.pageId || 0 }, p.params || {});
+    if (p.textParam) body[p.textParam] = text;
+    if (p.op === "alt") body.items = parseAltText(text, p.items || []);
+    return wpFetch("/wpt-hub/v1/site-edit", { method: "POST", body: body }).then(function (r) {
+      return { before: r.before, after: r.after, backup: r.backup, skipped: r.skipped || [] };
+    }, needsV13);
+  }
+  /* Alt text is edited as one line per image: "file name: description". */
+  function altFromFile(src, pageTitle) {
+    var f = decodeURIComponent(String(src || "").split("/").pop().split("?")[0]).replace(/\.[a-z0-9]+$/i, "").replace(/-\d+x\d+$/, "").replace(/-(scaled|e\d+)$/i, "");
+    var words = f.split(/[-_\s.]+/).filter(function (w) { return w && !/^(img|dsc|dscn|pxl|image|photo|picture|screenshot|copy|final|web|min|scaled|\d+|[a-f0-9]{8,})$/i.test(w); });
+    if (words.length < 1) return "";
+    var t = words.join(" ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function altFile(src) { return decodeURIComponent(String(src || "").split("/").pop().split("?")[0]); }
+  function altText(items) { return items.map(function (it) { return altFile(it.src) + ": " + (it.alt || ""); }).join("\n"); }
+  function parseAltText(text, items) {
+    var byFile = {}; String(text || "").split("\n").forEach(function (l) { var i = l.indexOf(":"); if (i > 0) byFile[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });
+    return items.map(function (it) { var f = altFile(it.src); return { src: it.src, alt: f in byFile ? byFile[f] : it.alt || "" }; }).filter(function (it) { return it.alt.length >= 3; });
+  }
   function previewH1(p) {
     var go = p.pageId > 0 ? Promise.resolve(p.pageId) : resolveId(p);
     return go.then(function (id) {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: id, op: "h1", dry_run: 1 } }).then(function (r) {
         if (!r.dry_run) throw new Error("Update the page checker snippet to version 11 to preview this fix.");
         return r;
-      }, needsV11);
+      }, function (err) {
+        if (/isn't built with Elementor/.test(err.message)) return { notElementor: true };
+        return needsV11(err);
+      });
     });
   }
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
+    /* Site fixes (page checker 13) keep their copy under an id starting with "s". */
+    if (st.backup && /^s\d/.test(st.backup)) return wpFetch("/wpt-hub/v1/site-undo", { method: "POST", body: { backup: st.backup, force: force ? 1 : 0 } });
+    if (p.type === "text_swap") p = Object.assign({}, p, { type: st.backup ? "elementor_swap" : "content_replace" });
     var base = "/wp/v2/" + p.postType + "/";
     if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq" || p.type === "elementor_h1") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
@@ -3073,8 +3262,8 @@
     function draw() {
       var s = fixState(), all = proposals().filter(function (p) { return area === "All" || (p.category || "Content") === area; });
       var groups = {
-        waiting: sortFixGroup(all.filter(function (p) { return !p.parent && isOpenFix(s[p.id]); }), s, "waiting"),
-        inprogress: sortFixGroup(all.filter(function (p) { return !p.parent && isParkedFix(s[p.id]); }), s, "inprogress"),
+        waiting: sortFixGroup(all.filter(function (p) { return !p.parent && cardMode(p) !== "job" && isOpenFix(s[p.id]); }), s, "waiting"),
+        inprogress: sortFixGroup(all.filter(function (p) { return !p.parent && cardMode(p) !== "job" && isParkedFix(s[p.id]); }), s, "inprogress"),
         pushed: all.filter(function (p) { return s[p.id] && /^(pushed|undone|done)$/.test(s[p.id].status); }),
         rejected: all.filter(function (p) { return s[p.id] && s[p.id].status === "rejected"; })
       };
@@ -3103,12 +3292,12 @@
 
   function headChips(p, st) {
     return '<div class="row">' + '<span class="chip ' + PRI_CHIP[p.priority || "medium"] + '">' + PRI_LABEL[p.priority || "medium"] + "</span>" +
-      '<span class="chip info">' + esc(TYPE_LABEL[p.type] || p.type) + "</span>" + '<span class="chip">' + esc(p.category || "Content") + "</span>" +
+      '<span class="chip info">' + esc(typeLabel(p)) + "</span>" + '<span class="chip">' + esc(p.category || "Content") + "</span>" +
       (p.auto ? '<span class="chip">Found by audit</span>' : "") + (p.example ? '<span class="chip ex">example</span>' : "") +
       (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">Still found on the last audit</span>' : "") + "</div>";
   }
   function offerAlreadyDone(p, box, redraw) {
-    var b = el('<div class="row" style="margin-top:8px"><span class="muted" style="font-size:.86rem">If this has already been sorted, you can close it.</span><button type="button" class="btn small primary">Mark as done</button></div>');
+    var b = el('<div class="row" style="margin-top:8px"><span class="muted" style="font-size:.86rem">If this has already been sorted, close it.</span><button type="button" class="btn small primary">Close it, already sorted</button></div>');
     box.appendChild(b);
     b.querySelector("button").addEventListener("click", function () {
       var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
@@ -3386,15 +3575,16 @@
     var w = t.split(" ").filter(Boolean), out = [];
     function keep(ph) { ph = ph.trim(); if (ph.length >= 4 && out.indexOf(ph) === -1) out.push(ph); }
     if (w.length >= 2 && w.length <= 6) keep(t);
-    for (var n = Math.min(4, w.length - 1); n >= 2; n--) {
-      for (var i = 0; i + n <= w.length; i++) {
+    /* Short phrases first: two words like "Engage Voice" turn up in body text far more often than long ones. */
+    [2, 3, 4].forEach(function (n) {
+      for (var i = 0; i + n <= w.length && n < w.length; i++) {
         var g = w.slice(i, i + n);
         if (LINK_STOP[g[0].toLowerCase()] || LINK_STOP[g[n - 1].toLowerCase()]) continue;
         keep(g.join(" "));
       }
-    }
+    });
     w.forEach(function (x) { if (x.length >= 4 && !LINK_STOP[x.toLowerCase()]) keep(x); });
-    return out.slice(0, 6);
+    return out.slice(0, 10);
   }
   /* The phrase exactly as written in the snippet, so the swap matches the page's own capitals. */
   /* Whole words only, so "Feature" never matches inside "features". */
@@ -3433,7 +3623,7 @@
         return findText(ph).then(function (rows) {
           rows.forEach(function (r) {
             if (found.length >= 2 || used[norm(r.link)] || orphanLinks[norm(r.link)]) return;
-            var hit = (r.hits || []).filter(function (h) { return (h.widget === "text-editor" || h.widget === "content") && phraseIn(h.snippet, ph); })[0];
+            var hit = linkHit(r, ph);
             if (!hit) return;
             used[norm(r.link)] = 1; found.push(linkFix(orphan, r, hit, ph));
           });
@@ -3444,6 +3634,19 @@
   function linksFor(orphan) {
     return proposals().filter(function (x) {
       return !x.example && x.type !== "manual" && (norm(x.target || "") === norm(orphan.link) || String(x.proposed || "").indexOf('href="' + orphan.link + '"') > -1 || String(x.proposed || "").indexOf('href="' + orphan.link.replace(/\/$/, "") + '"') > -1);
+    });
+  }
+  /* Is a page password-protected? WordPress says so in its content. Remembered once known. */
+  function checkLocked(pg) {
+    var known = load("protected-pages", {});
+    if (norm(pg.link) in known) return Promise.resolve(known[norm(pg.link)]);
+    var slug = shortPath(pg.link).replace(/\/$/, "").split("/").pop();
+    if (!slug) return Promise.resolve(false);
+    function ask(type) { return wpFetch("/wp/v2/" + type + "?slug=" + encodeURIComponent(slug) + "&_fields=id,link,content").then(function (rows) { return (rows || []).filter(function (r) { return norm(r.link) === norm(pg.link); })[0]; }); }
+    return ask("pages").then(function (r) { return r || ask("posts"); }).then(function (r) {
+      var locked = !!(r && r.content && r.content.protected);
+      var k2 = load("protected-pages", {}); k2[norm(pg.link)] = locked; save("protected-pages", k2);
+      return locked;
     });
   }
   function orphansCard(p, st, redraw) {
@@ -3460,6 +3663,11 @@
       '<span class="muted" style="font-size:.86rem">The next audit clears pages that now have a link.</span></div><div class="fix-msg"></div>';
     var rowsBox = card.querySelector(".claim-rows"), msg = card.querySelector(".fix-msg");
     var sugs = load("auto-fixes-links", []), queue = [], rowShows = [];
+    function leaveKey(pg) { return "orphan-leave-" + autoKey(pg.link); }
+    function isLocked(pg) { return load("protected-pages", {})[norm(pg.link)] === true; }
+    /* A page is sorted once it has a live link, you've chosen to leave it, or it's password-protected
+       (a link to a locked page doesn't help anyone). */
+    function resolved(pg, s) { return isLocked(pg) || !!(s[leaveKey(pg)] && s[leaveKey(pg)].status) || linksFor(pg).some(function (x) { return s[x.id] && s[x.id].status === "pushed"; }); }
     function pushOne(fix, act) {
       var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
       return pushFix(fix, fix.proposed).then(function (r) {
@@ -3475,7 +3683,35 @@
         var s = fixState(), mine = linksFor(pg);
         var live = mine.filter(function (x) { return s[x.id] && s[x.id].status === "pushed"; });
         var open = mine.filter(function (x) { return !(s[x.id] && s[x.id].status); });
-        box.innerHTML = ""; rowAct.innerHTML = live.length ? '<span class="chip good">Fixed: ' + live.length + " link" + (live.length > 1 ? "s" : "") + " live</span>" : "";
+        if (isLocked(pg)) {
+          row.classList.add("is-fixed");
+          rowAct.innerHTML = '<span class="chip">Left: password-protected</span>';
+          box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">Visitors only see a password box, so the hub won\'t link to it.' + (live.length ? " The link already added sends people to a locked page:" : "") + "</div>";
+          live.forEach(function (x) {
+            var u = el('<button type="button" class="btn small danger" style="margin-top:6px">Undo the link from ' + esc(x.pageTitle) + "</button>");
+            u.addEventListener("click", function () {
+              u.disabled = true; u.textContent = "Undoing\u2026";
+              undoFix(x, fixState()[x.id] || {}).then(function () {
+                var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+                setFix(x.id, { status: "undone", undoneAt: when });
+                logChange({ id: x.id, when: when, page: x.pageTitle, link: x.link, type: "Add a link", action: "Undone: link to a password-protected page" });
+                toast("Link removed"); show();
+              }, function (e) { u.disabled = false; u.textContent = "Undo the link from " + x.pageTitle; msg.innerHTML = '<div class="notice"><b>Couldn\'t undo.</b> ' + esc(e.message) + "</div>"; });
+            });
+            box.appendChild(u);
+          });
+          return 1;
+        }
+        if (s[leaveKey(pg)] && s[leaveKey(pg)].status && !live.length) {
+          row.classList.add("is-fixed");
+          rowAct.innerHTML = '<span class="chip">Left as it is</span> <button type="button" class="btn small">Put back</button>';
+          rowAct.querySelector("button").addEventListener("click", function () { var s2 = fixState(); delete s2[leaveKey(pg)]; save("fix-state", s2); show(); find(false); });
+          box.innerHTML = "";
+          return 1;
+        }
+        box.innerHTML = ""; rowAct.innerHTML = live.length ? '<span class="chip good">Fixed: ' + live.length + " link" + (live.length > 1 ? "s" : "") + " live</span>" : '<button type="button" class="btn small leave">Leave this page</button>';
+        var lv = rowAct.querySelector(".leave");
+        if (lv) lv.addEventListener("click", function () { setFix(leaveKey(pg), { status: "rejected" }); show(); allDone(); });
         /* One link from a live page is enough to stop it being hidden, so a fixed page folds away. */
         row.classList.toggle("is-fixed", live.length > 0);
         if (live.length) { box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">Linked from ' + live.map(function (x) { return esc(x.pageTitle); }).join(", ") + ".</div>"; return live.length; }
@@ -3500,28 +3736,28 @@
       function find(force) {
         if (show() && !force) return;
         var none = load("orphan-none", {});
-        if (!force && none[norm(pg.link)] === today()) { box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">No page mentions this topic in a way that suits a link. Use Copy list for Claude and it will write one.</div>'; return; }
+        if (!force && none[norm(pg.link)] === today() + "|" + VERSION) { box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">No page mentions this topic in a way that suits a link. Use Copy list for Claude and it will write one.</div>'; return; }
         var s = fixState(), tried = linksFor(pg).filter(function (x) { return x.auto && s[x.id] && s[x.id].status === "rejected"; }).map(function (x) { return norm(x.link); });
         suggestLinks(pg, orphanLinks, tried).then(function (found) {
           var keep = load("auto-fixes-links", []).filter(function (x) { return norm(x.target) !== norm(pg.link) || (fixState()[x.id] || {}).status; });
           save("auto-fixes-links", keep.concat(found.filter(function (f) { return !keep.some(function (k) { return k.id === f.id; }); })));
-          if (!found.length) { var nn = load("orphan-none", {}); nn[norm(pg.link)] = today(); save("orphan-none", nn); }
+          if (!found.length) { var nn = load("orphan-none", {}); nn[norm(pg.link)] = today() + "|" + VERSION; save("orphan-none", nn); }
           if (!show()) box.innerHTML = '<div class="muted" style="font-size:.82rem;margin-top:4px">No page mentions this topic in a way that suits a link. Use Copy list for Claude and it will write one.</div>';
         }, function (err) { box.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
       }
       rowsBox.appendChild(row);
       rowShows.push(show);
-      find(false);
+      checkLocked(pg).then(function (locked) { if (locked) { show(); allDone(); } else find(false); }, function () { find(false); });
     });
     /* When every page has a live link the card moves to Done by itself. The next audit reopens it if
        Google's view of the site disagrees. */
     function allDone() {
-      var s = fixState(), left = pages.filter(function (pg) { return !linksFor(pg).some(function (x) { return s[x.id] && s[x.id].status === "pushed"; }); });
+      var s = fixState(), left = pages.filter(function (pg) { return !resolved(pg, s); });
       if (left.length) return false;
       var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
       setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now(), reopened: false });
       logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Add a link", action: "Every hidden page now has a link" });
-      toast("Every page now has a link. Moved to Done."); redraw(); updateNav();
+      toast("Every page is sorted. Moved to Done."); redraw(); updateNav();
       return true;
     }
     var allBtn = card.querySelector(".all");
@@ -3549,12 +3785,223 @@
     return card;
   }
 
+  /* Every card in the Fix queue is one of four kinds. No card is closed by ticking it off:
+     push   the hub makes the change (Approve and push)
+     decide a choice only Connor can make, and the button is the choice
+     claude Claude writes new wording; the card closes itself when the audit stops finding the problem
+     job    work off the website (listings, hosting, Matt's templates), kept in Your jobs instead */
+  var JOB_RE = /^(auto-robots|auto-sitemap-missing$|auto-sitemap-bad|auto-sitemap-missing-pages|auto-variant|auto-verify-google|auto-redirect-dead|auto-redirect-chain|auto-slow|auto-schema|mob-slow|mob-images|mob-viewport|mob-cwv-field|ga4-no-leads)/;
+  function cardMode(p) {
+    if (p.type !== "manual" || p.id === "auto-claims" || p.id === "auto-orphans") return "push";
+    if (!p.auto || JOB_RE.test(p.id)) return "job";
+    if (/^(auto-cannibal-|gsc-split-)/.test(p.id)) return "decide";
+    return "claude";
+  }
+  function cardHead(p, st, label) {
+    return '<div class="panel-head"><div style="display:flex;flex-direction:column;gap:4px;min-width:0">' + headChips(p, st).replace(">Steps<", ">" + esc(label) + "<") +
+      "<h2>" + esc(p.issue) + "</h2>" + (p.pageTitle && p.pageTitle !== "Whole site" && !(p.pages || []).length ? '<p class="muted" style="font-size:.86rem"><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' + esc(p.pageTitle) + "</a></p>" : "") + "</div>" +
+      '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
+      (p.why ? '<p style="font-size:.9rem"><b>Why it matters:</b> ' + esc(p.why) + "</p>" : "");
+  }
+  function whereList(pages) {
+    if (!(pages || []).length) return "";
+    return "<details" + (pages.length <= 6 ? " open" : "") + '><summary style="cursor:pointer;font-size:.88rem"><b>Where (' + pages.length + ")</b></summary><ul class=\"where\">" +
+      pages.map(function (x) { return '<li><a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(String(x.title || "").trim() || shortPath(x.link)) + "</a>" + (x.note ? ' <span class="muted">· ' + esc(x.note) + "</span>" : "") + "</li>"; }).join("") + "</ul></details>";
+  }
+  function claudeText(p) {
+    return "From the hub Fix queue: " + p.issue + "\n" + (p.why ? p.why + "\n" : "") + (p.pages || [{ link: p.link }]).map(function (x) { return "- " + x.link + (x.note ? " (" + x.note + ")" : ""); }).join("\n") +
+      "\nPlease write these as fixes I can push from the hub.";
+  }
+  function claudeCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>');
+    card.innerHTML = cardHead(p, st, "Claude writes") + whereList(p.pages) +
+      '<p class="muted" style="font-size:.86rem">The hub can\'t write new wording itself. Copy this for Claude: the fixes come back here ready to push. This card closes itself once the audit or check stops finding the problem.</p>' +
+      '<div class="fix-actions row"></div>';
+    var actions = card.querySelector(".fix-actions");
+    if (!st.status) {
+      actions.innerHTML = '<button type="button" class="btn primary">Copy for Claude</button><button type="button" class="btn rej">Not doing this</button>';
+      actions.querySelector(".primary").addEventListener("click", function () { copyText(claudeText(p), "Copied. Paste it into Claude."); });
+      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    } else {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "rejected" ? "Not doing this" : "Closed " + esc(st.doneAt || "")) + '</span><button type="button" class="btn small">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
+    }
+    return card;
+  }
+  function decideCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>');
+    card.innerHTML = cardHead(p, st, "Your call") + whereList(p.pages) +
+      '<p class="muted" style="font-size:.86rem">Only you can decide this. If the pages answer different questions, keep both and the hub stops flagging them. If they really overlap, Claude writes the merge and redirect as fixes you can push.</p><div class="fix-actions row"></div>';
+    var actions = card.querySelector(".fix-actions");
+    if (!st.status) {
+      actions.innerHTML = '<button type="button" class="btn primary keep">Keep both, they\'re different</button><button type="button" class="btn merge">Merge them (copy for Claude)</button>';
+      actions.querySelector(".keep").addEventListener("click", function () {
+        var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+        setFix(p.id, { status: "rejected", decided: "keep", doneAt: when });
+        logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Decision", action: "Kept both: " + p.issue });
+        toast("Kept both. The hub won't flag this pair again."); redraw(); updateNav();
+      });
+      actions.querySelector(".merge").addEventListener("click", function () {
+        copyText("From the hub Fix queue: these two pages compete for the same searches. Please merge them: keep the stronger one, move anything useful from the other into it, and write a 301 redirect, as fixes I can push.\n" + (p.pages || []).map(function (x) { return "- " + x.link; }).join("\n"), "Copied. Paste it into Claude.");
+      });
+    } else {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.decided === "keep" ? "Kept both" : "Not doing this") + '</span><button type="button" class="btn small">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) { delete s[p.id].status; delete s[p.id].decided; } save("fix-state", s); redraw(); updateNav(); });
+    }
+    return card;
+  }
+
+  /* A group card holds a list of small fixes for one problem (titles, alt text, extra H1s and so on).
+     Push them one by one or all at once. Skip any you don't want. When none are left, the card moves to Done. */
+  function groupKids(p) { return proposals().filter(function (x) { return x.parent === p.id; }); }
+  function editableKid(k) { return k.type === "meta_title" || k.type === "meta_description" || k.op === "alt"; }
+  function groupCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>');
+    card.innerHTML = cardHead(p, st, p.groupLabel || "Fixes") + '<div class="claim-rows"></div><div class="fix-actions row"></div><div class="fix-msg"></div>';
+    var rowsBox = card.querySelector(".claim-rows"), actions = card.querySelector(".fix-actions"), msg = card.querySelector(".fix-msg");
+    var kids = groupKids(p), boxes = {};
+    if (st.status) {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "rejected" ? "Not doing this" : "Done " + esc(st.doneAt || "") + ". Each change is in Done with its own Undo.") + '</span><button type="button" class="btn small">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
+      return card;
+    }
+    if (p.producer === "fewLinks" && !kids.length) {
+      var tried = load("few-links-searched", "");
+      if (tried !== (p.created || "x")) {
+        rowsBox.innerHTML = '<div class="notice info">Looking for sentences in these posts that mention your service pages…</div>';
+        fewLinksProducer(p, function (i, n) { rowsBox.innerHTML = '<div class="notice info">Looking for sentences in these posts that mention your service pages (' + i + " of " + n + ")…</div>"; }).then(function (found) {
+          var keep = load("auto-fixes-links", []).filter(function (x) { return x.parent !== p.id || (fixState()[x.id] || {}).status; });
+          save("auto-fixes-links", keep.concat(found)); save("few-links-searched", p.created || "x"); redraw(); updateNav();
+        }, function (err) { rowsBox.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
+        return card;
+      }
+    }
+    /* Nothing the hub could write (for example no sentence mentions a service page): Claude writes these. */
+    if (!kids.length) return claudeCard(p, st, redraw);
+    function finish() {
+      var all = groupKids(p), s = fixState(), open = all.filter(function (k) { return !(s[k.id] && s[k.id].status); });
+      if (!all.length || open.length) return false;
+      var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now() });
+      logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: p.groupLabel || "Fixes", action: "All done: " + p.issue });
+      toast("All done. Moved to Done."); redraw(); updateNav();
+      return true;
+    }
+    function pushKid(k, row) {
+      var cur = fixState()[k.id] || {}, box = boxes[k.id];
+      var value = box ? box.value : cur.edited != null ? cur.edited : k.proposed;
+      var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      return pushFix(k, value).then(function (r) {
+        setFix(k.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, pageId: r.pageId || k.pageId, backup: r.backup || "" });
+        logChange({ id: k.id, when: when, page: k.pageTitle, link: k.link, type: typeLabel(k), action: "Pushed live: " + k.issue });
+        row.querySelector(".kid-act").innerHTML = '<span class="chip good">Live</span>' + (r.skipped && r.skipped.length ? '<div class="muted" style="font-size:.78rem">' + r.skipped.length + " not in the Media Library, skipped</div>" : "");
+      });
+    }
+    var shown = 0;
+    kids.forEach(function (k) {
+      var ks = fixState()[k.id] || {};
+      if (ks.status) return;
+      shown++;
+      var val = ks.edited != null ? ks.edited : k.op === "alt" && k.items ? altText(k.items) : k.proposed;
+      var row = el('<div class="claim-row"' + (editableKid(k) ? ' style="flex-direction:column;align-items:stretch"' : "") + '><div class="claim-what" style="flex:1;min-width:0"><a href="' + esc(k.link) + '" target="_blank" rel="noopener"><b>' + esc(k.pageTitle || shortPath(k.link)) + '</b></a> <span class="muted" style="font-size:.8rem">' + esc(k.issue || "") + "</span>" +
+        (k.current && k.op !== "alt" ? '<div class="muted" style="font-size:.8rem;margin-top:2px">Now: ' + esc(String(k.current).slice(0, 220)) + "</div>" : "") +
+        (editableKid(k) ? (k.op === "alt" ? '<textarea class="kid-box" style="width:100%;box-sizing:border-box;min-height:' + Math.min(220, 40 + 22 * (k.items || []).length) + 'px;margin-top:6px">' + esc(val) + "</textarea>" : '<input class="kid-box" style="margin-top:6px;width:100%;box-sizing:border-box" value="' + esc(val) + '">') + (k.type === "meta_title" || k.type === "meta_description" ? '<span class="hint mono" style="font-size:.75rem"></span>' : "")
+          : '<div style="font-size:.84rem;margin-top:4px"><b>Fix:</b> ' + esc(String(k.display || val || "").slice(0, 300)) + "</div>") +
+        '</div><div class="kid-act row" style="gap:6px;align-self:center"><button type="button" class="btn small primary">Approve and push</button><button type="button" class="btn small skip">Skip</button></div></div>');
+      var box = row.querySelector(".kid-box"), hint = row.querySelector(".hint");
+      if (box) {
+        boxes[k.id] = box;
+        var showHint = function () { if (hint) hint.textContent = lengthHint(k.type, box.value); };
+        showHint(); box.addEventListener("input", function () { showHint(); setFix(k.id, { edited: box.value }); });
+      }
+      var b = row.querySelector(".primary");
+      b.addEventListener("click", function () {
+        b.disabled = true; b.textContent = "Pushing…";
+        pushKid(k, row).then(function () { toast("Live on the site"); updateNav(); finish(); }, function (err) {
+          b.disabled = false; b.textContent = "Approve and push";
+          msg.innerHTML = '<div class="notice"><b>' + esc(k.pageTitle || "") + ": not pushed.</b> " + esc(err.message) + " Skip it if it isn't wanted.</div>";
+        });
+      });
+      row.querySelector(".skip").addEventListener("click", function () { setFix(k.id, { status: "rejected" }); row.remove(); finish(); updateNav(); });
+      rowsBox.appendChild(row);
+    });
+    if (!shown) {
+      if (finish()) return card;
+      rowsBox.innerHTML = '<div class="muted" style="font-size:.86rem">Nothing left to push.</div>';
+    }
+    actions.innerHTML = '<button type="button" class="btn primary all">Approve and push all (' + shown + ')</button><button type="button" class="btn rej">Not doing this</button>' +
+      '<span class="muted" style="font-size:.86rem">Every change keeps a copy, and each one has its own Undo in Done.</span>';
+    var allBtn = actions.querySelector(".all");
+    allBtn.addEventListener("click", function () {
+      var s = fixState(), todo = groupKids(p).filter(function (k) { return !(s[k.id] && s[k.id].status); });
+      if (!todo.length) return;
+      if (!allBtn.dataset.sure) { allBtn.dataset.sure = "1"; allBtn.textContent = "Click again to push " + todo.length; return; }
+      allBtn.disabled = true; var okN = 0, bad = [];
+      todo.reduce(function (pr, k) {
+        return pr.then(function () {
+          allBtn.textContent = "Pushing " + (okN + bad.length + 1) + " of " + todo.length + "…";
+          var row = Array.prototype.filter.call(rowsBox.children, function (r) { return r.querySelector("a") && r.querySelector("a").getAttribute("href") === k.link && r.querySelector(".kid-act button"); })[0] || el('<div><div class="kid-act"></div></div>');
+          return pushKid(k, row).then(function () { okN++; }, function (e) { bad.push((k.pageTitle || shortPath(k.link)) + ": " + e.message); });
+        });
+      }, Promise.resolve()).then(function () {
+        toast(okN + " pushed"); updateNav();
+        if (finish()) return;
+        allBtn.disabled = false; delete allBtn.dataset.sure; allBtn.textContent = "Approve and push all";
+        if (bad.length) msg.innerHTML = '<div class="notice"><b>' + bad.length + " not pushed.</b><br>" + bad.map(esc).join("<br>") + "<br>Skip any that aren't wanted and the card moves to Done.</div>";
+      });
+    });
+    actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    return card;
+  }
+
+  /* Which words on a page can become a link: body text only, never headings, buttons or the page title. */
+  function linkHit(r, ph) {
+    return (r.hits || []).filter(function (h) {
+      return (h.widget === "text-editor" || h.widget === "content" || /(^|\.)(editor|description_text|tab_content|content|text)$/.test(h.field || "") && !/heading|button|page title/.test(h.widget)) && phraseIn(h.snippet, ph);
+    })[0];
+  }
+  /* Blog posts with few links: look for each service page's name in the posts, and link the first mention. */
+  function fewLinksProducer(p, onProgress) {
+    var posts = {}, out = [], per = {};
+    (p.posts || []).forEach(function (x) { posts[norm(x.link)] = x; });
+    var targets = p.targets || [];
+    return targets.reduce(function (pr, t, i) {
+      return pr.then(function () {
+        if (onProgress) onProgress(i + 1, targets.length);
+        var phs = linkPhrases(t.title).slice(0, 2);
+        return phs.reduce(function (pr2, ph) {
+          return pr2.then(function () {
+            return findText(ph).then(function (rows) {
+              rows.forEach(function (r) {
+                var post = posts[norm(r.link)]; if (!post) return;
+                var key = norm(r.link), tk = norm(t.link);
+                if (key === tk || post.links.indexOf(tk) > -1 || (per[key] || 0) >= 3) return;
+                if (out.some(function (f) { return norm(f.link) === key && norm(f.target) === tk; })) return;
+                var hit = linkHit(r, ph); if (!hit) return;
+                var f = linkFix(t, r, hit, ph);
+                f.id = "pl-" + autoKey(r.link) + "-" + autoKey(t.link); f.parent = p.id; f.batch = "Links from blog posts"; f.priority = "medium";
+                f.issue = "Link “" + f.find + "” to " + t.title;
+                f.why = "Passes ranking strength from the post to a service page and gives readers a next step. Only those words become a link.";
+                f.current = "…" + hit.snippet + "…";
+                f.display = "“" + f.find + "” becomes a link to " + shortPath(t.link);
+                out.push(f); per[key] = (per[key] || 0) + 1;
+              });
+            }, function () {});
+          });
+        }, Promise.resolve());
+      });
+    }, Promise.resolve()).then(function () { return out; });
+  }
+
   function fixCard(p, st, redraw) {
     if (p.id === "auto-claims" && !st.status) return claimsCard(p, st, redraw);
     if (p.id === "auto-orphans" && !st.status) return orphansCard(p, st, redraw);
-    if (p.type === "manual") return manualCard(p, st, redraw);
+    if (p.type === "group") return groupCard(p, st, redraw);
+    if (p.type === "manual" && cardMode(p) === "decide") return decideCard(p, st, redraw);
+    if (p.type === "manual" && cardMode(p) === "claude") return claudeCard(p, st, redraw);
+    if (p.type === "manual") return st.status ? manualCard(p, st, redraw) : claudeCard(p, st, redraw);
     if (p.type === "page_build") return buildCard(p, st, redraw);
-    var text = st.edited != null ? st.edited : p.proposed;
+    var text = st.edited != null ? st.edited : p.op === "alt" && p.items ? altText(p.items) : p.proposed;
     var isMeta = p.type === "meta_title" || p.type === "meta_description";
     var done = st.status === "pushed" || st.status === "undone";
     var card = el('<article class="panel fix"></article>');
@@ -3566,8 +4013,8 @@
       '<span class="mono muted" style="font-size:.75rem">' + esc(p.batch || "") + " · " + esc(p.created || "") + "</span></div>" +
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
-      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1/.test(p.type) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : p.type === "elementor_faq" ? "Questions and answers (edit any of them, keep the Q: and A: labels)" : "Proposed (you can edit this)") +
-      '<textarea id="fix-' + esc(p.id) + '"' + (done || /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1/.test(p.type) ? " readonly" : "") + (p.type === "elementor_faq" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
+      '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : fixedText(p) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : p.type === "elementor_faq" ? "Questions and answers (edit any of them, keep the Q: and A: labels)" : p.op === "alt" ? "Alt text, one image per line (edit any of them; leave one blank to skip it)" : p.inputLabel || "Proposed (you can edit this)") +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done || fixedText(p) ? " readonly" : "") + (p.placeholder ? ' placeholder="' + esc(p.placeholder) + '"' : "") + (p.type === "elementor_faq" || p.op === "llms" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) || p.op === "alt" || p.op === "css" ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
       (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
       '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
       '<div class="fix-actions row"></div><div class="fix-msg"></div>';
@@ -3579,6 +4026,10 @@
     if (!st.status && p.type === "elementor_h1" && !p.example) {
       var a1 = wpAuth();
       if (a1 && a1.ok) previewH1(p).then(function (h) {
+        if (h.notElementor) {
+          ta.value = "This page isn't built with Elementor. The top heading in the page text becomes the H1, keeping its wording. If the page has no heading (like the blog page), the page name is added as the H1. Undo puts it back.";
+          return;
+        }
         card.querySelector("pre.was").textContent = "No H1. The first heading is an " + h.tag.toUpperCase() + ":\n\u201c" + h.text + "\u201d";
         ta.value = "\u201c" + h.text + "\u201d becomes the H1. The wording stays the same.";
       }).catch(function (err) { msg.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
@@ -3606,24 +4057,25 @@
     }
     if (!st.status) {
       actions.innerHTML = (p.size === "big" ? '<label class="row" style="font-size:.86rem"><input type="checkbox" class="sure"> I\'ve read this change and I\'m happy for it to go live</label>' : "") +
-        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + (p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live") + "</button>" +
+        '<button type="button" class="btn primary go"' + (p.example ? " disabled" : "") + ">" + goLabel(p) + "</button>" +
         '<button type="button" class="btn rej">Reject</button>' + (st.edited != null ? '<button type="button" class="btn small reset">Reset to Claude\'s version</button>' : "");
       actions.querySelector(".go").addEventListener("click", function () {
         var sure = actions.querySelector(".sure");
         if (sure && !sure.checked) { msg.innerHTML = '<div class="notice">Tick the box to confirm you\'ve read this change.</div>'; return; }
         var value = ta.value;
         if (p.needsEdit && value.trim() === String(p.current).trim()) { msg.innerHTML = '<div class="notice">Change the wording in the box first, then push.</div>'; return; }
-        if (!value.trim() && !/^(meta_description|elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1)$/.test(p.type)) { msg.innerHTML = '<div class="notice">The proposed text is empty.</div>'; return; }
+        if (!value.trim() && !fixedText(p) && p.type !== "meta_description") { msg.innerHTML = '<div class="notice">' + (p.placeholder ? "Fill in the box first." : "The proposed text is empty.") + "</div>"; return; }
         var btn = actions.querySelector(".go"); btn.disabled = true; btn.textContent = "Pushing…";
         var lv = fixState()[p.id] && fixState()[p.id].level;
         pushFix(p.type === "elementor_remove" ? Object.assign({}, p, { level: lv == null ? null : lv, scope: "" }) : p, value).then(function (r) {
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: TYPE_LABEL[p.type], action: p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : "Pushed live" });
+          if (r.skipped && r.skipped.length) toast(r.skipped.length + " image" + (r.skipped.length > 1 ? "s" : "") + " skipped: not in the Media Library");
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: typeLabel(p), action: p.type === "site_edit" ? (SITE_OP_LABEL[p.op] || "Site fix") + " pushed" : p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
-          btn.disabled = false; btn.textContent = p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live";
+          btn.disabled = false; btn.textContent = goLabel(p);
           msg.innerHTML = '<div class="notice"><b>Not pushed.</b> ' + esc(err.message) + "</div>";
           if (p.type !== "elementor_style" && /isn't on the page any more|isn't on the page/.test(err.message)) offerAlreadyDone(p, msg, redraw);
         });
@@ -4032,7 +4484,24 @@
       });
       applied[j.id] = j.update;
     });
+    /* Fix queue steps that happen off the website (Google Business Profile, directories, hosting, Matt's
+       templates) are jobs, not fixes. They're copied into Your jobs once, keeping any Done already ticked. */
+    try { importFixJobs(rows, seen); } catch (e) { /* the Fix queue isn't loaded yet */ }
     save("jobs", rows); save("jobs-imported", seen); save("jobs-updates-applied", applied);
+  }
+  function importFixJobs(rows, seen) {
+    var fs0 = fixState();
+    proposals().forEach(function (p) {
+      if (p.example || cardMode(p) !== "job") return;
+      var key = "fix:" + p.id;
+      if (seen.indexOf(key) > -1) return;
+      var st0 = fs0[p.id] || {};
+      rows.unshift({ _id: uid(), _src: key, job: p.issue, page: p.pageTitle + (p.link ? " (" + shortPath(p.link) + ")" : ""),
+        details: (p.why || "") + ((p.steps || []).length ? "\n\n" + p.steps.map(function (x, i) { return (i + 1) + ". " + x; }).join("\n") : "") +
+          ((p.pages || []).length ? "\n\nWhere:\n" + p.pages.slice(0, 30).map(function (x) { return "- " + shortPath(x.link) + (x.note ? " (" + x.note + ")" : ""); }).join("\n") : ""),
+        size: "", alt: "", status: st0.status === "done" ? "Done" : "To do" });
+      seen.push(key);
+    });
   }
   /* ---------- AI visibility prompts ----------
      The prompt list comes from data/proposals.js (WPT_AI_PROMPTS) and is copied in once per prompt,
@@ -4115,6 +4584,19 @@
     var next = dark ? "light" : "dark"; applyTheme(next); save("theme", next);
   });
   document.getElementById("version-tag").textContent = "v" + VERSION + " · " + BUILT;
+  /* A new version of the hub may turn more audit findings into fixes it can push. Rebuild them from the
+     saved audit, display check and mobile check, so nothing needs running again. */
+  function rebuildFixes() {
+    if (load("fixes-built-for", "") === VERSION) return;
+    try {
+      var au = load("seo-audit", null);
+      if (au && au.siteData) storeAutoFixes(buildAutoFixes(au), 0);
+      var dc = load("display", null); if (dc) save("auto-fixes-display", buildDisplayFixes(dc));
+      var ps = load("psi", null); if (ps) save("auto-fixes-mobile", buildMobileFixes(ps));
+      save("fixes-built-for", VERSION);
+    } catch (e) { if (window.console) console.warn("Fix rebuild failed", e); /* keep the saved fixes */ }
+  }
+  rebuildFixes();
   window.addEventListener("hashchange", route);
   route();
 })();
