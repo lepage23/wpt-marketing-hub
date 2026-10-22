@@ -1671,6 +1671,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "php-security-1",
+  "job": "Urgent: check the website's PHP has the 21 October security fix",
+  "page": "SiteGround Site Tools (westpiertech.com)",
+  "details": "PHP released an urgent fix on 21 October for two critical flaws (CVE-2026-109618 and CVE-2026-109619). On an unpatched server, an attacker could take control of it with a single web request, no login needed. The NCSC has put out an alert telling UK organisations to act now. WordPress runs on PHP, so this covers our site.\n\nWe're on SiteGround, which manages PHP for us and normally patches its servers itself. The job is to confirm it has, not to patch anything yourself.\n\n1. Sign in to SiteGround, open Site Tools for westpiertech.com, then Devs, then PHP Manager. Note the PHP version.\n2. Safe versions are 8.5.12, 8.4.27, 8.3.36, 8.2.35 or newer. If it only shows \"8.3\" without the last number, ask SiteGround support (live chat) whether their servers have the 21 October PHP security release for CVE-2026-109618.\n3. If the site is on 8.1 or older, ask Matt to move it to 8.3 or 8.4. Old versions no longer get fixes from PHP. Check a few pages and the enquiry forms after the switch.\n4. Ask Matt whether anything else WPT runs uses PHP (another WordPress site, a customer portal, the 3CX or phone system admin pages). Same check for each.\n5. Note here what SiteGround said and mark this Done.\n\nIf the site is on 8.2, plan a move to 8.3 or 8.4 anyway. PHP 8.2 gets no more fixes after 31 December 2026.\n\nSources: ncsc.gov.uk news alert (21 Oct 2026), php.net security advisory (21 Oct 2026).",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "idea-bid-engine-1",
   "job": "Idea: build a bid engine for tenders and PQQs",
   "page": "Side project (start with WPT)",

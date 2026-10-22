@@ -6,6 +6,10 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.27.2 · 2026-10-22 15:10 BST
+
+- **New urgent job:** check the website's PHP has the 21 October security fix (CVE-2026-109618 and CVE-2026-109619). The NCSC has issued an alert. Steps to check the version in SiteGround, what counts as safe, and who to ask.
+
 ## v0.27.1 · 2026-10-21 11:00 BST
 
 Two new ideas in **Your jobs**.
