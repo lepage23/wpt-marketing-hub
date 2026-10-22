@@ -13,7 +13,7 @@ global.fetch=async(url,o={})=>{const body=o.body?JSON.parse(o.body):null;calls.p
  if(/wpt-hub\/v1\/check/.test(url)){const draft=page.status==='draft';return J([{url:body.urls[0],status:draft&&!redirectOnDraft?404:301,location:'https://westpiertech.com/business-phone-systems/8x8/brighton/'}]);}
  if(/elementor-edit/.test(url))return J(body.dry_run?{ok:true,dry_run:true,tag:'h2',text:'8x8 in Brighton'}:{ok:true,backup:'b9',before:'H2: 8x8 in Brighton',after:'H1: 8x8 in Brighton'});
  return J({});};
-eval(['wpAuth','wpBase','wpFetch','metaKey','countOnce','norm','shortPath','isRedirect','hasChecker','checkUrls','resolveId','parseFaq','needsV11','previewH1','pushFix','undoFix'].map(grab).join('\n'));
+eval(['wpAuth','wpBase','wpFetch','metaKey','countOnce','norm','shortPath','isRedirect','hasChecker','checkUrls','resolveId','parseFaq','needsV11','needsV12','previewH1','pushFix','undoFix'].map(grab).join('\n'));
 save('wp-auth',{site:'https://westpiertech.com',user:'hub',pass:'pw',ok:true,checker:true});
 const fx={id:'auto-sitemap-draft-8x8-brighton',type:'set_status',status:'draft',postType:'pages',pageId:0,link:'https://westpiertech.com/8x8-brighton/',keepRedirect:'https://westpiertech.com/business-phone-systems/8x8/brighton/'};
 (async()=>{

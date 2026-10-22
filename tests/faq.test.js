@@ -9,7 +9,7 @@ let sent=null;
 global.fetch=async(url,o={})=>{sent={url,body:JSON.parse(o.body||'null')};
  if(/elementor-undo/.test(url))return {ok:true,status:200,json:async()=>({ok:true})};
  return {ok:true,status:200,json:async()=>({ok:true,backup:'b1',before:'',after:'Heading\n\nQ: x'})};};
-eval(['wpAuth','wpBase','wpFetch','metaKey','countOnce','parseFaq','needsV11','pushFix','undoFix'].map(grab).join('\n'));
+eval(['wpAuth','wpBase','wpFetch','metaKey','countOnce','parseFaq','needsV11','needsV12','pushFix','undoFix'].map(grab).join('\n'));
 save('wp-auth',{site:'https://x.test',user:'hub',pass:'pw'});
 const txt='Heading: 8x8 questions\nQ: Is 8x8 good for small teams?\nA: Yes. It suits teams from five users.\nIt scales up too.\n\nQ: Can I keep my numbers?\nA: Yes, we port them across.';
 const f=parseFaq(txt);

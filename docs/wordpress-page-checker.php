@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 11, adds FAQ blocks with FAQ schema, and setting a page's H1, on Elementor pages).
+ * WPT Marketing Hub: page checker (version 12: H1 fixes also work when the top heading sits in a text or HTML block, and wrong phrases can be swapped everywhere on a page).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -273,7 +273,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 11, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 12, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -561,24 +561,76 @@ add_action( 'rest_api_init', function () {
 						break;
 					}
 				}
+				if ( ! $elid ) {
+					/* Version 12: many pages put their top heading inside a text or HTML widget, or use an icon box.
+					 * Whichever comes first on the page wins, so the H1 is the heading visitors see at the top. */
+					$alt   = null;
+					$walk2 = function ( $els, $path ) use ( &$walk2, &$alt, $plain ) {
+						foreach ( $els as $i => $el ) {
+							if ( $alt ) {
+								return;
+							}
+							$p = array_merge( $path, array( $i ) );
+							$w = isset( $el['widgetType'] ) ? $el['widgetType'] : '';
+							$st = isset( $el['settings'] ) && is_array( $el['settings'] ) ? $el['settings'] : array();
+							foreach ( array( 'editor', 'html' ) as $key ) {
+								if ( ( 'text-editor' === $w || 'html' === $w ) && isset( $st[ $key ] ) && preg_match( '#<h([1-6])(\s[^>]*)?>(.*?)</h\1>#is', (string) $st[ $key ], $m, PREG_OFFSET_CAPTURE ) && strlen( $plain( $m[3][0] ) ) >= 3 ) {
+									$alt = array( 'path' => $p, 'id' => isset( $el['id'] ) ? $el['id'] : '', 'kind' => 'html', 'key' => $key, 'tag' => 'h' . $m[1][0], 'text' => $m[3][0], 'at' => $m[0][1], 'whole' => $m[0][0] );
+									return;
+								}
+							}
+							if ( ( 'icon-box' === $w || 'image-box' === $w ) && isset( $st['title_text'] ) && strlen( $plain( $st['title_text'] ) ) >= 3 ) {
+								$alt = array( 'path' => $p, 'id' => isset( $el['id'] ) ? $el['id'] : '', 'kind' => 'box', 'tag' => isset( $st['title_size'] ) ? (string) $st['title_size'] : 'h3', 'text' => $st['title_text'] );
+								return;
+							}
+							if ( ! empty( $el['elements'] ) ) {
+								$walk2( $el['elements'], array_merge( $p, array( 'elements' ) ) );
+							}
+						}
+					};
+					$walk2( $data, array() );
+					if ( $alt && 'h1' === $alt['tag'] ) {
+						return new WP_Error( 'wpt_edit', 'This page already has an H1 inside a text block ("' . $plain( $alt['text'] ) . '"), but it isn\'t showing to visitors. Nothing was changed. Tell Claude and it will look into it.', array( 'status' => 409 ) );
+					}
+					$first = function ( $a, $b ) {
+						for ( $i = 0; $i < min( count( $a ), count( $b ) ); $i++ ) {
+							if ( $a[ $i ] !== $b[ $i ] ) {
+								return (int) $a[ $i ] < (int) $b[ $i ];
+							}
+						}
+						return count( $a ) <= count( $b );
+					};
+					if ( $alt && ( ! $pick || $first( $alt['path'], $pick['path'] ) ) ) {
+						$pick = $alt;
+					}
+				}
 				if ( ! $pick ) {
-					return new WP_Error( 'wpt_edit', $elid ? 'That heading isn\'t on the page any more, so someone may have changed it. Nothing was changed.' : 'This page has no heading widget to turn into the H1. Nothing was changed. Tell Claude and it will write a different fix.', array( 'status' => 409 ) );
+					return new WP_Error( 'wpt_edit', $elid ? 'That heading isn\'t on the page any more, so someone may have changed it. Nothing was changed.' : 'This page has no heading at all to turn into the H1, so the hub would have to add one. Nothing was changed.', array( 'status' => 409 ) );
 				}
 				$label = strtoupper( $pick['tag'] ) . ': ' . $plain( $pick['text'] );
 				if ( $r->get_param( 'dry_run' ) ) {
-					return array( 'ok' => true, 'dry_run' => true, 'element' => $pick['id'], 'tag' => $pick['tag'], 'text' => $plain( $pick['text'] ) );
+					return array( 'ok' => true, 'dry_run' => true, 'element' => $pick['id'], 'tag' => $pick['tag'], 'text' => $plain( $pick['text'] ), 'kind' => isset( $pick['kind'] ) ? $pick['kind'] : 'heading' );
 				}
 				$before = wp_json_encode( $data );
 				$node   = &$data;
 				foreach ( $pick['path'] as $k ) {
 					$node = &$node[ $k ];
 				}
-				$node['settings']['header_size'] = 'h1';
+				if ( isset( $pick['kind'] ) && 'html' === $pick['kind'] ) {
+					/* Only the tag changes. Keep any class or style on it, so it looks the same. */
+					$h1 = preg_replace( '#^<h[1-6]#i', '<h1', preg_replace( '#</h[1-6]>$#i', '</h1>', $pick['whole'] ) );
+					$node['settings'][ $pick['key'] ] = substr_replace( (string) $node['settings'][ $pick['key'] ], $h1, $pick['at'], strlen( $pick['whole'] ) );
+				} elseif ( isset( $pick['kind'] ) && 'box' === $pick['kind'] ) {
+					$node['settings']['title_size'] = 'h1';
+				} else {
+					$node['settings']['header_size'] = 'h1';
+				}
+				$wtype = isset( $node['widgetType'] ) ? $node['widgetType'] : 'heading';
 				unset( $node );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
 				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
-				return array( 'ok' => true, 'backup' => $bid, 'element' => $pick['id'], 'widget' => 'heading', 'before' => $label, 'after' => 'H1: ' . $plain( $pick['text'] ) );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => $pick['id'], 'widget' => $wtype, 'before' => $label, 'after' => 'H1: ' . $plain( $pick['text'] ) );
 			}
 			if ( 'faq' === $op ) {
 				/* faq: add an FAQ block to the page, or replace the one the hub added before (version 11).
@@ -862,7 +914,8 @@ add_action( 'rest_api_init', function () {
 			if ( ! $matches ) {
 				return new WP_Error( 'wpt_edit', 'The text this fix looks for isn\'t on the page any more, so someone may have changed it. Nothing was changed.', array( 'status' => 409 ) );
 			}
-			if ( count( $seen ) > 1 && ( 'set' === $op || 'swap' === $op ) ) {
+			$every = 'swap' === $op && $r->get_param( 'every' );
+			if ( count( $seen ) > 1 && ( 'set' === $op || ( 'swap' === $op && ! $every ) ) ) {
 				return new WP_Error( 'wpt_edit', 'That text appears in more than one place on the page, so the hub can\'t tell which to change. Nothing was changed.', array( 'status' => 409 ) );
 			}
 			if ( 'remove' === $op ) {
@@ -914,6 +967,40 @@ add_action( 'rest_api_init', function () {
 				$detail = array( 'before' => $cell, 'after' => (string) $r->get_param( 'replace' ) );
 				$cell   = (string) $r->get_param( 'replace' );
 				unset( $cell, $node );
+			} elseif ( $every ) {
+				/* Swap a wrong phrase everywhere it appears on the page (version 12). Map addresses are left
+				 * alone, as changing them would move the pin. Each spot must swap cleanly or nothing changes. */
+				$phrase = (string) $r->get_param( 'find' );
+				$new    = (string) $r->get_param( 'replace' );
+				$done   = array();
+				$n      = 0;
+				foreach ( $matches as $mm ) {
+					$k = $mm['id'] . '|' . implode( '.', $mm['keys'] );
+					if ( isset( $done[ $k ] ) || ( 'google_maps' === $mm['widget'] && in_array( 'address', $mm['keys'], true ) ) ) {
+						continue;
+					}
+					$done[ $k ] = 1;
+					$node = &$data;
+					foreach ( $mm['path'] as $kk ) {
+						$node = &$node[ $kk ];
+					}
+					$cell = &$node['settings'];
+					foreach ( $mm['keys'] as $kk ) {
+						$cell = &$cell[ $kk ];
+					}
+					$old = str_replace( array( '&nbsp;', "\xC2\xA0" ), ' ', (string) $cell );
+					if ( false === strpos( $old, $phrase ) ) {
+						unset( $cell, $node );
+						return new WP_Error( 'wpt_edit', 'Found the text, but formatting inside it (bold, a link or similar) stops a clean swap in one spot. Nothing was changed. Ask Claude to rewrite this fix as a full text change.', array( 'status' => 409 ) );
+					}
+					$n   += substr_count( $old, $phrase );
+					$cell = str_replace( $phrase, $new, $old );
+					unset( $cell, $node );
+				}
+				if ( ! $n ) {
+					return new WP_Error( 'wpt_edit', 'The text only appears in the map address, which the hub leaves alone. Nothing was changed.', array( 'status' => 409 ) );
+				}
+				$detail = array( 'before' => $phrase . ( $n > 1 ? ' (' . $n . ' places)' : '' ), 'after' => $new );
 			} elseif ( 'swap' === $op ) {
 				/* Swap one phrase inside a widget's text, leaving the rest of it untouched. */
 				$node = &$data;
@@ -933,6 +1020,14 @@ add_action( 'rest_api_init', function () {
 						return new WP_Error( 'wpt_edit', 'Found the text, but formatting inside it (bold, a link or similar) stops a clean swap. Nothing was changed. Ask Claude to rewrite this fix as a full text change.', array( 'status' => 409 ) );
 					}
 					$old = $alt;
+				}
+				/* Adding a link: refuse if the words already sit inside a link, as a link in a link breaks both. */
+				if ( false !== stripos( $new, '<a ' ) ) {
+					$pos  = strpos( $old, $phrase );
+					$open = strripos( substr( $old, 0, $pos ), '<a ' );
+					if ( false !== $open && false === stripos( substr( $old, $open, $pos - $open ), '</a>' ) ) {
+						return new WP_Error( 'wpt_edit', 'Those words are already part of a link on this page. Nothing was changed. Click Skip and the hub will find another spot.', array( 'status' => 409 ) );
+					}
 				}
 				$cell   = str_replace( $phrase, $new, $old );
 				$detail = array( 'before' => $phrase, 'after' => $new );

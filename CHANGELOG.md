@@ -6,6 +6,20 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.28.0 · 2026-10-22 16:30 BST
+
+Two fixes that should have been push-ready from the start.
+
+- **Claims check, Contact page.** The card offered the Contact page's H1 fix for the "West Pier Telecom" claim. Wrong fix: it would never have removed the old name. The card now only offers a fix that takes the claim off the page. Where there isn't one, type the right wording on the card and click Approve and push. It goes live on that page and is saved as a replacement rule, so every later audit fixes it on any page by itself. It swaps every spot on the page and leaves map addresses alone, so the pin doesn't move.
+- **H1 fixes on pages with no heading widget.** The Contact page's "Contact Us" heading sits inside a text or HTML block, so the H1 fix had nothing to change. It now uses whichever heading is nearest the top, including ones inside text and HTML blocks or icon boxes. Only the tag changes; the wording and styling stay.
+- **Pages with no links pointing to them** is no longer a Mark as done card. For each page the hub finds a sentence on another page that already uses its topic words and writes a fix that turns those words into a link. Approve and push one at a time, or Approve and push all. Skip a spot and it looks for another. It won't link from a heading, from another hidden page, or inside an existing link. Claude's Batch 8 link fixes show here too.
+- **Needs version 12 of the page checker.** Click Copy page checker code on Website & SEO, replace the code in WordPress, save, then Save and test.
+- 418 tests, all passing.
+
+## Backup · 2026-10-22 16:01 BST
+
+`backup/v0.27.2-2026-10-22-1601`, taken before v0.28.0.
+
 ## v0.27.2 · 2026-10-22 14:52 BST
 
 - **New urgent job:** check the website's PHP has the 21 October security fix (CVE-2026-109618 and CVE-2026-109619). The NCSC has issued an alert. Steps to check the version in SiteGround, what counts as safe, and who to ask.

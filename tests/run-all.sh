@@ -28,6 +28,7 @@ out=$( {
   node tests/ai-prompts.test.js assets/app.js data/proposals.js
   node tests/ai-score.test.js assets/app.js
   node tests/orphans.test.js assets/app.js
+  node tests/auto-links.test.js assets/app.js
   node tests/google-updates.test.js assets/app.js
   node tests/speed-fixes.test.js assets/app.js tests/fixtures/psi_charity.json
   php tests/page-checker.test.php docs/wordpress-page-checker.php | grep -E "^(PASS|FAIL)"
@@ -39,6 +40,7 @@ out=$( {
   php tests/layout-fix.test.php docs/wordpress-page-checker.php
   php tests/text-size.test.php docs/wordpress-page-checker.php
   php tests/faq.test.php docs/wordpress-page-checker.php
+  php tests/contact-fixes.test.php docs/wordpress-page-checker.php
 } 2>&1 )
 pass=$(echo "$out" | grep -c "^PASS"); fail=$(echo "$out" | grep -c -E "^FAIL|Error")
 echo "$out" | grep -E "^FAIL|Error"
