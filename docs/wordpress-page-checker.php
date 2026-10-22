@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 13: site-wide fixes the hub can push and undo, for pages that aren't built with Elementor, alt text, links, llms.txt, site settings and more).
+ * WPT Marketing Hub: page checker (version 14: Elementor changes are written exactly, without re-saving the whole page, and a page can be restored from its Elementor revisions).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -20,6 +20,30 @@
  * Replace everything in the code box with everything below this comment block,
  * then Save Changes. (New install: Snippets > Add New, type PHP, Run everywhere.)
  */
+
+/* Write a page's Elementor data exactly as given (version 14), then make Elementor rebuild that page's
+ * styles and clear the page from SiteGround's cache. Nothing else on the page is touched. */
+if ( ! function_exists( 'wpt_hub_write_elementor' ) ) {
+	function wpt_hub_write_elementor( $id, $data, $raw = null ) {
+		$json = null !== $raw ? (string) $raw : wp_json_encode( $data );
+		update_post_meta( $id, '_elementor_data', wp_slash( $json ) );
+		foreach ( array( '_elementor_css', '_elementor_element_cache', '_elementor_page_assets' ) as $k ) {
+			delete_post_meta( $id, $k );
+		}
+		if ( class_exists( 'Elementor\\Core\\Files\\CSS\\Post' ) ) {
+			try {
+				\Elementor\Core\Files\CSS\Post::create( $id )->delete();
+			} catch ( \Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+			}
+		}
+		if ( function_exists( 'clean_post_cache' ) ) {
+			clean_post_cache( $id );
+		}
+		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+			sg_cachepress_purge_cache( get_permalink( $id ) );
+		}
+	}
+}
 
 add_action( 'rest_api_init', function () {
 	$host = wp_parse_url( home_url(), PHP_URL_HOST );
@@ -281,7 +305,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 13, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 14, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -373,25 +397,12 @@ add_action( 'rest_api_init', function () {
 		$walk( $elements, array() );
 		return $out;
 	};
+	/* Version 14: the hub writes only its own change. Saving through Elementor re-checks every block on
+	 * the page and can strip embedded content (PDF viewers, iframes, scripts) for some accounts. */
 	$save = function ( $id, $data ) {
-		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->documents ) ) {
-			$doc = \Elementor\Plugin::$instance->documents->get( $id, false );
-			if ( $doc ) {
-				$doc->save( array( 'elements' => $data ) );
-				if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
-					sg_cachepress_purge_cache( get_permalink( $id ) );
-				}
-				return;
-			}
-		}
-		update_post_meta( $id, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
-		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
-			\Elementor\Plugin::$instance->files_manager->clear_cache();
-		}
-		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
-			sg_cachepress_purge_cache( get_permalink( $id ) );
-		}
+		wpt_hub_write_elementor( $id, $data );
 	};
+
 	$at_level = function ( $path, $level, $scope ) {
 		if ( 'section' === $scope ) {
 			return array( $path[0] );
@@ -1064,6 +1075,55 @@ add_action( 'rest_api_init', function () {
 		},
 	) );
 
+	/* Earlier versions of a page from Elementor's own revisions (version 14).
+	 * GET  ?post_id=  The page's revisions, newest first, with when, who, and how many embeds each has.
+	 * POST post_id, revision_id  Put that revision's Elementor data back on the page, exactly as saved.
+	 *      The current version is kept first, so this can be undone like any other hub change. */
+	register_rest_route( 'wpt-hub/v1', '/elementor-revisions', array(
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => $can_post,
+			'callback'            => function ( WP_REST_Request $r ) {
+				$id   = (int) $r->get_param( 'post_id' );
+				$now  = (string) get_post_meta( $id, '_elementor_data', true );
+				$count = function ( $raw ) {
+					return preg_match_all( '#<(iframe|embed|object|script|video)\b|\[[a-z_-]+[\s\]]#i', (string) $raw );
+				};
+				$out  = array( 'current' => array( 'embeds' => $count( $now ), 'size' => strlen( $now ) ), 'revisions' => array() );
+				foreach ( wp_get_post_revisions( $id, array( 'posts_per_page' => 30 ) ) as $rev ) {
+					$raw = (string) get_post_meta( $rev->ID, '_elementor_data', true );
+					if ( '' === $raw ) {
+						continue;
+					}
+					$u = get_userdata( (int) $rev->post_author );
+					$out['revisions'][] = array( 'id' => (int) $rev->ID, 'date' => $rev->post_modified, 'author' => $u ? $u->display_name : '', 'embeds' => $count( $raw ), 'size' => strlen( $raw ) );
+				}
+				return $out;
+			},
+		),
+		array(
+			'methods'             => 'POST',
+			'permission_callback' => $can_post,
+			'callback'            => function ( WP_REST_Request $r ) {
+				$id  = (int) $r->get_param( 'post_id' );
+				$rid = (int) $r->get_param( 'revision_id' );
+				$rev = get_post( $rid );
+				if ( ! $rev || 'revision' !== $rev->post_type || (int) $rev->post_parent !== $id ) {
+					return new WP_Error( 'wpt_rev', 'That isn\'t a saved version of this page. Nothing was changed.', array( 'status' => 400 ) );
+				}
+				$raw = (string) get_post_meta( $rid, '_elementor_data', true );
+				if ( '' === $raw || ! is_array( json_decode( $raw, true ) ) ) {
+					return new WP_Error( 'wpt_rev', 'That version has no Elementor layout saved with it. Nothing was changed.', array( 'status' => 409 ) );
+				}
+				$cur = (string) get_post_meta( $id, '_elementor_data', true );
+				$bid = 'b' . time() . wp_rand( 100, 999 );
+				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $cur, 'after' => md5( wp_json_encode( json_decode( $raw, true ) ) ), 'time' => time() ) );
+				wpt_hub_write_elementor( $id, null, $raw );
+				return array( 'ok' => true, 'backup' => $bid, 'before' => 'Version before the restore', 'after' => 'Restored the version saved ' . $rev->post_modified );
+			},
+		),
+	) );
+
 	register_rest_route( 'wpt-hub/v1', '/elementor-undo', array(
 		'methods'             => 'POST',
 		'permission_callback' => $can_post,
@@ -1731,14 +1791,7 @@ add_action( 'rest_api_init', function () {
 		return is_array( $d ) ? $d : null;
 	};
 	$save_el = function ( $id, $data ) {
-		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->documents ) ) {
-			$doc = \Elementor\Plugin::$instance->documents->get( $id, false );
-			if ( $doc ) {
-				$doc->save( array( 'elements' => $data ) );
-				return;
-			}
-		}
-		update_post_meta( $id, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
+		wpt_hub_write_elementor( $id, $data );
 	};
 	$purge = function ( $id ) {
 		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {

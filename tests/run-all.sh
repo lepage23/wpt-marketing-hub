@@ -43,6 +43,7 @@ out=$( {
   php tests/faq.test.php docs/wordpress-page-checker.php
   php tests/contact-fixes.test.php docs/wordpress-page-checker.php
   php tests/site-edit.test.php docs/wordpress-page-checker.php
+  php tests/revisions.test.php docs/wordpress-page-checker.php
 } 2>&1 )
 pass=$(echo "$out" | grep -c "^PASS"); fail=$(echo "$out" | grep -c -E "^FAIL|Error")
 echo "$out" | grep -E "^FAIL|Error"

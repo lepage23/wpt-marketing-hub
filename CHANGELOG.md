@@ -6,6 +6,20 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.30.0 · 2026-10-22 18:05 BST
+
+Fix for the 8x8 Feature Matrix page losing its PDF viewer.
+
+- **What went wrong.** Every Elementor change from the hub was saved through Elementor's own save, which re-checks every block on the page. On this page that stripped the embedded PDF viewer. Undo saved the same way, so the PDF stayed missing.
+- **Now the hub writes only its own change** and leaves everything else on the page exactly as it was. Undo works the same way.
+- **Restore an earlier version.** Elementor fix cards in Done have a new button that lists the page's saved versions, newest first, and flags any with embedded content the page is now missing. Restoring keeps the current version first, so the restore can be undone too.
+- **Needs page checker version 14.**
+- 492 tests, all passing.
+
+## Backup · 2026-10-22 17:45 BST
+
+`backup/v0.29.1-2026-10-22-1745`, taken before v0.30.0.
+
 ## v0.29.1 · 2026-10-22 17:50 BST
 
 Link suggestions fixed after the 8x8 Feature Matrix card.

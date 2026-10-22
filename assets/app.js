@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.29.1";
-  var BUILT = "2026-10-22 17:37 BST";
+  var VERSION = "0.30.0";
+  var BUILT = "2026-10-22 17:48 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3215,6 +3215,41 @@
       });
     });
   }
+  /* Put back an earlier version of an Elementor page from its revisions (page checker 14). Versions with
+     more embedded content (PDF viewers, videos, forms) than the page has now are flagged. */
+  function revisionTool(p, box) {
+    var wrap = el('<div class="notice info" style="display:block">Loading the saved versions of this page\u2026</div>');
+    box.appendChild(wrap);
+    var go = p.pageId > 0 ? Promise.resolve(p.pageId) : resolveId(p);
+    go.then(function (id) {
+      return wpFetch("/wpt-hub/v1/elementor-revisions?post_id=" + id).then(function (d) {
+        if (!d.revisions || !d.revisions.length) { wrap.innerHTML = "WordPress has no earlier versions of this page with an Elementor layout. Ask Matt whether SiteGround has a backup from before " + esc(new Date().toLocaleDateString("en-GB")) + "."; return; }
+        wrap.innerHTML = "<b>Saved versions of this page</b>, newest first. The page has " + d.current.embeds + " embedded item" + (d.current.embeds === 1 ? "" : "s") + " now (PDF viewers, videos, forms). Pick the newest one from before the change went wrong. The version on the page now is kept, so this can be undone too." +
+          '<div class="rev-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>';
+        var list = wrap.querySelector(".rev-list");
+        d.revisions.forEach(function (r) {
+          var more = r.embeds > d.current.embeds;
+          var row = el('<div class="row" style="justify-content:space-between;gap:8px"><span>' + esc(new Date(r.date.replace(" ", "T")).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (r.author ? " \u00b7 " + esc(r.author) : "") +
+            " \u00b7 " + r.embeds + " embedded" + (more ? ' <span class="chip good">has what\'s missing</span>' : "") + '</span><button type="button" class="btn small">Restore this version</button></div>');
+          var b = row.querySelector("button");
+          b.addEventListener("click", function () {
+            if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Click again to restore"; return; }
+            b.disabled = true; b.textContent = "Restoring\u2026";
+            wpFetch("/wpt-hub/v1/elementor-revisions", { method: "POST", body: { post_id: id, revision_id: r.id } }).then(function (res) {
+              var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+              logChange({ id: p.id + "-restore", when: when, page: p.pageTitle, link: p.link, type: "Restore", action: res.after + " (undo id " + res.backup + ")" });
+              wrap.innerHTML = "<b>Restored.</b> " + esc(res.after) + '. Open the page to check it. <button type="button" class="btn small danger">Undo the restore</button>';
+              wrap.querySelector("button").addEventListener("click", function () {
+                wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: id, backup: res.backup, force: 1 } }).then(function () { wrap.innerHTML = "Restore undone."; }, function (e) { wrap.innerHTML = '<span class="notice">' + esc(e.message) + "</span>"; });
+              });
+              toast("Earlier version restored");
+            }, function (e) { b.disabled = false; delete b.dataset.sure; b.textContent = "Restore this version"; wrap.appendChild(el('<div class="notice">' + esc(/no route/i.test(e.message) ? "Restoring needs version 14 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message) + "</div>")); });
+          });
+          list.appendChild(row);
+        });
+      });
+    }).catch(function (e) { wrap.className = "notice"; wrap.innerHTML = esc(/no route/i.test(e.message) ? "Restoring needs version 14 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message); });
+  }
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     /* Site fixes (page checker 13) keep their copy under an id starting with "s". */
@@ -4130,7 +4165,10 @@
     } else {
       actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "undone" ? "Undone " + esc(st.undoneAt || "") : "Pushed " + esc(st.pushedAt || "")) + "</span>" +
         (st.editLink ? '<a class="btn small" href="' + esc(st.editLink) + '" target="_blank" rel="noopener">Open draft in WordPress</a>' : "") +
-        (st.status === "pushed" && p.type !== "new_draft" ? '<button type="button" class="btn small danger undo">Undo</button>' : "");
+        (st.status === "pushed" && p.type !== "new_draft" ? '<button type="button" class="btn small danger undo">Undo</button>' : "") +
+        (/^elementor_|^text_swap$/.test(p.type) || (st.backup && /^b\d/.test(st.backup)) ? '<button type="button" class="btn small revs">Page not right? Restore an earlier version</button>' : "");
+      var rv = actions.querySelector(".revs");
+      if (rv) rv.addEventListener("click", function () { rv.remove(); revisionTool(Object.assign({}, p, { pageId: p.pageId || st.pageId }), msg); });
       var u = actions.querySelector(".undo");
       if (u) u.addEventListener("click", function () {
         if (!u.dataset.sure) { u.dataset.sure = "1"; u.textContent = "Click again to undo"; return; }
