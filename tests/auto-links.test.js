@@ -5,7 +5,7 @@ const i0=src.indexOf('var LINK_STOP');const LS=src.slice(i0,src.indexOf(';\n',i0
 let STORE={};function load(k,f){return k in STORE?JSON.parse(JSON.stringify(STORE[k])):f;}function save(k,v){STORE[k]=v;}
 function today(){return '2026-10-22';}function shortPath(u){return u.replace(/^https?:\/\/[^\/]+/,'');}
 let PROPS=[];function proposals(){return PROPS.concat(load('auto-fixes-rules',[]));}
-eval(LS+['norm','autoKey','linkPhrases','phraseIn','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
+eval(LS+['norm','autoKey','linkPhrases','phraseIn','linkFix','suggestLinks','claimPageTerms','claimFixFor','claimRules','matchCase','ruleFixes','pushClaimReplace'].map(grab).join('\n'));
 function updateNav(){}global.window={};
 const H='https://westpiertech.com';
 /* Topic phrases from a title */
@@ -40,4 +40,14 @@ const orphan={title:'Top 10 UCaaS Providers for 2026',link:H+'/top-10-ucaas/'};
  const o=await pushClaimReplace(pg,'west pier telecom','West Pier Technologies');
  ok(STORE['claim-rules'][0].replace==='West Pier Technologies','wording saved as a rule for every later audit');
  ok(pushed&&pushed.fx.every===true&&pushed.fx.pageId===44&&pushed.t==='West Pier Technologies','pushed straight away, every spot on the page');
+})();
+(async()=>{await new Promise(r=>setTimeout(r,50));
+ eval(grab('matchCase'));
+ ok(matchCase('west pier technologies','West Pier Telecom')==='West Pier Technologies','lower-case wording gets the page\'s capitals');
+ ok(matchCase('west pier technologies','WEST PIER TELECOM')==='WEST PIER TECHNOLOGIES','all capitals kept');
+ ok(matchCase('West Pier Technologies Ltd','west pier telecom')==='West Pier Technologies Ltd','wording typed with capitals is left as typed');
+ STORE={};PROPS=[];global.findText=async()=>[{post_id:44,title:'Contact',link:H+'/contact/',type:'page',elementor:true,hits:[{snippet:'Contact UsWest Pier Telecom LtdMocatta House'}]}];
+ let pushed=null;global.pushFix=async(fx,t)=>{pushed={fx,t};return {};};
+ await pushClaimReplace({link:H+'/contact/',terms:['west pier telecom']},'west pier telecom','west pier technologies');
+ ok(pushed.fx.find==='West Pier Telecom'&&pushed.t==='West Pier Technologies','Contact page: looks for the phrase as written and pushes it with capitals');
 })();

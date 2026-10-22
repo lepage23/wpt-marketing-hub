@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.28.1";
-  var BUILT = "2026-10-22 16:18 BST";
+  var VERSION = "0.28.2";
+  var BUILT = "2026-10-22 16:21 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3628,6 +3628,16 @@
   function parseRules(txt) {
     return String(txt || "").split(/\n/).map(function (l) { var m = l.split(/\s*=>\s*/); return m.length === 2 && m[0].trim().length > 3 ? { find: m[0].trim(), replace: m[1].trim() } : null; }).filter(Boolean);
   }
+  /* "west pier technologies" typed in lower case comes out as "West Pier Technologies" where the page
+     used capitals. Wording typed with any capitals is kept exactly as typed. */
+  function matchCase(rep, found) {
+    rep = String(rep || ""); found = String(found || "");
+    if (rep !== rep.toLowerCase() || !/[A-Z]/.test(found)) return rep;
+    if (found === found.toUpperCase()) return rep.toUpperCase();
+    var words = found.split(/\s+/).filter(function (w) { return /[a-z]/i.test(w); });
+    if (words.length > 1 && words.every(function (w) { return /^[A-Z]/.test(w); })) return rep.replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); });
+    return /^[A-Z]/.test(found) ? rep.charAt(0).toUpperCase() + rep.slice(1) : rep;
+  }
   function ruleFixes() {
     var rules = claimRules(), today = new Date().toISOString().slice(0, 10), out = [];
     var claude = {}; (window.WPT_PROPOSALS || []).forEach(function (f) { if (f.find) claude[norm(f.link) + "|" + f.find.toLowerCase()] = true; });
@@ -3637,10 +3647,12 @@
           rows.forEach(function (r) {
             if (claude[norm(r.link) + "|" + rule.find.toLowerCase()]) return;
             var hit = r.hits[0] || {};
+            /* Use the phrase exactly as the page writes it, and match its capitals in the new wording. */
+            var exact = phraseIn(hit.snippet, rule.find) || rule.find, rep = matchCase(rule.replace, exact);
             out.push({ id: "rule-" + (norm(r.link) + "-" + rule.find).replace(/\W+/g, "-").slice(0, 100), auto: true, created: today, batch: "Automatic replacement",
               type: r.elementor ? "elementor_swap" : "content_replace", size: "small", priority: "critical", category: "Content",
-              postType: r.type === "post" ? "posts" : "pages", pageId: r.post_id, pageTitle: r.title, link: r.link, find: rule.find, every: !!r.elementor,
-              issue: "Says \u201c" + rule.find + "\u201d", current: r.elementor ? "\u2026" + (hit.snippet || rule.find) + "\u2026" : rule.find, proposed: rule.replace,
+              postType: r.type === "post" ? "posts" : "pages", pageId: r.post_id, pageTitle: r.title, link: r.link, find: exact, every: !!r.elementor,
+              issue: "Says \u201c" + exact + "\u201d", current: r.elementor ? "\u2026" + (hit.snippet || exact) + "\u2026" : exact, proposed: rep,
               why: "Matches one of your automatic replacement rules on the Website & SEO page. Only this phrase changes, everywhere it appears on the page (map addresses are left alone). The rest of the text stays as it is." });
           });
         });

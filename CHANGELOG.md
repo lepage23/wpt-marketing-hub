@@ -6,6 +6,10 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.28.2 · 2026-10-22 16:30 BST
+
+- **Claims card, Contact page.** The push failed because the rule said "west pier telecom" in lower case and the page says "West Pier Telecom". Replacement rules now look for the phrase exactly as the page writes it, and lower-case wording picks up the page's capitals, so "west pier technologies" goes live as "West Pier Technologies". Wording you type with capitals is kept as typed.
+
 ## v0.28.1 · 2026-10-22 16:20 BST
 
 - **New job:** check out last30days, a free Claude skill that searches Reddit, X, YouTube and the web. Could feed the weekly brief and spot lead signals.
