@@ -113,3 +113,9 @@ $POSTS[60]=$o60="<h2>Feature Comparison</h2>\n<script>var re=/\\d+/; var s=\"a\\
 $r=e(array('op'=>'h1','post_id'=>60));
 ok(!is_wp_error($r)&&strpos($POSTS[60],'<h1>Feature Comparison</h1>')===0&&strpos($POSTS[60],'/\\d+/')!==false&&strpos($POSTS[60],'"a\\nb"')!==false,'h1: page code keeps every backslash');
 u($r['backup']); ok($POSTS[60]===$o60,'undo: page code back exactly');
+/* Repairing a page: the whole text goes back exactly, checked, and can be undone */
+$POSTS[61]=$broken='<script>html += "<th class="tpfc">";</script>';
+$good="<!-- wp:html -->\n<script>html += \"<th class=\\\"tpfc\\\">\";</script>\n<!-- /wp:html -->";
+$r=e(array('op'=>'content_set','post_id'=>61,'content'=>$good));
+ok(!is_wp_error($r)&&$POSTS[61]===$good,'content_set: page text put back exactly, backslashes and all');
+u($r['backup']); ok($POSTS[61]===$broken,'content_set: undo');

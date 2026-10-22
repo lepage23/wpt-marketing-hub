@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.30.1";
-  var BUILT = "2026-10-22 17:59 BST";
+  var VERSION = "0.30.2";
+  var BUILT = "2026-10-22 18:05 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2831,14 +2831,15 @@
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
     elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
-  function typeLabel(p) { return p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
+  function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
   function goLabel(p) {
+    if (p.type === "content_set") return "Approve and repair the page";
     if (p.type === "site_edit") return { h1: "Approve and make it the H1", h1_one: "Approve and keep one H1", alt: "Approve and add the alt text", relink: "Approve and fix the link", menu_add: "Approve and add to the menu", css: "Approve and fix the display", llms: "Approve and publish llms.txt", option: p.params && p.params.key === "blog_public" ? "Approve and let Google index the site" : "Approve and save the setting", meta: p.params && p.params.key === "rank_math_robots" ? "Approve and let Google index it" : "Approve and clear it", redirect_code: "Approve and make it permanent" }[p.op] || "Approve and push";
     return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live";
   }
   /* Fixes whose box only describes what happens, rather than holding text to edit. */
-  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
+  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|content_set/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
   function parseFaq(text) {
@@ -3111,6 +3112,7 @@
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_tidy" ? "tidy" : p.type === "elementor_type" ? "type" : "layout", element: p.element, set: p.set || {}, clear_negative_margin: p.clearNeg ? 1 : 0 } })
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV9);
     }
+    if (p.type === "content_set") return pushRepair(p);
     if (p.type === "site_edit") return pushSite(p, text);
     if (p.type === "text_swap") {
       /* Elementor pages swap inside the widget; anything else changes the page text. */
@@ -3181,6 +3183,32 @@
     });
   }
   /* Ask WordPress which heading would become the H1, without changing anything. */
+  /* Repair a page by putting its whole text back. Uses the page checker's exact write when it's there
+     (version 15), otherwise WordPress's own editor route. Either way the page is read back afterwards and
+     must match byte for byte, or the old text goes back and the push fails. */
+  function pushRepair(p) {
+    var base = "/wp/v2/" + p.postType + "/" + p.pageId;
+    function verify() {
+      return wpFetch(base + "?context=edit&_fields=id,content").then(function (cur) {
+        var raw = (cur.content && cur.content.raw) || "";
+        if (raw !== p.code) throw new Error("WordPress didn't keep the page text exactly (" + raw.length + " of " + p.code.length + " characters match the original).");
+        return raw.length;
+      });
+    }
+    return pushSite(Object.assign({}, p, { op: "content_set", params: { content: p.code } }), "").then(function (r) {
+      return verify().then(function () { return r; });
+    }, function (err) {
+      if (!/version 13|no route|unknown edit type/i.test(err.message)) throw err;
+      return wpFetch(base + "?context=edit&_fields=id,content").then(function (cur) {
+        var before = (cur.content && cur.content.raw) || "";
+        return wpFetch(base, { method: "POST", body: { content: p.code } }).then(function () {
+          return verify().then(function (n) { return { before: before, after: n + " characters, checked byte for byte", restBefore: before }; }, function (e) {
+            return wpFetch(base, { method: "POST", body: { content: before } }).then(function () { throw new Error(e.message + " The page has been put back as it was. Update the page checker to version 15 and push again."); });
+          });
+        });
+      });
+    });
+  }
   function pushSite(p, text) {
     var body = Object.assign({ op: p.op, post_id: p.siteWide ? 0 : p.pageId || 0 }, p.params || {});
     if (p.textParam) body[p.textParam] = text;
@@ -3255,6 +3283,7 @@
     /* Site fixes (page checker 13) keep their copy under an id starting with "s". */
     if (st.backup && /^s\d/.test(st.backup)) return wpFetch("/wpt-hub/v1/site-undo", { method: "POST", body: { backup: st.backup, force: force ? 1 : 0 } });
     if (p.type === "text_swap") p = Object.assign({}, p, { type: st.backup ? "elementor_swap" : "content_replace" });
+    if (p.type === "content_set") return wpFetch(base + p.pageId, { method: "POST", body: { content: st.before || "" } });
     var base = "/wp/v2/" + p.postType + "/";
     if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq" || p.type === "elementor_h1") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });

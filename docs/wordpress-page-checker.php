@@ -1913,6 +1913,23 @@ add_action( 'rest_api_init', function () {
 				return array( 'ok' => true, 'backup' => $bid, 'before' => $label, 'after' => $after );
 			}
 
+			if ( 'content_set' === $op ) {
+				/* Put a page's whole text back exactly, used to repair a page (version 15). */
+				$new = (string) $r->get_param( 'content' );
+				if ( strlen( $new ) < 20 ) {
+					return $err( 'The fix has no page text in it. Nothing was changed.', 400 );
+				}
+				$c   = (string) get_post_field( 'post_content', $id );
+				$bid = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
+				wpt_hub_write_content( $id, $new );
+				$now = (string) get_post_field( 'post_content', $id );
+				if ( $now !== $new ) {
+					wpt_hub_write_content( $id, $c );
+					return $err( 'WordPress didn\'t store the text exactly, so the page has been put back as it was. Nothing was changed.' );
+				}
+				return array( 'ok' => true, 'backup' => $bid, 'before' => strlen( $c ) . ' characters', 'after' => strlen( $new ) . ' characters, checked byte for byte' );
+			}
+
 			if ( 'h1_one' === $op ) {
 				$data = $load( $id );
 				if ( $data ) {
