@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.32.1 · 2026-10-23 08:28 BST
+
+- **Rejecting a fix is now logged.** Moving a card to Not doing writes a line to the Progress & change log with the date, time and page, like a push.
+- **A repair with nothing left to fix says so plainly** and tells you to Reject it, instead of "Not pushed".
+- 517 tests, all passing.
+
+## Backup · 2026-10-23 08:23 BST
+
+`backup/v0.32.0-2026-10-23-0823`, taken before v0.32.1.
+
 ## v0.32.0 · 2026-10-23 08:25 BST
 
 Fix for the 8x8 Feature Matrix page losing its layout. **Needs page checker version 18.**

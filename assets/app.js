@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.32.0";
-  var BUILT = "2026-10-23 08:12 BST";
+  var VERSION = "0.32.1";
+  var BUILT = "2026-10-23 08:23 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2919,6 +2919,12 @@
     var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s);
   }
   /* When a fix last moved: the stamp if there is one, otherwise the date shown on older cards. */
+  /* Not doing: kept on the card and written to the change log, like a push. */
+  function rejectFix(p, note) {
+    var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+    setFix(p.id, { status: "rejected", doneAt: when });
+    logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: typeLabel(p), action: "Moved to Not doing" + (note ? ": " + note : "") + " (" + p.issue + ")" });
+  }
   function fixTime(st) {
     if (!st) return 0;
     if (st.ts) return st.ts;
@@ -3167,6 +3173,7 @@
     if (p.type === "elementor_h1_look") {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "h1_look", find: p.find, level: p.level || 2 } })
         .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, function (err) {
+          if (/No H1 with that text needs repairing/.test(err.message)) throw new Error("Nothing to repair: this page has no H1 with that text any more, so this card has no job left. Nothing was changed. Click Reject to move it to Not doing (it's logged).");
           if (/Unknown edit type|no route/i.test(err.message)) throw new Error("This repair needs page checker version 18. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push again. Nothing was changed.");
           throw err;
         });
@@ -3485,7 +3492,7 @@
         logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Steps", action: "Marked done: " + p.issue });
         toast(p.auto ? "Marked done. The next audit will check it." : "Marked done"); redraw(); updateNav();
       });
-      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+      actions.querySelector(".rej").addEventListener("click", function () { rejectFix(p); toast("Moved to Not doing"); redraw(); updateNav(); });
     } else {
       actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "done" ? "Done " + esc(st.doneAt || "") : "Not doing this") + '</span><button type="button" class="btn small">Put back in the queue</button>';
       actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
@@ -3594,7 +3601,7 @@
           msg.innerHTML = '<div class="notice"><b>Not built.</b> ' + esc(err.message) + "</div>";
         });
       });
-      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+      actions.querySelector(".rej").addEventListener("click", function () { rejectFix(p); toast("Moved to Not doing"); redraw(); updateNav(); });
     }
     return card;
   }
@@ -3714,7 +3721,7 @@
         redraw(); updateNav();
       }).catch(function (err) { b.disabled = false; b.textContent = "Check the site again now"; msg.innerHTML = '<div class="notice">' + esc(err.message) + "</div>"; });
     });
-    card.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    card.querySelector(".rej").addEventListener("click", function () { rejectFix(p); toast("Moved to Not doing"); redraw(); updateNav(); });
     return card;
   }
 
@@ -3971,7 +3978,7 @@
     copy.addEventListener("click", function () {
       copyText("From the hub Fix queue: " + p.issue + "\n" + pages.map(function (x) { return "- " + x.link; }).join("\n") + "\nPlease write link fixes I can push for any the hub couldn't find a spot for.", "Copied. Paste it into Claude.");
     });
-    card.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    card.querySelector(".rej").addEventListener("click", function () { rejectFix(p); toast("Moved to Not doing"); redraw(); updateNav(); });
     return card;
   }
 
@@ -4011,7 +4018,7 @@
     if (!st.status) {
       actions.innerHTML = '<button type="button" class="btn primary">Copy for Claude</button><button type="button" class="btn rej">Not doing this</button>';
       actions.querySelector(".primary").addEventListener("click", function () { copyText(claudeText(p), "Copied. Paste it into Claude."); });
-      actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+      actions.querySelector(".rej").addEventListener("click", function () { rejectFix(p); toast("Moved to Not doing"); redraw(); updateNav(); });
     } else {
       actions.innerHTML = '<span class="muted" style="font-size:.86rem">' + (st.status === "rejected" ? "Not doing this" : "Closed " + esc(st.doneAt || "")) + '</span><button type="button" class="btn small">Put back in the queue</button>';
       actions.querySelector("button").addEventListener("click", function () { var s = fixState(); if (s[p.id]) delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
@@ -4143,7 +4150,7 @@
         if (bad.length) msg.innerHTML = '<div class="notice"><b>' + bad.length + " not pushed.</b><br>" + bad.map(esc).join("<br>") + "<br>Skip any that aren't wanted and the card moves to Done.</div>";
       });
     });
-    actions.querySelector(".rej").addEventListener("click", function () { setFix(p.id, { status: "rejected" }); toast("Moved to Not doing"); redraw(); updateNav(); });
+    actions.querySelector(".rej").addEventListener("click", function () { rejectFix(p); toast("Moved to Not doing"); redraw(); updateNav(); });
     return card;
   }
 

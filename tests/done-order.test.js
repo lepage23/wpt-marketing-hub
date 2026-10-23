@@ -24,3 +24,8 @@ ok(!st.x.status&&st.x.reopened&&st.x.reopenNote==='Undo broke it'&&st.x.history[
 mem['fix-state'].x={status:'pushed',ts:9};
 st=applyReopens(load('fix-state',{}));
 ok(st.x.status==='pushed','same stamp is not applied twice, so a new push stays in Done');
+// Every reject is written to the change log.
+let logged=[];global.logChange=e=>logged.push(e);global.typeLabel=()=>'H1 colour repair';
+eval(grab('rejectFix').replace(/^function (\w+)/,'global.$1 = function'));
+store={};rejectFix({id:'r',pageTitle:'8x8',link:'u',issue:'Heading invisible'});
+ok(store.r.status==='rejected'&&typeof store.r.ts==='number'&&logged[0].action.indexOf('Moved to Not doing')===0,'reject is time-stamped and logged');
