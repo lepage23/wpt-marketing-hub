@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 21: the blog page's H1 spans the full width above the posts instead of taking a slot in the grid).
+ * WPT Marketing Hub: page checker (version 22: add a block of text to the end of a page that isn't built with Elementor, written exactly).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -378,7 +378,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 21, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 22, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -2105,6 +2105,36 @@ add_action( 'rest_api_init', function () {
 					return $err( 'WordPress didn\'t store the text exactly, so the page has been put back as it was. Nothing was changed.' );
 				}
 				return array( 'ok' => true, 'backup' => $bid, 'before' => strlen( $c ) . ' characters', 'after' => strlen( $new ) . ' characters, checked byte for byte' );
+			}
+
+			if ( 'content_append' === $op ) {
+				/* Version 22: add a block of HTML to the end of a page that isn't built with Elementor (like the
+				 * Feature Comparison tool). The block sits between markers, so pushing again replaces it rather
+				 * than adding a second copy. Written exactly and read back, so code on the page is never touched. */
+				if ( $load( $id ) ) {
+					return $err( 'This page is built with Elementor. Use an Elementor fix instead. Nothing was changed.', 400 );
+				}
+				$key  = preg_replace( '/[^a-z0-9-]/', '', strtolower( (string) $r->get_param( 'key' ) ) );
+				$html = trim( (string) $r->get_param( 'html' ) );
+				if ( ! $key || strlen( wp_strip_all_tags( $html ) ) < 50 ) {
+					return $err( 'The fix has no text to add. Nothing was changed.', 400 );
+				}
+				$html  = wp_kses_post( $html );
+				$open  = '<!-- wpt-hub-append:' . $key . ' -->';
+				$close = '<!-- /wpt-hub-append:' . $key . ' -->';
+				$block = $open . "\n<!-- wp:html -->\n" . $html . "\n<!-- /wp:html -->\n" . $close;
+				$c     = (string) get_post_field( 'post_content', $id );
+				$a     = strpos( $c, $open );
+				$b     = false === $a ? false : strpos( $c, $close, $a );
+				$new   = false !== $a && false !== $b ? substr_replace( $c, $block, $a, $b + strlen( $close ) - $a ) : rtrim( $c ) . "\n\n" . $block . "\n";
+				$bid   = $keep( array( 'kind' => 'content', 'post_id' => $id, 'content' => $c, 'after' => md5( $new ) ) );
+				wpt_hub_write_content( $id, $new );
+				if ( (string) get_post_field( 'post_content', $id ) !== $new ) {
+					wpt_hub_write_content( $id, $c );
+					return $err( 'WordPress didn\'t store the page exactly, so it has been put back as it was. Nothing was changed.' );
+				}
+				$purge( $id );
+				return array( 'ok' => true, 'backup' => $bid, 'before' => false !== $a ? 'Earlier version of this block' : '(no block)', 'after' => strlen( wp_strip_all_tags( $html ) ) . ' characters of text added, rest of the page untouched' );
 			}
 
 			if ( 'h1_one' === $op ) {

@@ -6,6 +6,22 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.37.0 · 2026-10-23 10:45 BST
+
+Content for the 11 thin pages, all push-ready.
+
+- **11 cards in the Fix queue (batch "Thin pages: FAQ content").** Six questions and answers per page, written for that sector's buyers, adding 270 to 390 words each. Every page ends up over 300 words, and most land between 500 and 620.
+- **Written to current guidance.** Google's own advice for AI search (May 2026): original, specific content written for people, with no special markup needed. The GEO research: real statistics, cited sources and quotes make content more likely to be quoted. Google's scaled content policy: each sector page carries facts that appear on no other page, so they don't read as a template.
+- **Facts used are sourced:** the Openreach switch-off date (31 January 2027) and what happens after it, the April 2026 Cyber Essentials rules, 3CX's hotel features and free plan, 8x8 Engage, Microsoft's figure on multi-factor authentication.
+- **Healthcare is aimed at private clinics and health suppliers.** GP practices have to buy cloud phones through NHS England's own framework, which WPT isn't on.
+- **Feature Comparison** is code, not Elementor, so it gets a new fix type: text added after the tool, written exactly and read back. **Page checker 22**, which the hub installs itself before pushing.
+- **New job:** get one real customer quote per sector page.
+- 534 tests, all passing.
+
+## Backup · 2026-10-23 10:19 BST
+
+`backup/v0.36.0-2026-10-23-1019`, taken before v0.37.0.
+
 ## v0.36.0 · 2026-10-23 10:18 BST
 
 Fix for the News page heading taking a post's slot. **Page checker 21, which the hub installs itself.**

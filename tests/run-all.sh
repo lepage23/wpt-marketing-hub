@@ -5,6 +5,7 @@ out=$( {
   node tests/push-undo.test.js assets/app.js
   node tests/done-order.test.js assets/app.js
   node tests/checker-update.test.js assets/app.js ./data/snippets.js
+  node tests/content-append.test.js assets/app.js ./data/proposals.js
   php tests/undo-slashes.test.php docs/wordpress-page-checker.php
   php tests/h1-look.test.php docs/wordpress-page-checker.php
   node tests/page-lookup.test.js assets/app.js

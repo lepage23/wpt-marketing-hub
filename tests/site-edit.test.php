@@ -119,3 +119,13 @@ $good="<!-- wp:html -->\n<script>html += \"<th class=\\\"tpfc\\\">\";</script>\n
 $r=e(array('op'=>'content_set','post_id'=>61,'content'=>$good));
 ok(!is_wp_error($r)&&$POSTS[61]===$good,'content_set: page text put back exactly, backslashes and all');
 u($r['backup']); ok($POSTS[61]===$broken,'content_set: undo');
+// Version 22: add a block of text to the end of a page that isn't built with Elementor, exactly.
+if(!function_exists('wp_kses_post')){function wp_kses_post($s){return preg_replace('#<script.*?</script>#is','',$s);}}
+$POSTS[62]=$o62="<!-- wp:html -->\n<script>var re=/\\d+/;</script>\n<!-- /wp:html -->";
+$faq='<h2>How to choose</h2><h3>Which is best?</h3><p>There is no single best system, only the best fit for how your team works every day.</p><script>bad()</script>';
+$r=e(array('op'=>'content_append','post_id'=>62,'key'=>'faq','html'=>$faq));
+ok(!is_wp_error($r)&&strpos($POSTS[62],$o62)===0&&strpos($POSTS[62],'<h3>Which is best?</h3>')!==false&&strpos($POSTS[62],'bad()')===false,'content_append: text added after the page code, code untouched, scripts stripped from the new block');
+$once=$POSTS[62];
+$r2=e(array('op'=>'content_append','post_id'=>62,'key'=>'faq','html'=>str_replace('Which is best?','Which system is best?',$faq)));
+ok(!is_wp_error($r2)&&substr_count($POSTS[62],'<!-- wpt-hub-append:faq -->')===1&&strpos($POSTS[62],'Which system is best?')!==false,'content_append: pushing again replaces the block, no second copy');
+u($r2['backup']); ok($POSTS[62]===$once,'content_append: undo');

@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.36.0";
-  var BUILT = "2026-10-23 10:08 BST";
+  var VERSION = "0.37.0";
+  var BUILT = "2026-10-23 10:21 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2836,19 +2836,40 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check", snippet_update: "Hub update" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check", snippet_update: "Hub update", content_append: "Add text to page" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
   function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
   function goLabel(p) {
     if (p.type === "content_set") return "Approve and repair the page";
     if (p.type === "site_edit") return { h1: "Approve and make it the H1", h1_one: "Approve and keep one H1", alt: "Approve and add the alt text", relink: "Approve and fix the link", menu_add: "Approve and add to the menu", css: "Approve and fix the display", llms: "Approve and publish llms.txt", option: p.params && p.params.key === "blog_public" ? "Approve and let Google index the site" : "Approve and save the setting", meta: p.params && p.params.key === "rank_math_robots" ? "Approve and let Google index it" : "Approve and clear it", redirect_code: "Approve and make it permanent" }[p.op] || "Approve and push";
-    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : p.type === "snippet_update" ? "Approve and update the page checker" : "Approve and push live";
+    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : p.type === "snippet_update" ? "Approve and update the page checker" : p.type === "content_append" ? "Approve and add the text to the page" : "Approve and push live";
   }
   /* Fixes whose box only describes what happens, rather than holding text to edit. */
   function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|elementor_h1_look|content_set|snippet_update/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
+  /* Questions and answers as plain HTML for a page that isn't built with Elementor: a heading, then each
+     question as a smaller heading with its answer underneath, so people and search engines see it all. */
+  function faqHtml(text) {
+    var f = parseFaq(text);
+    return (f.heading ? "<h2>" + esc(f.heading) + "</h2>\n" : "") + f.items.map(function (it) { return "<h3>" + esc(it.q) + "</h3>\n<p>" + esc(it.a) + "</p>"; }).join("\n");
+  }
+  /* Adds text to the end of a page that isn't built with Elementor (page checker 22). If the site's page
+     checker is older than the card needs, the hub updates it first. */
+  function pushAppend(p, text) {
+    var html;
+    try { html = faqHtml(text == null ? p.proposed : text); } catch (e) { return Promise.reject(e); }
+    return siteChecker().then(function (v) {
+      if (v >= (p.needs || 0)) return null;
+      return pushChecker(checkerCards()[0] || {}).then(function (r) {
+        var c = checkerCards()[0], when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+        if (c && r.backup) { setFix(c.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, backup: r.backup }); logChange({ id: c.id, when: when, page: "Page checker", link: c.link, type: "Hub update", action: r.after }); }
+      });
+    }).then(function () {
+      return wpFetch("/wpt-hub/v1/site-edit", { method: "POST", body: { post_id: p.pageId, op: "content_append", key: p.appendKey || "faq", html: html } });
+    }).then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; });
+  }
   function parseFaq(text) {
     var heading = "", items = [], cur = null;
     String(text || "").replace(/\r/g, "").split("\n").forEach(function (line) {
@@ -3161,6 +3182,7 @@
         .then(function (r) { return { before: p.current, after: p.proposed, backup: r.backup }; }, needsV9);
     }
     if (p.type === "content_set") return pushRepair(p);
+    if (p.type === "content_append") return pushAppend(p, text);
     if (p.type === "site_edit") return pushSite(p, text);
     if (p.type === "text_swap") {
       /* Elementor pages swap inside the widget; anything else changes the page text. */
@@ -4405,7 +4427,7 @@
       '<div class="cols2">' +
       '<div class="field">Now on the site<pre class="was">' + esc(p.type === "new_draft" ? "(new page, nothing yet)" : (done ? st.before : p.current) || "(empty)") + "</pre></div>" +
       '<label class="field" for="fix-' + esc(p.id) + '">' + (done ? "What went live" : fixedText(p) ? "What will happen" : p.needsEdit ? "Your new wording (change it, then push)" : p.type === "elementor_faq" ? "Questions and answers (edit any of them, keep the Q: and A: labels)" : p.op === "alt" ? "Alt text, one image per line (edit any of them; leave one blank to skip it)" : p.inputLabel || "Proposed (you can edit this)") +
-      '<textarea id="fix-' + esc(p.id) + '"' + (done || fixedText(p) ? " readonly" : "") + (p.placeholder ? ' placeholder="' + esc(p.placeholder) + '"' : "") + (p.type === "elementor_faq" || p.op === "llms" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) || p.op === "alt" || p.op === "css" ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
+      '<textarea id="fix-' + esc(p.id) + '"' + (done || fixedText(p) ? " readonly" : "") + (p.placeholder ? ' placeholder="' + esc(p.placeholder) + '"' : "") + (p.type === "elementor_faq" || p.type === "content_append" || p.op === "llms" ? ' style="min-height:360px"' : /content_replace|new_draft|elementor_set/.test(p.type) || p.op === "alt" || p.op === "css" ? ' style="min-height:140px"' : "") + ">" + esc(done ? (st.after || (p.type === "elementor_remove" ? "(removed)" : "")) : text) + "</textarea>" +
       (isMeta ? '<span class="hint mono"></span>' : "") + "</label></div>" +
       '<p class="muted" style="font-size:.86rem"><b>Why:</b> ' + esc(p.why) + "</p>" +
       '<div class="fix-actions row"></div><div class="fix-msg"></div>';
