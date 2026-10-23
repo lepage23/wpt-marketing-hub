@@ -6,6 +6,19 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.31.1 · 2026-10-23 08:02 BST
+
+Fix for the 8x8 Feature Matrix heading repair, which saved but changed nothing. **Needs page checker version 17.**
+
+- **What went wrong.** On Elementor heading blocks, version 16 put the keep-colour class in `css_classes`. Elementor reads a block's classes from `_css_classes`, so the class never reached the page. Let's get started worked because its heading sits in an HTML block.
+- **New repair card for 8x8 Feature Matrix** at the top of the Fix queue. It puts the class in the right setting and tidies the wrong one away.
+- Future H1 fixes on heading blocks use the right setting too.
+- 510 tests, all passing.
+
+## Backup · 2026-10-23 07:52 BST
+
+`backup/v0.31.0-2026-10-23-0752`, taken before v0.31.1.
+
 ## v0.31.0 · 2026-10-23 08:05 BST
 
 Fix for headings turning invisible after the hub's H1 fix. **Needs page checker version 16.**

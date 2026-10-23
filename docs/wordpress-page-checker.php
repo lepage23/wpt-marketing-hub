@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 16: a heading the hub turns into the H1 keeps the colour it had, instead of taking the theme's H1 style).
+ * WPT Marketing Hub: page checker (version 17: a heading the hub turns into the H1 keeps the colour it had, including Elementor heading blocks).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -38,6 +38,19 @@ function wpt_hub_keep_look( $open, $level ) {
 function wpt_hub_keep_class( $classes, $level ) {
 	$cls = 'wpt-was-h' . max( 2, min( 6, (int) $level ) );
 	return false !== strpos( (string) $classes, 'wpt-was-h' ) ? (string) $classes : trim( $classes . ' ' . $cls );
+}
+/* Version 17: Elementor keeps a widget's CSS classes in "_css_classes" (sections and containers use
+ * "css_classes"). Version 16 wrote the wrong one, so tidy that away too. Returns true if anything changed. */
+function wpt_hub_keep_widget( &$settings, $level ) {
+	$was = isset( $settings['_css_classes'] ) ? (string) $settings['_css_classes'] : '';
+	$new = wpt_hub_keep_class( $was, $level );
+	$changed = $new !== $was;
+	$settings['_css_classes'] = $new;
+	if ( isset( $settings['css_classes'] ) && preg_match( '#^\s*wpt-was-h[2-6]\s*$#', (string) $settings['css_classes'] ) ) {
+		unset( $settings['css_classes'] );
+		$changed = true;
+	}
+	return $changed;
 }
 
 /* Write a page's text exactly as given (version 15). Saving through wp_update_post strips backslashes
@@ -343,7 +356,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 16, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 17, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -682,10 +695,10 @@ add_action( 'rest_api_init', function () {
 					$node['settings'][ $pick['key'] ] = substr_replace( (string) $node['settings'][ $pick['key'] ], $h1, $pick['at'], strlen( $pick['whole'] ) );
 				} elseif ( isset( $pick['kind'] ) && 'box' === $pick['kind'] ) {
 					$node['settings']['title_size']  = 'h1';
-					$node['settings']['css_classes'] = wpt_hub_keep_class( isset( $node['settings']['css_classes'] ) ? $node['settings']['css_classes'] : '', (int) substr( $pick['tag'], 1 ) );
+					wpt_hub_keep_widget( $node['settings'], (int) substr( $pick['tag'], 1 ) );
 				} else {
 					$node['settings']['header_size'] = 'h1';
-					$node['settings']['css_classes'] = wpt_hub_keep_class( isset( $node['settings']['css_classes'] ) ? $node['settings']['css_classes'] : '', (int) substr( $pick['tag'], 1 ) );
+					wpt_hub_keep_widget( $node['settings'], (int) substr( $pick['tag'], 1 ) );
 				}
 				$wtype = isset( $node['widgetType'] ) ? $node['widgetType'] : 'heading';
 				unset( $node );
@@ -709,16 +722,12 @@ add_action( 'rest_api_init', function () {
 						if ( isset( $el['settings'] ) && is_array( $el['settings'] ) ) {
 							$st = &$el['settings'];
 							if ( 'heading' === $w && isset( $st['header_size'] ) && 'h1' === $st['header_size'] && isset( $st['title'] ) && false !== stripos( $plain( $st['title'] ), $find ) ) {
-								$new = wpt_hub_keep_class( isset( $st['css_classes'] ) ? $st['css_classes'] : '', $was );
-								if ( ! isset( $st['css_classes'] ) || $new !== $st['css_classes'] ) {
-									$st['css_classes'] = $new;
+								if ( wpt_hub_keep_widget( $st, $was ) ) {
 									$n++;
 								}
 							}
 							if ( ( 'icon-box' === $w || 'image-box' === $w ) && isset( $st['title_size'] ) && 'h1' === $st['title_size'] && isset( $st['title_text'] ) && false !== stripos( $plain( $st['title_text'] ), $find ) ) {
-								$new = wpt_hub_keep_class( isset( $st['css_classes'] ) ? $st['css_classes'] : '', $was );
-								if ( ! isset( $st['css_classes'] ) || $new !== $st['css_classes'] ) {
-									$st['css_classes'] = $new;
+								if ( wpt_hub_keep_widget( $st, $was ) ) {
 									$n++;
 								}
 							}

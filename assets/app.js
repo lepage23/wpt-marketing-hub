@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.31.0";
-  var BUILT = "2026-10-23 07:47 BST";
+  var VERSION = "0.31.1";
+  var BUILT = "2026-10-23 07:52 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -3149,7 +3149,7 @@
     if (p.type === "elementor_h1_look") {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "h1_look", find: p.find, level: p.level || 2 } })
         .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, function (err) {
-          if (/Unknown edit type|no route/i.test(err.message)) throw new Error("This repair needs page checker version 16. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push again. Nothing was changed.");
+          if (/Unknown edit type|no route/i.test(err.message)) throw new Error("This repair needs page checker version 17. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push again. Nothing was changed.");
           throw err;
         });
     }

@@ -20,6 +20,25 @@
 
 window.WPT_PROPOSALS = [
  {
+  "id": "repair-h1-colour-8x8-matrix-2",
+  "created": "2026-10-23 08:00",
+  "batch": "Urgent repair",
+  "type": "elementor_h1_look",
+  "size": "small",
+  "priority": "critical",
+  "category": "Structure",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "8x8 Feature Matrix with Engage Voice",
+  "link": "https://westpiertech.com/8x8-feature-matrix-with-engage-voice/",
+  "find": "8x8 Feature Matrix with Engage Voice",
+  "level": 2,
+  "issue": "Heading still invisible: the first repair didn't take",
+  "current": "The 07:50 repair saved, but changed nothing you can see. This heading is an Elementor heading block, and Claude's code put its class in the wrong setting (css_classes instead of _css_classes, which is where Elementor looks for a block's classes). The colour rule itself is live and working: Let's get started is fixed.",
+  "proposed": "Puts the class in the right setting and tidies away the wrong one. Tested in your browser before writing this card: with the class in place the heading turns from white to navy (#0C1B2C). After you push, reload the page to check. Undo is in Done.",
+  "why": "Needs page checker version 17. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push."
+ },
+ {
   "id": "repair-h1-colour-get-started-1",
   "created": "2026-10-23 07:55",
   "batch": "Urgent repair",
@@ -55,7 +74,7 @@ window.WPT_PROPOSALS = [
   "issue": "Page heading is invisible: white text on a white background",
   "current": "Same problem, found when Claude checked every page on the site this morning. The heading block \"8x8 Feature Matrix with Engage Voice\" became an H1 and took the white H1 colour. Contrast is 1 to 1.",
   "proposed": "Keeps it as the H1 and puts it back to dark navy (#0C1B2C). Only this heading changes. Undo is in Done.",
-  "why": "The other 39 pages checked are fine. Needs page checker version 16."
+  "why": "The other 39 pages checked are fine. Needs page checker version 16. (This first attempt didn't work on this page. See the newer repair card.)"
  },
  {
   "id": "repair-feature-comparison-1",
