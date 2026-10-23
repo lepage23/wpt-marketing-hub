@@ -1815,6 +1815,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "human-check-h1-size-1",
+  "job": "Urgent: update the page checker to version 19, then check four headings look right",
+  "page": "Website & SEO (Copy page checker code), then four pages",
+  "details": "When the hub turns a smaller heading into the H1, Elementor's Site Settings make it 44.8px, the size meant for the big banners. On About, \"Who we are\" jumped from 30px to 44.8px. Version 19 keeps each heading the size it was (taken from the theme's own setting for that heading level). No card to push: installing the update is the fix.\n\n1. Website & SEO page, Copy page checker code, replace the code in Snippets, WPT Hub page checker, save.\n2. Purge SG Cache (top bar in WordPress).\n3. Check each page on your laptop and your phone. The top heading should match the size of the other headings on the page:\n- About: \"Who we are\" should look like \"What we do\" (was an H3, 30px)\n- Contact: \"Contact Us\" (was an H2, 35px)\n- Let's get started (was an H2, 35px)\n- Privacy Policy (was an H2, 35px)\n4. If any still look too big, or wrong on a phone, tell Claude which and send a screenshot.\n\nClaude checked all 41 pages: these four are the only ones with H1s the hub changed. Tested on About in your browser before writing this (nothing saved): with the rule, \"Who we are\" comes out exactly like \"What we do\".",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "human-check-contact-1",
   "job": "Human check: the Contact page, as a visitor would see it",
   "page": "Contact (westpiertech.com/contact/)",

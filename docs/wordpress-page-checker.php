@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 18: Undo copies keep every backslash, and a damaged copy is never written back to a page).
+ * WPT Marketing Hub: page checker (version 19: a heading the hub turns into the H1 keeps its size as well as its colour).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -369,7 +369,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 18, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 19, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -2482,7 +2482,31 @@ add_action( 'wp_head', function () {
 	for ( $i = 2; $i <= 6; $i++ ) {
 		$keep[] = 'body h1.wpt-was-h' . $i . ', body .wpt-was-h' . $i . ' h1.elementor-heading-title, body .wpt-was-h' . $i . ' h1.elementor-icon-box-title, body .wpt-was-h' . $i . ' h1.elementor-image-box-title { color: var(--theme-heading-' . $i . '-color, var(--theme-headings-color, inherit)); }';
 	}
-	echo "\n<style id=\"wpt-hub-h1-look\">" . implode( ' ', $keep ) . "</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- fixed text.
+	/* Version 19: and the size it had. Elementor's Site Settings make every H1 44.8px for the banners, so an
+	 * H3 turned H1 jumped from 30px. The size comes from the theme's own setting for that heading level
+	 * (Blocksy), falling back to the sizes the site uses today. Low priority (:where), so a heading block's
+	 * own size in Elementor still wins. */
+	$fallback = array( 2 => '35px', 3 => '30px', 4 => '25px', 5 => '20px', 6 => '16px' );
+	$ok       = function ( $v ) {
+		return is_string( $v ) && preg_match( '#^\d+(\.\d+)?(px|rem|em)$#', trim( $v ) ) ? trim( $v ) : '';
+	};
+	$media = array( 'tablet' => '(max-width: 999.98px)', 'mobile' => '(max-width: 689.98px)' );
+	for ( $i = 2; $i <= 6; $i++ ) {
+		$sel  = ':where(body) h1.wpt-was-h' . $i . ', :where(body .wpt-was-h' . $i . ') h1.elementor-heading-title, :where(body .wpt-was-h' . $i . ') h1.elementor-icon-box-title, :where(body .wpt-was-h' . $i . ') h1.elementor-image-box-title';
+		$mod  = function_exists( 'get_theme_mod' ) ? get_theme_mod( 'h' . $i . 'Typography' ) : null;
+		$size = is_array( $mod ) && isset( $mod['size'] ) ? $mod['size'] : null;
+		$desk = is_array( $size ) ? $ok( isset( $size['desktop'] ) ? $size['desktop'] : '' ) : $ok( $size );
+		$keep[] = $sel . ' { font-size: ' . ( $desk ? $desk : $fallback[ $i ] ) . '; }';
+		if ( is_array( $size ) ) {
+			foreach ( $media as $k => $q ) {
+				$v = $ok( isset( $size[ $k ] ) ? $size[ $k ] : '' );
+				if ( $v ) {
+					$keep[] = '@media ' . $q . ' { ' . $sel . ' { font-size: ' . $v . '; } }';
+				}
+			}
+		}
+	}
+	echo "\n<style id=\"wpt-hub-h1-look\">" . implode( ' ', $keep ) . "</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- built from fixed text and checked sizes.
 	$css = get_option( 'wpt_hub_css', '' );
 	if ( $css ) {
 		echo "\n<style id=\"wpt-hub-css\">\n" . wp_strip_all_tags( $css ) . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput

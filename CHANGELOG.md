@@ -6,6 +6,19 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.33.0 · 2026-10-23 09:20 BST
+
+Headings the hub turns into the H1 now keep their size. **Needs page checker version 19.**
+
+- **What went wrong.** Elementor's Site Settings make every H1 44.8px, for the banners. So "Who we are" on About jumped from 30px (H3) to 44.8px when it became the H1.
+- **Page checker 19** keeps each hub-made H1 the size of the heading it was, using the theme's own size for that level (desktop, tablet and phone). A heading block's own size in Elementor still wins.
+- **New urgent job** to install it and check the four pages with hub-made H1s: About, Contact, Let's get started and Privacy Policy.
+- 521 tests, all passing.
+
+## Backup · 2026-10-23 09:12 BST
+
+`backup/v0.32.2-2026-10-23-0912`, taken before v0.33.0.
+
 ## v0.32.2 · 2026-10-23 08:33 BST
 
 - **New job: Human check of the Contact page.** Ten things Claude thinks need a person's eye, from the empty strip at the top and the form with no heading, to phone numbers you can't tap on a mobile and the old @westpiertele.com emails.
