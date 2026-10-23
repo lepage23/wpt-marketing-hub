@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.31.1";
-  var BUILT = "2026-10-23 07:52 BST";
+  var VERSION = "0.32.0";
+  var BUILT = "2026-10-23 08:12 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2831,7 +2831,7 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
   function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
@@ -2894,7 +2894,25 @@
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
   }
-  function fixState() { return load("fix-state", {}); }
+  function fixState() { return applyReopens(load("fix-state", {})); }
+  /* Claude can send a fix back from Done to Waiting for you, from GitHub: a card with a "reopen" stamp
+     (and a reopenNote saying why) is reopened once per stamp. Its last push stays in its history. */
+  function applyReopens(s) {
+    var seen = load("fix-reopens", {}), changed = false, marked = false;
+    ((typeof window !== "undefined" && window.WPT_PROPOSALS) || []).forEach(function (p) {
+      if (!p.reopen || seen[p.id] === p.reopen) return;
+      var st = s[p.id];
+      if (st && /^(pushed|done|undone|rejected)$/.test(st.status || "")) {
+        s[p.id] = { reopened: true, reopenNote: p.reopenNote || "", reopenTs: Date.now(),
+          history: (st.history || []).concat([{ status: st.status, ts: fixTime(st), before: st.before || "", after: st.after || "", backup: st.backup || "" }]) };
+        changed = true;
+      }
+      seen[p.id] = p.reopen; marked = true;
+    });
+    if (changed) save("fix-state", s);
+    if (marked) save("fix-reopens", seen);
+    return s;
+  }
   function setFix(id, patch) {
     /* Every change of state is time-stamped, so Done can list the newest first and each card shows when it happened. */
     if (patch && /^(pushed|done|undone|rejected)$/.test(patch.status || "") && !patch.ts) patch = Object.assign({ ts: Date.now() }, patch);
@@ -3149,7 +3167,7 @@
     if (p.type === "elementor_h1_look") {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "h1_look", find: p.find, level: p.level || 2 } })
         .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, function (err) {
-          if (/Unknown edit type|no route/i.test(err.message)) throw new Error("This repair needs page checker version 17. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push again. Nothing was changed.");
+          if (/Unknown edit type|no route/i.test(err.message)) throw new Error("This repair needs page checker version 18. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push again. Nothing was changed.");
           throw err;
         });
     }
@@ -3303,6 +3321,31 @@
       });
     }).catch(function (e) { wrap.className = "notice"; wrap.innerHTML = esc(/no route/i.test(e.message) ? "Restoring needs version 15 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then try again." : e.message); });
   }
+  /* A broken page: the card shows the page's saved Elementor versions so you can pick one and restore it.
+     Close it once the page looks right. */
+  function restoreCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>');
+    card.innerHTML = cardHead(p, st, "Restore") +
+      (p.current ? '<p style="font-size:.9rem"><b>What happened:</b> ' + esc(p.current) + "</p>" : "") +
+      ((p.steps || []).length ? "<ol>" + p.steps.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>" : "") +
+      '<div class="restore-box"></div><div class="row restore-actions" style="margin-top:10px"></div>';
+    var box = card.querySelector(".restore-box"), actions = card.querySelector(".restore-actions");
+    if (st.status === "done") {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">Done ' + esc(st.doneAt || "") + '</span><button type="button" class="btn small">Put back in the queue</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); delete s[p.id]; save("fix-state", s); redraw(); updateNav(); });
+      return card;
+    }
+    actions.innerHTML = '<button type="button" class="btn primary">Show the saved versions</button><button type="button" class="btn">The page looks right now, close this</button>';
+    var bs = actions.querySelectorAll("button");
+    bs[0].addEventListener("click", function () { bs[0].disabled = true; revisionTool(p, box); });
+    bs[1].addEventListener("click", function () {
+      var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now() });
+      logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Restore", action: "Page checked and closed" });
+      redraw(); updateNav();
+    });
+    return card;
+  }
   function undoFix(p, st, force) {
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     /* Site fixes (page checker 13) keep their copy under an id starting with "s". */
@@ -3393,8 +3436,8 @@
     return '<div class="row">' + '<span class="chip ' + PRI_CHIP[p.priority || "medium"] + '">' + PRI_LABEL[p.priority || "medium"] + "</span>" +
       '<span class="chip info">' + esc(typeLabel(p)) + "</span>" + '<span class="chip">' + esc(p.category || "Content") + "</span>" +
       (p.auto ? '<span class="chip">Found by audit</span>' : "") + (p.example ? '<span class="chip ex">example</span>' : "") +
-      (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">Still found on the last audit</span>' : "") +
-      timeChip(p, st) + "</div>";
+      (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">' + (st.reopenNote ? "Back from Done" : "Still found on the last audit") + "</span>" : "") +
+      timeChip(p, st) + "</div>" + (st.reopened && !st.status && st.reopenNote ? '<div class="notice" style="margin-top:8px"><b>Why it\'s back:</b> ' + esc(st.reopenNote) + "</div>" : "");
   }
   /* Date and time on every card: when it was pushed, done or undone, or when Claude wrote it. */
   function timeChip(p, st) {
@@ -4151,6 +4194,7 @@
     if (p.type === "manual" && cardMode(p) === "claude") return claudeCard(p, st, redraw);
     if (p.type === "manual") return st.status ? manualCard(p, st, redraw) : claudeCard(p, st, redraw);
     if (p.type === "page_build") return buildCard(p, st, redraw);
+    if (p.type === "page_restore") return restoreCard(p, st, redraw);
     var text = st.edited != null ? st.edited : p.op === "alt" && p.items ? altText(p.items) : p.proposed;
     var isMeta = p.type === "meta_title" || p.type === "meta_description";
     var done = st.status === "pushed" || st.status === "undone";

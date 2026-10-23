@@ -13,5 +13,5 @@ $w = array( 'title' => 'x', 'css_classes' => 'wpt-was-h2' );
 ok( wpt_hub_keep_widget( $w, 2 ) && 'wpt-was-h2' === $w['_css_classes'] && ! isset( $w['css_classes'] ), 'widget class goes in _css_classes, the version 16 slip is tidied' );
 $w2 = array( '_css_classes' => 'hero wpt-was-h2' );
 ok( ! wpt_hub_keep_widget( $w2, 2 ), 'already repaired widget counts as no change' );
-ok( false !== strpos( $src, "'version' => 17" ), 'reports version 17' );
+ok( false !== strpos( $src, "'version' => 18" ), 'reports version 18' );
 exit( empty( $GLOBALS['bad'] ) ? 0 : 1 );

@@ -4,6 +4,7 @@ cd "$(dirname "$0")/.." || exit 1
 out=$( {
   node tests/push-undo.test.js assets/app.js
   node tests/done-order.test.js assets/app.js
+  php tests/undo-slashes.test.php docs/wordpress-page-checker.php
   php tests/h1-look.test.php docs/wordpress-page-checker.php
   node tests/page-lookup.test.js assets/app.js
   node tests/redirects.test.js assets/app.js

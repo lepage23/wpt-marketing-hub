@@ -2,7 +2,7 @@
 const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(n){const i=src.indexOf('function '+n+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 const store={};function load(k,f){return k in store?JSON.parse(JSON.stringify(store[k])):f;}function save(k,v){store[k]=JSON.parse(JSON.stringify(v));}
-['localDay','addDays','fmtDay','isParkedFix','isDueBackFix','isOpenFix','cardState','sortFixGroup','fixState','setFix','parkFix','unparkFix'].forEach(n=>eval(grab(n).replace(/^function (\w+)/,'global.$1 = function')));
+['localDay','addDays','fmtDay','isParkedFix','isDueBackFix','isOpenFix','cardState','sortFixGroup','fixState','applyReopens','fixTime','setFix','parkFix','unparkFix'].forEach(n=>eval(grab(n).replace(/^function (\w+)/,'global.$1 = function')));
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const t=localDay(), tom=addDays(t,1), yest=addDays(t,-1);
 ok(addDays('2026-10-31',1)==='2026-11-01','addDays crosses a month');

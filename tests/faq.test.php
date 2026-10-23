@@ -61,7 +61,7 @@ $c=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'faq','items'=>$items,'be
 $dc=json_decode($META[10]['_elementor_data'],true);
 ok(!is_wp_error($c) && $dc[0]['elType']==='container' && $dc[0]['elements'][1]['widgetType']==='accordion' && $dc[1]['id']==='k1','container page gets a container, placed before the call to action');
 $an=$routes['wpt-hub/v1/analytics'];
-ok(strpos(file_get_contents($argv[1]),"'version' => 17")!==false,'snippet reports version 17');
+ok(strpos(file_get_contents($argv[1]),"'version' => 18")!==false,'snippet reports version 18');
 $META[10]['_elementor_data']=json_encode($page);
 $dry=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'h1','dry_run'=>1)));
 ok($dry['dry_run']===true && $dry['element']==='h1' && $dry['text']==='Our Expertise' && json_decode($META[10]['_elementor_data'],true)==$page,'h1 dry run: names the first heading, changes nothing');

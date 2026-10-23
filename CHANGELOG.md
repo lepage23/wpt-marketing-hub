@@ -6,6 +6,20 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.32.0 · 2026-10-23 08:25 BST
+
+Fix for the 8x8 Feature Matrix page losing its layout. **Needs page checker version 18.**
+
+- **What went wrong.** WordPress strips backslashes from the copy the hub keeps for Undo. Elementor layouts are full of them (this page's PDF embed especially), so the copy was damaged. Undo on the H1 repair wrote the damaged copy back as the word "null", and the page lost its whole layout. Reproduced in a test against page checker 17.
+- **Page checker 18** keeps Undo copies intact, refuses to Undo from a damaged older copy, and never writes a layout Elementor can't read.
+- **Restore card at the top of the Fix queue** for 8x8 Feature Matrix. It lists the versions Elementor saved itself, so you can put the page back.
+- **Failed fixes now come back to Waiting by themselves.** Claude can send a card back from Done with a note on why, so you don't have to move them back yourself. The H1 repair for 8x8 Feature Matrix is back in Waiting, to push again once the page is restored.
+- 516 tests, all passing, including one that strips backslashes the way WordPress does.
+
+## Backup · 2026-10-23 08:09 BST
+
+`backup/v0.31.1-2026-10-23-0809`, taken before v0.32.0.
+
 ## v0.31.1 · 2026-10-23 08:02 BST
 
 Fix for the 8x8 Feature Matrix heading repair, which saved but changed nothing. **Needs page checker version 17.**

@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 17: a heading the hub turns into the H1 keeps the colour it had, including Elementor heading blocks).
+ * WPT Marketing Hub: page checker (version 18: Undo copies keep every backslash, and a damaged copy is never written back to a page).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -75,8 +75,20 @@ if ( ! function_exists( 'wpt_hub_write_content' ) ) {
 /* Write a page's Elementor data exactly as given (version 14), then make Elementor rebuild that page's
  * styles and clear the page from SiteGround's cache. Nothing else on the page is touched. */
 if ( ! function_exists( 'wpt_hub_write_elementor' ) ) {
+	/* Version 18: WordPress strips one level of backslashes from anything saved with update_post_meta.
+	 * Elementor's layout is full of them (every \" in embed code), so before version 18 the hub's Undo
+	 * copies were damaged and an Undo could leave a page with no layout. Copies are now slashed first,
+	 * so they come back exactly, and marked v18 so older ones can be told apart. */
+	function wpt_hub_bk( $id, $bid, $rec ) {
+		$rec['v'] = 18;
+		update_post_meta( $id, '_wpt_hub_bk_' . $bid, wp_slash( $rec ) );
+	}
 	function wpt_hub_write_elementor( $id, $data, $raw = null ) {
 		$json = null !== $raw ? (string) $raw : wp_json_encode( $data );
+		/* Never write a layout Elementor can't read. */
+		if ( ! is_string( $json ) || ! is_array( json_decode( $json, true ) ) ) {
+			return false;
+		}
 		update_post_meta( $id, '_elementor_data', wp_slash( $json ) );
 		foreach ( array( '_elementor_css', '_elementor_element_cache', '_elementor_page_assets' ) as $k ) {
 			delete_post_meta( $id, $k );
@@ -93,6 +105,7 @@ if ( ! function_exists( 'wpt_hub_write_elementor' ) ) {
 		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
 			sg_cachepress_purge_cache( get_permalink( $id ) );
 		}
+		return true;
 	}
 }
 
@@ -356,7 +369,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 17, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 18, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -598,7 +611,7 @@ add_action( 'rest_api_init', function () {
 				$type = isset( $node['widgetType'] ) ? $node['widgetType'] : '';
 				unset( $node );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $elid, 'widget' => $type, 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
 			}
@@ -703,7 +716,7 @@ add_action( 'rest_api_init', function () {
 				$wtype = isset( $node['widgetType'] ) ? $node['widgetType'] : 'heading';
 				unset( $node );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $pick['id'], 'widget' => $wtype, 'before' => $label, 'after' => 'H1: ' . $plain( $pick['text'] ) );
 			}
@@ -755,7 +768,7 @@ add_action( 'rest_api_init', function () {
 					return new WP_Error( 'wpt_edit', 'No H1 with that text needs repairing on this page (it may already be fixed). Nothing was changed.', array( 'status' => 409 ) );
 				}
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => '', 'widget' => 'h1', 'before' => 'H1 "' . $find . '" in the theme\'s H1 colour', 'after' => 'H1 "' . $find . '" kept in its H' . $was . ' colour' );
 			}
@@ -859,7 +872,7 @@ add_action( 'rest_api_init', function () {
 					$after .= "\n\nQ: " . $it['q'] . "\nA: " . $plain( $it['a'] );
 				}
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $block['id'], 'widget' => 'accordion', 'replaced' => null !== $mine, 'position' => $where, 'before' => trim( $before_txt ), 'after' => $after );
 			}
@@ -947,7 +960,7 @@ add_action( 'rest_api_init', function () {
 				$type = isset( $node['widgetType'] ) ? $node['widgetType'] : ( isset( $node['elType'] ) ? $node['elType'] : '' );
 				unset( $node );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $elid, 'widget' => $type, 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $now ) );
 			}
@@ -1021,7 +1034,7 @@ add_action( 'rest_api_init', function () {
 				}
 				$eid = implode( ',', $eid );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $eid, 'widget' => $want, 'count' => count( $hits ), 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
 			}
@@ -1177,7 +1190,7 @@ add_action( 'rest_api_init', function () {
 				return new WP_Error( 'wpt_edit', 'Unknown edit type.', array( 'status' => 400 ) );
 			}
 			$bid = 'b' . time() . wp_rand( 100, 999 );
-			update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+			wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 			$save( $id, $data );
 			return array( 'ok' => true, 'backup' => $bid, 'element' => $m['id'], 'widget' => $m['widget'], 'before' => $detail['before'], 'after' => $detail['after'] );
 		},
@@ -1225,7 +1238,7 @@ add_action( 'rest_api_init', function () {
 					/* A page that isn't built with Elementor: put the revision's text back, exactly. */
 					$cur = (string) get_post_field( 'post_content', $id );
 					$bid = 'b' . time() . wp_rand( 100, 999 );
-					update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'content' => $cur, 'after' => md5( (string) $rev->post_content ), 'time' => time() ) );
+					wpt_hub_bk( $id, $bid, array( 'content' => $cur, 'after' => md5( (string) $rev->post_content ), 'time' => time() ) );
 					wpt_hub_write_content( $id, (string) $rev->post_content );
 					return array( 'ok' => true, 'backup' => $bid, 'before' => 'Version before the restore', 'after' => 'Restored the version saved ' . $rev->post_modified );
 				}
@@ -1235,7 +1248,7 @@ add_action( 'rest_api_init', function () {
 				}
 				$cur = (string) get_post_meta( $id, '_elementor_data', true );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
-				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $cur, 'after' => md5( wp_json_encode( json_decode( $raw, true ) ) ), 'time' => time() ) );
+				wpt_hub_bk( $id, $bid, array( 'data' => $cur, 'after' => md5( wp_json_encode( json_decode( $raw, true ) ) ), 'time' => time() ) );
 				wpt_hub_write_elementor( $id, null, $raw );
 				return array( 'ok' => true, 'backup' => $bid, 'before' => 'Version before the restore', 'after' => 'Restored the version saved ' . $rev->post_modified );
 			},
@@ -1249,7 +1262,11 @@ add_action( 'rest_api_init', function () {
 			$id  = (int) $r->get_param( 'post_id' );
 			$bid = preg_replace( '/[^a-z0-9]/i', '', (string) $r->get_param( 'backup' ) );
 			$bk  = get_post_meta( $id, '_wpt_hub_bk_' . $bid, true );
+			$old = $bk && empty( $bk['v'] );
 			if ( $bk && isset( $bk['content'] ) ) {
+				if ( $old && false !== strpos( (string) get_post_field( 'post_content', $id ), '\\' ) ) {
+					return new WP_Error( 'wpt_undo_old', 'This page has code with backslashes in it, and Undo copies made before page checker 18 lost them. Undoing could break the page, so nothing was changed. Use "Page not right? Restore an earlier version" instead.', array( 'status' => 409 ) );
+				}
 				if ( md5( (string) get_post_field( 'post_content', $id ) ) !== $bk['after'] && ! $r->get_param( 'force' ) ) {
 					return new WP_Error( 'wpt_undo_changed', 'The page has been edited since. Undoing would also wipe those later edits. Undo anyway from the hub, or use Revisions in WordPress.', array( 'status' => 409 ) );
 				}
@@ -1264,7 +1281,13 @@ add_action( 'rest_api_init', function () {
 			if ( md5( wp_json_encode( $now ) ) !== $bk['after'] && ! $r->get_param( 'force' ) ) {
 				return new WP_Error( 'wpt_undo_changed', 'The page has been edited since this fix went live. Undoing would also wipe those later edits. Use Revisions in Elementor instead, or undo anyway from the hub.', array( 'status' => 409 ) );
 			}
-			$save( $id, json_decode( $bk['data'], true ) );
+			$back = json_decode( (string) $bk['data'], true );
+			if ( ! is_array( $back ) || ( $old && preg_match( '#u(00|20)[0-9a-f]{2}#i', (string) $bk['data'] ) ) ) {
+				return new WP_Error( 'wpt_undo_damaged', 'The Undo copy of this page was damaged when it was saved (a bug fixed in page checker 18), so nothing was changed. Use "Page not right? Restore an earlier version" to go back to a version Elementor saved.', array( 'status' => 409 ) );
+			}
+			if ( false === wpt_hub_write_elementor( $id, $back ) ) {
+				return new WP_Error( 'wpt_undo_damaged', 'The Undo copy couldn\'t be read as an Elementor layout, so nothing was changed.', array( 'status' => 409 ) );
+			}
 			delete_post_meta( $id, '_wpt_hub_bk_' . $bid );
 			return array( 'ok' => true );
 		},

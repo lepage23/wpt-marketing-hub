@@ -2,7 +2,7 @@ const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');const f
 function grab(n){const i=src.indexOf('function '+n+'(');if(i<0)throw n;let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(n){const m=src.match(new RegExp('var '+n+' = [^;]*;'));return m[0];}
 const store={};const load=(k,f)=>k in store?JSON.parse(store[k]):f;const save=(k,v)=>store[k]=JSON.stringify(v);
-eval(['norm','shortPath','copyLive','isRedirect','liveIssues','applyLive','liveOnlyRow','robotsBlocks','titleWords','overlap','indexable','autoKey','pageRef','competes','aboutWords','townOf','shortTitle','trimDesc','autoGroups','altFromFile','altFile','buildAutoFixes','storeAutoFixes','fixState','setFix','proposals','syncFixProgress','parkFix','localDay'].map(grab).join('\n')+'\n'+['PRI_ORDER','AI_BOTS','STOP','API_ONLY_ISSUE','BOILER','LINK_TARGET_SKIP'].map(grabVar).join('\n'));
+eval(['norm','shortPath','copyLive','isRedirect','liveIssues','applyLive','liveOnlyRow','robotsBlocks','titleWords','overlap','indexable','autoKey','pageRef','competes','aboutWords','townOf','shortTitle','trimDesc','autoGroups','altFromFile','altFile','buildAutoFixes','storeAutoFixes','fixState','applyReopens','fixTime','setFix','proposals','syncFixProgress','parkFix','localDay'].map(grab).join('\n')+'\n'+['PRI_ORDER','AI_BOTS','STOP','API_ONLY_ISSUE','BOILER','LINK_TARGET_SKIP'].map(grabVar).join('\n'));
 global.window={WPT_PROPOSALS:[]};
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const live={};fx.check.forEach(r=>{if(r.url)live[norm(r.url)]=r;});

@@ -3,7 +3,7 @@ const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(n){const i=src.indexOf('function '+n+'(');let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 const store={};function load(k,f){return k in store?JSON.parse(JSON.stringify(store[k])):f;}function save(k,v){store[k]=JSON.parse(JSON.stringify(v));}
 global.window={};
-['localDay','addDays','fixState','setFix','parkFix','syncFixProgress','trackStatus','setTrackStatus','fixLogEntries','addFixLog','deleteFixLog','hasFixLog'].forEach(n=>eval(grab(n).replace(/^function (\w+)/,'global.$1 = function')));
+['localDay','addDays','fixState','applyReopens','fixTime','setFix','parkFix','syncFixProgress','trackStatus','setTrackStatus','fixLogEntries','addFixLog','deleteFixLog','hasFixLog'].forEach(n=>eval(grab(n).replace(/^function (\w+)/,'global.$1 = function')));
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const t=localDay(), wk=addDays(t,7);
 const fix={id:'f',progress:{update:'s1',nextDate:wk,note:'Chase'},tracks:[{name:'3CX',status:'Waiting on them',log:[{date:'2026-10-19',text:'old'},{date:'2026-10-20',text:'first'},{date:'2026-10-20',text:'second'}]},{name:'Gamma',log:[]}]};

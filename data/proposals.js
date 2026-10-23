@@ -16,9 +16,35 @@
    progress: {update, nextDate, note} puts a fix In progress once per update stamp (bump the stamp to apply again).
    tracks: [{name, status, next, log: [{date, text}]}] shows a Progress log with one tab per vendor or strand.
      status: To do, Waiting on them, Done, Not possible. A new progress stamp lets these statuses override Connor's.
+   reopen + reopenNote: when a fix Claude wrote went wrong or didn't work, Claude MUST send it back from Done to
+     Waiting for you in the same release: set reopen to a new stamp (date-time) and reopenNote to why it's back.
+     Connor should never have to move a failed fix back himself. Its last push stays in the card's history.
+   page_restore: a broken page. The card lists Elementor's own saved versions to restore from.
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
 window.WPT_PROPOSALS = [
+ {
+  "id": "restore-8x8-matrix-1",
+  "created": "2026-10-23 08:20",
+  "batch": "Urgent repair",
+  "type": "page_restore",
+  "priority": "critical",
+  "category": "Content",
+  "postType": "pages",
+  "pageId": 0,
+  "pageTitle": "8x8 Feature Matrix with Engage Voice",
+  "link": "https://westpiertech.com/8x8-feature-matrix-with-engage-voice/",
+  "issue": "Page layout gone: the PDF fills the screen and the footer sits on top of it",
+  "current": "The page's Elementor layout has been replaced with the word null, so WordPress is showing its plain backup text instead. The cause is a bug in the hub's Undo. WordPress strips backslashes from the copy the hub keeps for Undo, and this page's PDF embed is full of them, so the copy was damaged. When Undo ran on the H1 repair, it wrote that damaged copy back. Claude reproduced it exactly in a test.",
+  "steps": [
+   "Update the page checker to version 18 first (Website & SEO page, Copy page checker code, replace the code in Snippets, WPT Hub page checker, save). Version 18 keeps Undo copies intact and refuses to write a damaged one.",
+   "Click Show the saved versions below. These are versions Elementor saved itself, so they don't have the backslash problem.",
+   "Pick the newest version from before today. Click Restore this version, then click again to confirm.",
+   "Open the page and check the heading, the intro line and the PDF viewer are back. Then close this card.",
+   "The heading will probably be back to an H2. The H1 repair card below can be pushed again once this page looks right."
+  ],
+  "why": "A live page that looks broken. The hub caused it, so it's first."
+ },
  {
   "id": "repair-h1-colour-8x8-matrix-2",
   "created": "2026-10-23 08:00",
@@ -36,7 +62,9 @@ window.WPT_PROPOSALS = [
   "issue": "Heading still invisible: the first repair didn't take",
   "current": "The 07:50 repair saved, but changed nothing you can see. This heading is an Elementor heading block, and Claude's code put its class in the wrong setting (css_classes instead of _css_classes, which is where Elementor looks for a block's classes). The colour rule itself is live and working: Let's get started is fixed.",
   "proposed": "Puts the class in the right setting and tidies away the wrong one. Tested in your browser before writing this card: with the class in place the heading turns from white to navy (#0C1B2C). After you push, reload the page to check. Undo is in Done.",
-  "why": "Needs page checker version 17. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push."
+  "why": "Push this only after the restore card above has put the page back. Needs page checker version 18.",
+  "reopen": "2026-10-23-0820",
+  "reopenNote": "Undo on this card broke the page (a bug in the hub's Undo, fixed in page checker 18). Restore the page with the card above first, then push this again. The repair itself was fine."
  },
  {
   "id": "repair-h1-colour-get-started-1",
