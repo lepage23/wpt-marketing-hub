@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.33.0";
-  var BUILT = "2026-10-23 09:13 BST";
+  var VERSION = "0.34.0";
+  var BUILT = "2026-10-23 09:29 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2539,7 +2539,8 @@
     stranded_punct: "Punctuation on its own line", overflow_box: "Image hangs out of its box", repeat_word: "Same word twice in a heading",
     misaligned: "Doesn't line up with the text above", off_centre: "Box isn't centred", uneven_space: "Much more space below than above",
     broken_word: "Word broken across two lines", loose_lines: "Big gaps between heading lines", big_padding: "Too much empty space in a box",
-    invisible_text: "Heading you can't see (same colour as the background)"
+    invisible_text: "Heading you can't see (same colour as the background)",
+    h1_look: "Heading the hub made the H1 looks different from the rest"
   };
   var FIT_SET = { "object-fit": "contain", "object-fit_tablet": "contain", "object-fit_mobile": "contain", "object-position": "center center" };
   function modeOf(w) { return w >= 1025 ? "desktop" : w >= 768 ? "tablet" : "phone"; }
@@ -2679,6 +2680,7 @@
             why: "Found by the display check, which looks at each page the way a visitor sees it. Cut-off or squashed images look careless, especially logos and badges, which are trust signals." });
           return;
         }
+        if (it.kind === "h1_look_ok") return;
         if (it.kind === "repeat_word" && claudeText[norm(u) + "|" + String(it.text || "").toLowerCase()]) return;
         var g = groups[it.kind] = groups[it.kind] || [];
         g.push({ _pid: pg.pageId || 0, title: shortPath(u) + (it.at && it.at.near ? " · near “" + it.at.near + "”" : ""), link: u,
@@ -2701,10 +2703,11 @@
       misaligned: ["Open the page in Elementor and click the item listed.", "In Advanced, set its left margin and padding to match the text above (usually 0).", "Update."],
       off_centre: ["Open the page in Elementor and click the box (the section or container).", "In Advanced or Layout, make the left and right margins the same, or set the content width so it centres.", "Update."],
       uneven_space: ["Open the page in Elementor and click the box.", "In Advanced, make the bottom padding match the top.", "Update."],
+      h1_look: ["Update the page checker to the latest version (Website & SEO, Copy page checker code).", "Run the display check again. If it's still listed, tell Claude which page."],
       invisible_text: ["Tell Claude straight away. It writes a repair card that sets the heading back to a colour you can see.", "If you need it fixed before then: open the page in Elementor, click the heading, and in Style set Text Color to the dark navy (#0C1B2C).", "Update, then run the display check again."],
       no_alt: ["Open the image in the Media Library.", "Fill in Alternative Text with a short description of what it shows (or the company name for a logo).", "Save. Google and AI tools use this to understand the image."]
     };
-    var PRI = { invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
+    var PRI = { h1_look: "high", invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
     /* Words breaking, loose heading lines and wrapping buttons outside Elementor widgets the hub can edit:
        one small style fix, scoped to the pages where they were seen. */
     var cssFix = displayCss(groups, today);
@@ -2831,7 +2834,7 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
   function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
@@ -3350,6 +3353,114 @@
       setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now() });
       logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Restore", action: "Page checked and closed" });
       redraw(); updateNav();
+    });
+    return card;
+  }
+  /* Loads pages in a small frame inside the hub and runs the display check at the widths given.
+     Resolves to { url: [{ width, issues }] }, or { url: null } for a page that didn't report back. */
+  function displayOn(urls, widths, box, note) {
+    var origin = new URL(urls[0]).origin, out = {}, waiting = null;
+    function onMsg(e) { if (e.origin === origin && e.data && e.data.wpt === "display-check" && waiting) waiting(e.data); }
+    window.addEventListener("message", onMsg);
+    var stage = el('<div class="dc-stage"><div class="dc-scale"><iframe title="Page being checked" sandbox="allow-scripts allow-same-origin"></iframe></div></div>');
+    box.appendChild(stage);
+    var frame = stage.querySelector("iframe");
+    function size(wd) { frame.style.width = wd + "px"; frame.style.height = (wd < 768 ? 820 : 900) + "px"; var k = Math.min(1, 300 / wd); stage.querySelector(".dc-scale").style.transform = "scale(" + k + ")"; stage.style.height = Math.round((wd < 768 ? 820 : 900) * k) + "px"; }
+    function wait(u, ms, kick) {
+      return new Promise(function (res) {
+        var t = setTimeout(function () { waiting = null; res(null); }, ms);
+        waiting = function (data) { if (norm(data.url) !== norm(u)) return; clearTimeout(t); waiting = null; res(data); };
+        kick();
+      });
+    }
+    var i = 0;
+    function nextPage() {
+      if (i >= urls.length) return Promise.resolve();
+      var u = urls[i++], got = [];
+      if (note) note(shortPath(u), i, urls.length);
+      size(widths[0]);
+      return wait(u, 45000, function () { frame.src = u + (u.indexOf("?") > -1 ? "&" : "?") + "wpt_check=1&r=" + Date.now(); }).then(function (first) {
+        if (!first) { out[u] = null; return; }
+        got.push({ width: first.width, issues: first.issues });
+        var j = 1;
+        function nextWidth() {
+          if (j >= widths.length) return Promise.resolve();
+          var wd = widths[j++]; size(wd);
+          return wait(u, 15000, function () { setTimeout(function () { try { frame.contentWindow.postMessage({ wpt: "display-rerun" }, origin); } catch (e) {} }, 300); })
+            .then(function (r) { if (r) got.push({ width: r.width, issues: r.issues }); return nextWidth(); });
+        }
+        return nextWidth().then(function () { out[u] = got; });
+      }).then(nextPage);
+    }
+    return nextPage().then(function () { window.removeEventListener("message", onMsg); stage.remove(); return out; },
+      function (e) { window.removeEventListener("message", onMsg); stage.remove(); throw e; });
+  }
+  /* A check the hub runs itself: makes sure the page checker is new enough, then looks at each page the
+     way a visitor would. If everything passes, the card closes itself and logs it. Nothing on the site changes. */
+  function pageCheckCard(p, st, redraw) {
+    var card = el('<article class="panel fix"></article>'), raw = fixState()[p.id] || {};
+    card.innerHTML = cardHead(p, st, "Automatic check") +
+      (p.current ? '<p style="font-size:.9rem"><b>Why:</b> ' + esc(p.current) + "</p>" : "") +
+      (p.proposed ? '<p style="font-size:.9rem"><b>What happens:</b> ' + esc(p.proposed) + "</p>" : "") +
+      '<div class="pc-out"></div><div class="row pc-actions" style="margin-top:10px"></div>';
+    var out = card.querySelector(".pc-out"), actions = card.querySelector(".pc-actions");
+    function table(res) {
+      return '<table class="table" style="margin-top:8px"><thead><tr><th>Page</th><th>Result</th></tr></thead><tbody>' + p.pages.map(function (pg) {
+        var r = res[pg.link];
+        return "<tr><td>" + esc(pg.title || shortPath(pg.link)) + "</td><td>" + (r ? (r.ok ? '<span class="chip good">Looks right</span> ' : '<span class="chip bad">Not right</span> ') + esc(r.text) : '<span class="chip flag">Not checked</span>') + "</td></tr>";
+      }).join("") + "</tbody></table>";
+    }
+    if (raw.lastCheck) out.innerHTML = table(raw.lastCheck);
+    if (st.status === "done") {
+      actions.innerHTML = '<span class="muted" style="font-size:.86rem">Checked and closed ' + esc(st.doneAt || "") + '</span><button type="button" class="btn small">Check again</button>';
+      actions.querySelector("button").addEventListener("click", function () { var s = fixState(); delete s[p.id].status; save("fix-state", s); redraw(); updateNav(); });
+      return card;
+    }
+    actions.innerHTML = '<button type="button" class="btn primary">Approve and check the pages</button>';
+    var go = actions.querySelector("button");
+    go.addEventListener("click", function () {
+      go.disabled = true; go.textContent = "Checking\u2026";
+      var status = el('<div class="notice info" style="display:block;margin-top:8px">Checking the page checker version\u2026</div>');
+      out.appendChild(status);
+      wpFetch("/wpt-hub/v1/analytics?days=7").then(function (d) {
+        var v = (d && d.version) || 0;
+        if (v < (p.needs || 0)) {
+          status.className = "notice"; status.innerHTML = "<b>The page checker on the site is version " + v + ", and this check needs version " + p.needs + ".</b> Copy the code, paste it over everything in Snippets, WPT Hub page checker, save, then click Check again. That's the only step the hub can't do itself." +
+            '<div class="row" style="margin-top:8px"><button type="button" class="btn small primary">Copy page checker code</button></div>';
+          status.querySelector("button").addEventListener("click", function () { copyText((window.WPT_SNIPPETS || {}).checker || "", "Page checker code copied. Paste it into Snippets in WordPress."); });
+          go.disabled = false; go.textContent = "Check again";
+          return;
+        }
+        var widths = p.widths || [1366, 400];
+        return displayOn(p.pages.map(function (x) { return x.link; }), widths, out, function (name, n, total) { status.textContent = "Checking " + name + " (" + n + " of " + total + ") on desktop and phone\u2026"; }).then(function (got) {
+          var res = {}, bad = 0;
+          p.pages.forEach(function (pg) {
+            var reps = got[pg.link];
+            if (!reps) { res[pg.link] = { ok: false, text: "The page didn't report back. Try again." }; bad++; return; }
+            var problems = [], seenOk = false;
+            reps.forEach(function (rp) { (rp.issues || []).forEach(function (it) {
+              if ((p.kinds || []).indexOf(it.kind) > -1) problems.push((rp.width < 768 ? "Phone: " : "Desktop: ") + (it.detail || it.kind));
+              if (it.kind === p.okKind) seenOk = true;
+            }); });
+            if (p.okKind && !seenOk && !problems.length) problems.push("No heading made by the hub found on this page");
+            res[pg.link] = problems.length ? { ok: false, text: problems.join("; ") } : { ok: true, text: "Desktop and phone" };
+            if (problems.length) bad++;
+          });
+          var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+          if (!bad) {
+            setFix(p.id, { status: "done", doneAt: when, doneTs: Date.now(), lastCheck: res });
+            logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Automatic check", action: "All " + p.pages.length + " pages look right: " + p.issue });
+            toast("All " + p.pages.length + " pages look right. Moved to Done.");
+            redraw(); updateNav(); return;
+          }
+          setFix(p.id, { lastCheck: res, lastCheckTs: Date.now() });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: "Automatic check", action: bad + " of " + p.pages.length + " pages not right yet: " + p.issue });
+          status.className = "notice"; status.innerHTML = "<b>" + bad + " of " + p.pages.length + " pages aren't right yet.</b> Send Claude a screenshot of this card and it will write the fix.";
+          out.querySelectorAll("table").forEach(function (t) { t.remove(); });
+          out.insertAdjacentHTML("afterbegin", table(res));
+          go.disabled = false; go.textContent = "Check again";
+        });
+      }).catch(function (e) { status.className = "notice"; status.textContent = e.message; go.disabled = false; go.textContent = "Check again"; });
     });
     return card;
   }
@@ -4202,6 +4313,7 @@
     if (p.type === "manual") return st.status ? manualCard(p, st, redraw) : claudeCard(p, st, redraw);
     if (p.type === "page_build") return buildCard(p, st, redraw);
     if (p.type === "page_restore") return restoreCard(p, st, redraw);
+    if (p.type === "page_check") return pageCheckCard(p, st, redraw);
     var text = st.edited != null ? st.edited : p.op === "alt" && p.items ? altText(p.items) : p.proposed;
     var isMeta = p.type === "meta_title" || p.type === "meta_description";
     var done = st.status === "pushed" || st.status === "undone";

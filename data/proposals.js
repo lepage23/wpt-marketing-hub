@@ -20,11 +20,54 @@
      Waiting for you in the same release: set reopen to a new stamp (date-time) and reopenNote to why it's back.
      Connor should never have to move a failed fix back himself. Its last push stays in the card's history.
    page_restore: a broken page. The card lists Elementor's own saved versions to restore from.
+   page_check: an automatic check the hub runs itself (pages, kinds, okKind, needs, widths). Use this instead of
+     asking Connor to look at pages: anything that can be measured is checked by the hub, not by hand.
    Human checks: anything Claude thinks a person should look at (how a page reads, feels or works for a visitor,
      not just how Google sees it) goes into Your jobs as a "Human check" job, with what to look at and why.
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
 window.WPT_PROPOSALS = [
+ {
+  "id": "check-h1-look-1",
+  "created": "2026-10-23 09:35",
+  "batch": "Automatic check",
+  "type": "page_check",
+  "priority": "high",
+  "category": "Structure",
+  "pageTitle": "About, Contact, Let's get started, Privacy Policy",
+  "link": "https://westpiertech.com/about/",
+  "issue": "Check the four headings the hub made the H1 now look like the rest of each page",
+  "needs": 19,
+  "kinds": [
+   "h1_look",
+   "invisible_text"
+  ],
+  "okKind": "h1_look_ok",
+  "widths": [
+   1366,
+   400
+  ],
+  "pages": [
+   {
+    "link": "https://westpiertech.com/about/",
+    "title": "About (“Who we are”, was an H3)"
+   },
+   {
+    "link": "https://westpiertech.com/contact/",
+    "title": "Contact (“Contact Us”, was an H2)"
+   },
+   {
+    "link": "https://westpiertech.com/lets-get-started/",
+    "title": "Let's get started (was an H2)"
+   },
+   {
+    "link": "https://westpiertech.com/privacy-policy/",
+    "title": "Privacy Policy (was an H2)"
+   }
+  ],
+  "current": "On About, \"Who we are\" jumped from 30px to 44.8px when the hub made it the H1, because Elementor's Site Settings size every H1 for the banners. Page checker 19 keeps each one the size and colour it was.",
+  "proposed": "The hub checks the page checker on the site is version 19. If it isn't, it gives you the code to paste (the one step it can't do). Then it loads each page at desktop and phone width, draws a heading of the old level next to the H1, and compares size, weight and colour. If all four match, this card closes itself and it's logged. Nothing on the site changes."
+ },
  {
   "id": "restore-8x8-matrix-1",
   "created": "2026-10-23 08:20",
@@ -1818,7 +1861,9 @@ window.WPT_JOBS = [
   "id": "human-check-h1-size-1",
   "job": "Urgent: update the page checker to version 19, then check four headings look right",
   "page": "Website & SEO (Copy page checker code), then four pages",
-  "details": "When the hub turns a smaller heading into the H1, Elementor's Site Settings make it 44.8px, the size meant for the big banners. On About, \"Who we are\" jumped from 30px to 44.8px. Version 19 keeps each heading the size it was (taken from the theme's own setting for that heading level). No card to push: installing the update is the fix.\n\n1. Website & SEO page, Copy page checker code, replace the code in Snippets, WPT Hub page checker, save.\n2. Purge SG Cache (top bar in WordPress).\n3. Check each page on your laptop and your phone. The top heading should match the size of the other headings on the page:\n- About: \"Who we are\" should look like \"What we do\" (was an H3, 30px)\n- Contact: \"Contact Us\" (was an H2, 35px)\n- Let's get started (was an H2, 35px)\n- Privacy Policy (was an H2, 35px)\n4. If any still look too big, or wrong on a phone, tell Claude which and send a screenshot.\n\nClaude checked all 41 pages: these four are the only ones with H1s the hub changed. Tested on About in your browser before writing this (nothing saved): with the rule, \"Who we are\" comes out exactly like \"What we do\".",
+  "details": "Moved to the Fix queue as an automatic check (top card). The hub checks the four pages itself. Nothing to do here.",
+  "status": "Done",
+  "update": "2026-10-23-0935",
   "size": "",
   "alt": ""
  },

@@ -6,6 +6,21 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.34.0 · 2026-10-23 09:45 BST
+
+The heading check is automatic. No more checking pages by hand.
+
+- **New card type: Automatic check.** Approve it and the hub checks the page checker version (and gives you the code to paste if it's old, the one step it can't do), then loads each page at desktop and phone width and checks it the way a visitor sees it. If everything passes, the card closes itself and it's logged. If not, it lists each page with what's wrong.
+- **First one, top of the Fix queue:** the four headings the hub made the H1 (About, Contact, Let's get started, Privacy Policy). It draws a heading of the old level next to each H1 and compares size, weight and colour.
+- **The display check now does the same comparison** on every page, so a hub-made H1 that looks wrong is raised as a fix.
+- The "check four pages yourself" job is closed and points to the card.
+- Tested end to end against a pretend WordPress site: old checker, all pages right, and one page wrong.
+- 521 tests, all passing.
+
+## Backup · 2026-10-23 09:26 BST
+
+`backup/v0.33.0-2026-10-23-0926`, taken before v0.34.0.
+
 ## v0.33.0 · 2026-10-23 09:20 BST
 
 Headings the hub turns into the H1 now keep their size. **Needs page checker version 19.**

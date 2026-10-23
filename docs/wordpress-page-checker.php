@@ -1928,6 +1928,23 @@ add_action( 'wp_footer', function () {
         detail: el.tagName + " text is almost the same colour as the background (contrast " + Math.round(ratio * 10) / 10 + " to 1)" });
     });
 
+    /* H1s the hub made (version 19): they should look exactly like the heading they used to be.
+       A test heading of the old level is drawn next to each one and the two are compared. */
+    Array.prototype.forEach.call(document.querySelectorAll("h1"), function (h) {
+      var tag = (h.className.match(/wpt-was-h([2-6])/) || []), host = h.closest("[class*='wpt-was-h']");
+      var lv = tag[1] || (host && (host.className.match(/wpt-was-h([2-6])/) || [])[1]);
+      if (!lv || !shown(h)) return;
+      var probe = document.createElement("h" + lv);
+      probe.className = h.className.replace(/wpt-was-h[2-6]/, "").trim();
+      probe.textContent = "x"; probe.style.position = "absolute"; probe.style.visibility = "hidden";
+      h.parentNode.insertBefore(probe, h);
+      var a = getComputedStyle(h), b = getComputedStyle(probe), da = parseFloat(a.fontSize), db = parseFloat(b.fontSize);
+      var colour = a.color === b.color, same = Math.abs(da - db) <= 1 && colour && a.fontWeight === b.fontWeight;
+      probe.remove();
+      add({ kind: same ? "h1_look_ok" : "h1_look", text: h.textContent.replace(/\s+/g, " ").trim().slice(0, 60), widget: widgetOf(h), at: where(h), level: +lv,
+        detail: same ? "matches the H" + lv + " headings" : "H1 is " + Math.round(da) + "px, the H" + lv + " headings are " + Math.round(db) + "px" + (colour ? "" : ", and a different colour") });
+    });
+
     var m = document.body.className.match(/(?:page-id|postid)-(\d+)/);
     var msg = { wpt: "display-check", url: location.href.split("?")[0], width: W, pageId: m ? +m[1] : 0, issues: out };
     try { (window.opener || window.parent).postMessage(msg, "*"); } catch (e) {}
