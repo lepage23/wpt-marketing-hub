@@ -28,6 +28,33 @@
 
 window.WPT_PROPOSALS = [
  {
+  "id": "check-news-h1-1",
+  "created": "2026-10-23 10:15",
+  "batch": "Automatic check",
+  "type": "page_check",
+  "priority": "critical",
+  "category": "Structure",
+  "pageTitle": "News",
+  "link": "https://westpiertech.com/news/",
+  "issue": "News page: the heading takes a post's slot in the grid",
+  "needs": 21,
+  "kinds": [
+   "h1_squashed"
+  ],
+  "widths": [
+   1366,
+   400
+  ],
+  "pages": [
+   {
+    "link": "https://westpiertech.com/news/",
+    "title": "News"
+   }
+  ],
+  "current": "When the hub gave the News page an H1, it printed it at the start of the post list. On this theme the post list is a grid, so \"News\" took the first slot and pushed the posts across, leaving a wide empty column. The hub caused it.",
+  "proposed": "The hub updates the page checker to version 21 (a small style rule makes the heading span the full width above the posts), then loads the News page at desktop and phone width and checks the heading isn't squeezed into a slot. Tested in your browser first (nothing saved): \"News\" sits across the top and the three posts line up in one row. If it passes, this card closes itself and it's logged."
+ },
+ {
   "id": "check-h1-look-1",
   "created": "2026-10-23 09:35",
   "batch": "Automatic check",

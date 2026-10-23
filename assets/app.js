@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.35.0";
-  var BUILT = "2026-10-23 09:57 BST";
+  var VERSION = "0.36.0";
+  var BUILT = "2026-10-23 10:08 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2540,7 +2540,8 @@
     misaligned: "Doesn't line up with the text above", off_centre: "Box isn't centred", uneven_space: "Much more space below than above",
     broken_word: "Word broken across two lines", loose_lines: "Big gaps between heading lines", big_padding: "Too much empty space in a box",
     invisible_text: "Heading you can't see (same colour as the background)",
-    h1_look: "Heading the hub made the H1 looks different from the rest"
+    h1_look: "Heading the hub made the H1 looks different from the rest",
+    h1_squashed: "Page heading squeezed into a grid slot"
   };
   var FIT_SET = { "object-fit": "contain", "object-fit_tablet": "contain", "object-fit_mobile": "contain", "object-position": "center center" };
   function modeOf(w) { return w >= 1025 ? "desktop" : w >= 768 ? "tablet" : "phone"; }
@@ -2703,11 +2704,12 @@
       misaligned: ["Open the page in Elementor and click the item listed.", "In Advanced, set its left margin and padding to match the text above (usually 0).", "Update."],
       off_centre: ["Open the page in Elementor and click the box (the section or container).", "In Advanced or Layout, make the left and right margins the same, or set the content width so it centres.", "Update."],
       uneven_space: ["Open the page in Elementor and click the box.", "In Advanced, make the bottom padding match the top.", "Update."],
+      h1_squashed: ["Tell Claude which page. It writes a style fix so the heading spans the full width."],
       h1_look: ["Update the page checker to the latest version (Website & SEO, Copy page checker code).", "Run the display check again. If it's still listed, tell Claude which page."],
       invisible_text: ["Tell Claude straight away. It writes a repair card that sets the heading back to a colour you can see.", "If you need it fixed before then: open the page in Elementor, click the heading, and in Style set Text Color to the dark navy (#0C1B2C).", "Update, then run the display check again."],
       no_alt: ["Open the image in the Media Library.", "Fill in Alternative Text with a short description of what it shows (or the company name for a logo).", "Save. Google and AI tools use this to understand the image."]
     };
-    var PRI = { h1_look: "high", invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
+    var PRI = { h1_squashed: "high", h1_look: "high", invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
     /* Words breaking, loose heading lines and wrapping buttons outside Elementor widgets the hub can edit:
        one small style fix, scoped to the pages where they were seen. */
     var cssFix = displayCss(groups, today);

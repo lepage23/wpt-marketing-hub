@@ -6,6 +6,21 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.36.0 · 2026-10-23 10:18 BST
+
+Fix for the News page heading taking a post's slot. **Page checker 21, which the hub installs itself.**
+
+- **What went wrong.** The hub's H1 for the News page is printed at the start of the post list. On this theme the post list is a grid, so "News" took the first slot and pushed the posts across. The hub caused it.
+- **Page checker 21** makes that heading span every column, above the posts.
+- **Automatic check card, top of the Fix queue.** Approve it: the hub updates the page checker, then loads the News page at desktop and phone width and checks the heading isn't squeezed. It closes itself if it passes.
+- **The display check now spots any H1 squeezed into a grid or row of cards** on every page.
+- Tested on the live News page in the browser (nothing saved): flagged as it is now, passes with the fix.
+- 527 tests, all passing.
+
+## Backup · 2026-10-23 10:07 BST
+
+`backup/v0.35.0-2026-10-23-1007`, taken before v0.36.0.
+
 ## v0.35.0 · 2026-10-23 10:05 BST
 
 The hub now updates its own page checker. No more copying and pasting into Snippets.

@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 20: every function is guarded, so the hub can update this snippet itself).
+ * WPT Marketing Hub: page checker (version 21: the blog page's H1 spans the full width above the posts instead of taking a slot in the grid).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -378,7 +378,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 20, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 21, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -1956,6 +1956,14 @@ add_action( 'wp_footer', function () {
         detail: same ? "matches the H" + lv + " headings" : "H1 is " + Math.round(da) + "px, the H" + lv + " headings are " + Math.round(db) + "px" + (colour ? "" : ", and a different colour") });
     });
 
+    /* An H1 squeezed into a grid or row of cards (version 21): narrower than half the box it sits in. */
+    Array.prototype.forEach.call(document.querySelectorAll("h1"), function (h) {
+      var p = h.parentElement; if (!p || !shown(h)) return;
+      var d = getComputedStyle(p).display, wh = h.getBoundingClientRect().width, wp = p.getBoundingClientRect().width;
+      if (/grid|flex/.test(d) && wp > 300 && wh < wp * 0.5) add({ kind: "h1_squashed", text: h.textContent.replace(/\s+/g, " ").trim().slice(0, 60), widget: widgetOf(h), at: where(h),
+        detail: "the H1 takes one slot of a " + d + " (" + Math.round(wh) + "px of " + Math.round(wp) + "px)" });
+    });
+
     var m = document.body.className.match(/(?:page-id|postid)-(\d+)/);
     var msg = { wpt: "display-check", url: location.href.split("?")[0], width: W, pageId: m ? +m[1] : 0, issues: out };
     try { (window.opener || window.parent).postMessage(msg, "*"); } catch (e) {}
@@ -2534,6 +2542,9 @@ add_action( 'wp_head', function () {
 			}
 		}
 	}
+	/* Version 21: the blog page's H1 is printed at the start of the post loop, which on this theme is a
+	 * grid, so it took the first post's slot. It now spans every column. */
+	$keep[] = '.wpt-hub-blog-h1 { grid-column: 1 / -1; flex-basis: 100%; width: 100%; max-width: none; margin: 0 0 8px; }';
 	echo "\n<style id=\"wpt-hub-h1-look\">" . implode( ' ', $keep ) . "</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- built from fixed text and checked sizes.
 	$css = get_option( 'wpt_hub_css', '' );
 	if ( $css ) {

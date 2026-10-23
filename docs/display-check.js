@@ -324,6 +324,14 @@
         detail: same ? "matches the H" + lv + " headings" : "H1 is " + Math.round(da) + "px, the H" + lv + " headings are " + Math.round(db) + "px" + (colour ? "" : ", and a different colour") });
     });
 
+    /* An H1 squeezed into a grid or row of cards (version 21): narrower than half the box it sits in. */
+    Array.prototype.forEach.call(document.querySelectorAll("h1"), function (h) {
+      var p = h.parentElement; if (!p || !shown(h)) return;
+      var d = getComputedStyle(p).display, wh = h.getBoundingClientRect().width, wp = p.getBoundingClientRect().width;
+      if (/grid|flex/.test(d) && wp > 300 && wh < wp * 0.5) add({ kind: "h1_squashed", text: h.textContent.replace(/\s+/g, " ").trim().slice(0, 60), widget: widgetOf(h), at: where(h),
+        detail: "the H1 takes one slot of a " + d + " (" + Math.round(wh) + "px of " + Math.round(wp) + "px)" });
+    });
+
     var m = document.body.className.match(/(?:page-id|postid)-(\d+)/);
     var msg = { wpt: "display-check", url: location.href.split("?")[0], width: W, pageId: m ? +m[1] : 0, issues: out };
     try { (window.opener || window.parent).postMessage(msg, "*"); } catch (e) {}
