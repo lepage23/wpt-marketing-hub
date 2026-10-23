@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.39.0";
-  var BUILT = "2026-10-23 14:12 BST";
+  var VERSION = "0.40.0";
+  var BUILT = "2026-10-23 14:18 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -284,6 +284,10 @@
      so there's nothing to remember to tick. Add more to WEEKLY_TASKS as they come up. */
   function weekStart(d) { d = new Date(d || Date.now()); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d; }
   var WEEKLY_TASKS = [
+    { id: "full-audit", t: "Run the full website audit", mins: "One click, then about " + "{mins}" + " minutes on its own",
+      steps: ["Click Run full audit. The hub opens Website & SEO and runs every check one after another.", "Leave the hub open on that page until the bar at the bottom goes. You can work in other windows.", "Approve what it finds in the Fix queue. This task ticks itself off when the audit finishes."],
+      go: { href: "#seo", tab: "audit", label: "Run full audit", start: true }, open: { href: "#fixes", label: "Open the Fix queue" },
+      last: function () { var l = fullAuditLast(); return l && l.complete ? l.finished : null; } },
     { id: "ai-gsc", t: "Import the Google AI report", mins: "About 2 minutes",
       steps: ["Open Search Console, then Performance, then Generative AI.", "Set the date to the last 7 days.", "Click Export, then Download CSV.", "Drop the zip on the AI visibility tab. This task ticks itself off."],
       open: { href: "https://search.google.com/search-console", label: "Open Search Console", ext: true }, go: { href: "#seo", tab: "ai", label: "Go to the drop zone" },
@@ -300,10 +304,10 @@
     var p = panel("Weekly tasks", left ? left + " to do this week. They reset every Monday." : "All done this week. They reset on Monday.");
     p.appendChild(el('<div class="list">' + WEEKLY_TASKS.map(function (t, i) {
       var s = st[i];
-      return '<div class="list-item"><span class="chip ' + (s.done ? "good" : s.late ? "bad" : "flag") + '">' + (s.done ? "\u2713 Done" : "To do") + '</span><div><div class="t">' + esc(t.t) + ' <span class="muted" style="font-weight:400">· ' + esc(t.mins) + "</span></div>" +
+      return '<div class="list-item"><span class="chip ' + (s.done ? "good" : s.late ? "bad" : "flag") + '">' + (s.done ? "\u2713 Done" : "To do") + '</span><div><div class="t">' + esc(t.t) + ' <span class="muted" style="font-weight:400">· ' + esc(t.mins.replace("{mins}", fullAuditMins())) + "</span></div>" +
         '<div class="s">' + esc(s.label) + "</div>" +
         (s.done ? "" : '<ol class="s" style="margin:6px 0 8px 18px;padding:0">' + t.steps.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>" +
-          '<div class="row"><a class="btn" href="' + t.open.href + '"' + (t.open.ext ? ' target="_blank" rel="noopener"' : "") + ">" + esc(t.open.label) + '</a> <a class="btn primary" href="' + t.go.href + '" data-seotab="' + t.go.tab + '">' + esc(t.go.label) + "</a></div>") +
+          '<div class="row"><a class="btn primary" href="' + t.go.href + '" data-seotab="' + t.go.tab + '"' + (t.go.start ? " data-fullaudit" : "") + ">" + esc(t.go.label) + '</a> <a class="btn" href="' + t.open.href + '"' + (t.open.ext ? ' target="_blank" rel="noopener"' : "") + ">" + esc(t.open.label) + "</a></div>") +
         "</div><span></span></div>";
     }).join("") + "</div>"));
     return p;
@@ -418,11 +422,82 @@
     return next(1);
   }
 
+  /* Checks that the full audit can run one after another. Each panel registers its own runner when it draws,
+     and each runner returns a promise that settles when its check has finished. */
+  var RUNNERS = {};
+  var FULL_STEPS = [
+    { id: "google", tab: "search", label: "Google ranking updates (Search Status Dashboard)", run: function () { return googleUpdates(true).then(function (d) { var u = updateSummary(d.list); return { ok: true, note: u.live.length ? u.live.length + " Google update rolling out now: " + u.live[0].name : "No Google update rolling out." }; }); } },
+    { id: "audit", tab: "audit", label: "Every page and post: titles, headings, links, redirects, schema, Search Console, Analytics and false claims" },
+    { id: "speed", tab: "speed", label: "Speed on phone and desktop (Google PageSpeed)" },
+    { id: "display", tab: "speed", label: "How every page looks at ten screen widths" }
+  ];
+  function fullAuditLast() { return load("full-audit", null); }
+  function fullAuditMins() {
+    var a = load("seo-audit", null), n = a ? a.pages.filter(function (x) { return x.live && !x.redirectTo; }).length : 60;
+    return Math.max(10, Math.round((n * 2 * 11 / 2 + n * 25 + 120) / 60 / 5) * 5);
+  }
+  var fullRun = null;
+  function renderFullAudit(main) {
+    var p = panel("Full website audit", "Runs every check on the whole of westpiertech.com, one after another, with one click. Read-only: nothing on the site changes. What it finds goes into the Fix queue for you to approve.");
+    var box = el("<div></div>"); p.appendChild(box); main.appendChild(p);
+    function draw() {
+      var last = fullAuditLast();
+      box.innerHTML = '<div class="row"><button type="button" class="btn primary" id="fa-run"' + (fullRun ? " disabled" : "") + ">" + (fullRun ? "Running\u2026" : "Run full audit") + '</button><span class="muted" style="font-size:.86rem">Takes about ' + fullAuditMins() + " minutes. Keep the hub open on this page until it finishes. Best run on Monday morning.</span></div>" +
+        '<ol style="margin:10px 0 0 18px;padding:0;font-size:.9rem">' + FULL_STEPS.map(function (st, i) {
+          var r = last && last.steps && last.steps[i];
+          return "<li>" + esc(st.label) + (r ? ' <span class="chip ' + (r.ok ? "good" : "flag") + '">' + (r.ok ? "OK" : r.skipped ? "Not run" : "Check") + "</span>" + (r.note && !r.ok ? '<div class="muted" style="font-size:.82rem">' + esc(r.note.slice(0, 220)) + "</div>" : "") : "") + "</li>";
+        }).join("") + "</ol>" +
+        (last ? '<p class="muted mono" style="font-size:.78rem;margin-top:8px">Last run ' + esc(new Date(last.started).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })) + (last.complete ? ", finished in " + Math.max(1, Math.round((last.finished - last.started) / 60000)) + " minutes" + (last.newFixes != null ? ", " + last.newFixes + " new fixes" : "") : ", didn't finish: " + esc(last.stopped || "")) + "</p>" : "");
+      box.querySelector("#fa-run").addEventListener("click", function () { startFullAudit(main); });
+    }
+    draw(); p.redraw = draw;
+  }
+  function startFullAudit(main) {
+    if (fullRun) return;
+    var rec = { started: Date.now(), steps: [], complete: false }, before = pendingFixes().length, stopped = "";
+    var banner = el('<div class="full-audit-bar" role="status" style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;background:var(--panel,#fff);border:1px solid var(--line);box-shadow:0 6px 24px rgba(0,0,0,.18);border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px)"><span class="fa-msg"></span><button type="button" class="btn small">Stop</button></div>');
+    document.body.appendChild(banner);
+    var stops = Array.prototype.slice.call(main.querySelectorAll("#psi-stop, #dc-stop"));
+    function halt(why) { if (stopped) return; stopped = why; stops.concat(Array.prototype.slice.call(main.querySelectorAll("#psi-stop, #dc-stop"))).forEach(function (b) { try { b.click(); } catch (e) {} }); }
+    banner.querySelector("button").addEventListener("click", function () { halt("You pressed Stop."); });
+    function onHash() { if (location.hash !== "#seo") halt("You left Website & SEO, so it stopped."); }
+    window.addEventListener("hashchange", onHash);
+    fullRun = rec; redraw();
+    function redraw() { var pp = Array.prototype.find.call(main.querySelectorAll(".panel"), function (x) { return x.redraw; }); if (pp) pp.redraw(); }
+    function tab(id) { var b = main.querySelector('nav.subtabs button[data-tab="' + id + '"]'); if (b) b.click(); }
+    var i = 0;
+    function next() {
+      if (stopped || i >= FULL_STEPS.length) return Promise.resolve();
+      var st = FULL_STEPS[i++], run = st.run || RUNNERS[st.id], t0 = Date.now();
+      banner.querySelector(".fa-msg").innerHTML = "<b>Full audit, step " + i + " of " + FULL_STEPS.length + ":</b> " + esc(st.label) + ". Keep this page open.";
+      tab(st.tab); stops = stops.concat(Array.prototype.slice.call(main.querySelectorAll("#psi-stop, #dc-stop")));
+      if (!run) { rec.steps.push({ id: st.id, ok: false, skipped: true, note: "This check isn't set up yet." }); return next(); }
+      return Promise.resolve().then(run).then(function (r) { r = r || {}; rec.steps.push({ id: st.id, ok: !!r.ok && !stopped, note: stopped || r.note || "", ms: Date.now() - t0 }); },
+        function (e) { rec.steps.push({ id: st.id, ok: false, note: e.message || String(e), ms: Date.now() - t0 }); })
+        .then(next);
+    }
+    return next().then(function () {
+      window.removeEventListener("hashchange", onHash);
+      banner.remove(); fullRun = null;
+      rec.finished = Date.now(); var auditOk = rec.steps.some(function (x) { return x.id === "audit" && x.ok; });
+      rec.complete = !stopped && rec.steps.length === FULL_STEPS.length && auditOk; rec.stopped = stopped || (auditOk ? "" : "the page audit couldn't run, so it doesn't count. See step 2.");
+      rec.newFixes = Math.max(0, pendingFixes().length - before);
+      while (rec.steps.length < FULL_STEPS.length) rec.steps.push({ id: FULL_STEPS[rec.steps.length].id, ok: false, skipped: true, note: stopped });
+      save("full-audit", rec);
+      var log = load("full-audit-log", []); log.unshift(rec); save("full-audit-log", log.slice(0, 26));
+      logChange({ id: "full-audit-" + rec.started, when: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }), page: "Whole site", link: "https://westpiertech.com/", type: "Full audit", action: rec.complete ? "Full website audit finished. " + rec.steps.filter(function (x) { return x.ok; }).length + " of " + FULL_STEPS.length + " checks OK, " + rec.newFixes + " new fixes." : "Full website audit stopped part way. " + stopped });
+      updateNav();
+      if (location.hash === "#seo") { tab("audit"); redraw(); window.scrollTo(0, 0); }
+      toast(rec.complete ? "Full audit finished: " + rec.newFixes + " new fixes in the Fix queue" : "Full audit stopped");
+    });
+  }
+
   function renderSeo(main) {
     var cfg = load("seo-settings", { site: "https://westpiertech.com", types: "pages,posts" });
     main.innerHTML = head("Priority area", "Website & SEO", "Audit westpiertech.com through the WordPress API, track rankings and AI search visibility, and plan content.",
       '<div class="row"><a class="btn" href="#progress">Progress report</a><a class="btn primary" href="#fixes">Fix queue (' + pendingFixes().length + " waiting)</a></div>");
     renderWpConnect(main);
+    renderFullAudit(main);
     renderPerformance(main);
     renderGoogleUpdates(main);
     renderGa4(main);
@@ -511,12 +586,14 @@
       var cols = [{ k: "title", label: "Page" }, { k: "link", label: "URL" }, { k: "type", label: "Type" }, { k: "words", label: "Words" }, { k: "metaTitle", label: "Title tag" }, { k: "metaDesc", label: "Meta description" }, { k: "modified", label: "Updated" }, { label: "Custom description set", compute: function (r) { return r.customDesc ? "yes" : "no"; } }, { label: "Redirects to", compute: function (r) { return r.redirectTo || ""; } }, { label: "Checked live", compute: function (r) { return r.live ? "yes" : r.redirectTo ? "redirect" : "no"; } }, { label: "H1", compute: function (r) { return (r.h1 || []).join(" / "); } }, { label: "Schema", compute: function (r) { return (r.schema || []).join(" "); } }, { label: "Canonical", compute: function (r) { return r.canonical || ""; } }, { label: "Noindex", compute: function (r) { return r.noindex ? "yes" : ""; } }, { label: "Content links", compute: function (r) { return (r.linksContent || []).length; } }, { label: "Images missing alt", compute: function (r) { return r.imagesNoAlt || 0; } }, { label: "Server ms", compute: function (r) { return r.ms || ""; } }, { label: "Google clicks", compute: function (r) { var x = perfByPage()[norm(r.link)]; return x ? x.clicks : ""; } }, { label: "Google impressions", compute: function (r) { var x = perfByPage()[norm(r.link)]; return x ? x.impressions : ""; } }, { label: "Google position", compute: function (r) { var x = perfByPage()[norm(r.link)]; return x ? x.position.toFixed(1) : ""; } }, { label: "Issues", compute: function (r) { return r.issues.join("; "); } }];
       copyText(toCsv(cols, a.pages), "Audit copied as CSV");
     });
-    actions.querySelector("#seo-run").addEventListener("click", function () {
+    actions.querySelector("#seo-run").addEventListener("click", function () { runAudit(); });
+    RUNNERS.audit = function () { return runAudit().then(function () { var t = status.textContent.trim(); return { ok: /^Audit finished/.test(t), note: t }; }); };
+    function runAudit() {
       var site = form.querySelector("#seo-site").value.trim();
       var types = form.querySelector("#seo-types").value.split(",");
       save("seo-settings", { site: site, types: types.join(",") });
       status.innerHTML = '<div class="notice info">Reading ' + esc(types.join(" and ")) + " from " + esc(site) + "…</div>";
-      Promise.all(types.map(function (t) { return fetchAll(site, t).then(function (items) { return items.map(function (i) { return auditItem(i, t === "pages" ? "Page" : "Post", site); }); }); }))
+      return Promise.all(types.map(function (t) { return fetchAll(site, t).then(function (items) { return items.map(function (i) { return auditItem(i, t === "pages" ? "Page" : "Post", site); }); }); }))
         .then(function (sets) {
           var pages = [].concat.apply([], sets);
           if (!hasChecker()) {
@@ -566,7 +643,7 @@
             " Usually this means a security plugin is blocking the WordPress API, or the site doesn't allow requests from this page. Matt can check the security plugin settings. Until then, use the paste option below.</div>";
           paste.open = true;
         });
-    });
+    }
     paste.querySelector("#seo-paste-run").addEventListener("click", function () {
       var site = form.querySelector("#seo-site").value.trim();
       try {
@@ -726,6 +803,7 @@
     }).node);
     main.appendChild(plan);
     seoTabs(main);
+    if (load("full-audit-go", 0) > Date.now() - 60000) { save("full-audit-go", 0); setTimeout(function () { startFullAudit(main); }, 300); }
   }
 
   /* ---------- AI visibility: Google AI impressions panel ---------- */
@@ -862,7 +940,7 @@
      The page has a lot of panels. Group them into tabs so only one group shows at a time.
      A panel is placed by its heading. Anything without a heading (notices) shows on every tab. */
   var SEO_TABS = [
-    { id: "audit", label: "Audit", match: /^(Page audit|Find text on the site|Change log)/ },
+    { id: "audit", label: "Audit", match: /^(Full website audit|Page audit|Find text on the site|Change log)/ },
     { id: "search", label: "Search and traffic", match: /^(Search performance|Google ranking updates|Website traffic and leads|Keyword rankings)/ },
     { id: "ai", label: "AI visibility", match: /^AI (search )?visibility/ },
     { id: "speed", label: "Speed and display", match: /^(Mobile and speed|Display check)/ },
@@ -904,6 +982,7 @@
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("a[data-seotab]");
     if (a) save("seo-tab", a.getAttribute("data-seotab"));
+    if (a && a.hasAttribute("data-fullaudit")) save("full-audit-go", Date.now());
   });
 
 
@@ -2575,6 +2654,7 @@
         '<span class="muted" style="font-size:.82rem">' + (psiDesk() ? "About 40 minutes for every page, phone and desktop." : "About 20 minutes for every page, phone only.") + " Uses the pages from your last audit.</span></div><div id=\"psi-status\"></div><div id=\"psi-out\"></div>";
       body.querySelector("#psi-save").addEventListener("click", function () { var v = body.querySelector("#psi-key").value.trim(); if (v) { save("psi-key", v); toast("Key saved"); draw(); } });
       body.querySelector("#psi-run").addEventListener("click", function () { runAll(false); });
+      RUNNERS.speed = function () { return Promise.resolve(runAll(false)).then(function () { var t = (body.querySelector("#psi-status") || {}).textContent || ""; return { ok: /Speed check finished/.test(t) && !/couldn't be checked/.test(t), note: t.trim() }; }); };
       body.querySelector("#psi-stop").addEventListener("click", function () { stop = true; });
       body.querySelector("#psi-desk").addEventListener("change", function () { save("psi-desktop", this.checked); draw(); });
       table(d);
@@ -2618,7 +2698,7 @@
     }
     function runAll(failedOnly) {
       var audit = load("seo-audit", null), st = body.querySelector("#psi-status");
-      if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return; }
+      if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return Promise.resolve(); }
       var old = psiData(), d, urls;
       if (failedOnly === true && old && old.pages) {
         d = old; urls = Object.keys(old.pages).filter(function (k) { return pageFailed(old, k); });
@@ -2626,7 +2706,7 @@
         d = { when: new Date().toISOString(), pages: {}, desktop: {}, withDesktop: psiDesk() };
         urls = audit.pages.filter(function (p) { return p.live && !p.redirectTo && !p.noindex; }).map(function (p) { return p.link; }).slice(0, 120);
       }
-      if (!urls.length) return;
+      if (!urls.length) return Promise.resolve();
       var i = 0, done = 0, inARow = 0, why = ""; stop = false;
       d.desktop = d.desktop || {};
       /* What each page still needs: phone, desktop or both. A recheck only redoes the side that failed. */
@@ -2647,7 +2727,7 @@
           else if (e.network && ++inARow >= 6) { stop = true; why = "Six pages in a row got no answer from Google, so it stopped rather than mark the rest as failed. Check the internet connection, then click Check the ones that failed again."; }
         }).then(function () { done++; bar.step(done, jobs.length, shortPath(u) + (job.s === "DESKTOP" ? " on desktop" : " on mobile")); save("psi", d); return next(); });
       }
-      Promise.all([next(), next()]).then(function () {
+      return Promise.all([next(), next()]).then(function () {
         bar.close();
         save("psi", d); save("auto-fixes-mobile", buildMobileFixes(d)); updateNav();
         body.querySelector("#psi-run").disabled = false; body.querySelector("#psi-stop").hidden = true;
@@ -2865,6 +2945,7 @@
       body.innerHTML = '<div class="row"><button type="button" class="btn primary" id="dc-run">Check every page</button><button type="button" class="btn" id="dc-stop" hidden>Stop</button>' +
         '<span class="muted" style="font-size:.82rem">Loads each page in a small preview here and checks it at ten screen widths, from big monitors down to phones. Stay on this page while it runs. About 15 seconds a page. Needs page checker version 10.</span></div><div id="dc-status"></div><div id="dc-out"></div>';
       body.querySelector("#dc-run").addEventListener("click", run);
+      RUNNERS.display = function () { return Promise.resolve(run()).then(function () { var t = (body.querySelector("#dc-status") || {}).textContent || ""; return { ok: /Display check finished/.test(t), note: t.trim() }; }); };
       body.querySelector("#dc-stop").addEventListener("click", function () { stop = true; });
       summary(d);
     }
@@ -2880,7 +2961,7 @@
     }
     function run() {
       var audit = load("seo-audit", null), st = body.querySelector("#dc-status");
-      if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return; }
+      if (!audit) { st.innerHTML = '<div class="notice">Run the page audit first, so the check knows which pages are live.</div>'; return Promise.resolve(); }
       var urls = audit.pages.filter(function (x) { return x.live && !x.redirectTo; }).map(function (x) { return x.link; }).slice(0, 150);
       stop = false;
       var origin = new URL(urls[0]).origin, d = { when: new Date().toISOString(), pages: {} }, waiting = null;
@@ -2952,7 +3033,7 @@
         }
         return next();
       }
-      pass().then(function () {
+      return pass().then(function () {
         bar.close();
         window.removeEventListener("message", onMsg);
         try { if (popup) popup.close(); } catch (e) {}

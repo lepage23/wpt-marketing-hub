@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.40.0 · 2026-10-23
+
+One-click full website audit, run weekly.
+
+- **New "Full website audit" panel** at the top of Website & SEO, Audit. One button runs every check one after another: Google ranking updates, then every page and post (titles, headings, links, redirects, schema, Search Console, Analytics, false claims), then speed on phone and desktop, then how every page looks at ten screen widths.
+- **Read-only.** Nothing on the site changes. Findings go into the Fix queue for approval, as before.
+- **A bar at the bottom** shows which step it's on, with a Stop button. Leaving Website & SEO stops it cleanly.
+- **Each step's result is saved,** with a note where something didn't work. The run is logged in the change log with the number of new fixes.
+- **Weekly task on Today:** "Run the full website audit". The button there starts it straight away. It ticks itself off when a run finishes, but only if the page audit itself worked.
+
 ## v0.39.0 · 2026-10-23
 
 Weekly tasks on the main page.
