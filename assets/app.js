@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.37.0";
-  var BUILT = "2026-10-23 10:21 BST";
+  var VERSION = "0.38.0";
+  var BUILT = "2026-10-23 14:02 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -259,7 +259,7 @@
     }).concat((function () { var fs = fixState(); return proposals().filter(function (p) { return !p.example && isDueBackFix(fs[p.id]); }).map(function (p) {
       var st = fs[p.id];
       return { chip: '<span class="chip info">Fix</span>', t: p.issue || p.pageTitle || "Fix", s: "Back from In progress, next action due " + fmtDay(st.nextDate) + (st.progressNote ? " · " + st.progressNote : "") };
-    }); })()).concat(inbox.slice(0, 5).map(function (m) {
+    }); })()).concat(aiGscDue() ? [{ chip: '<span class="chip info">AI</span>', t: "Import this week's Google AI report", s: "Search Console, Performance, Generative AI, last 7 days, Export. Drop the zip on Website & SEO, AI visibility. About two minutes." }] : []).concat(inbox.slice(0, 5).map(function (m) {
       return { chip: '<span class="chip ' + (m.category === "Lead" ? "flag" : m.category === "Complaint" ? "bad" : "info") + '">' + esc(m.category) + "</span>", t: m.subject, s: m.from + " · " + (m.why || "") };
     }));
     p1.appendChild(el(items.length ? '<div class="list">' + items.map(function (i) {
@@ -561,6 +561,8 @@
       ]
     }).node);
 
+    renderAiGsc(main);
+
     var ai = panel("AI search visibility: results", "One row per answer you check. Pinned competitors: " + (window.WPT_AI_COMPETITORS || []).join(", ") + ".");
     if (!load("ai-vis-examples-cleared", false)) { save("ai-visibility", (load("ai-visibility", null) || []).filter(function (r) { return !r._ex; })); save("ai-vis-examples-cleared", true); }
     var aiResults = editableTable({
@@ -692,6 +694,51 @@
     }).node);
     main.appendChild(plan);
     seoTabs(main);
+  }
+
+  /* ---------- AI visibility: Google AI impressions panel ---------- */
+  function renderAiGsc(main) {
+    var p = panel("AI visibility: Google AI Overviews and AI Mode", "How often Google's AI answers showed a link to westpiertech.com. Real numbers from Search Console, not prompt checks.");
+    var box = el("<div></div>"); p.appendChild(box); main.appendChild(p);
+    function draw() {
+      var h = aiGscHistory(), cur = h[0], prev = h[1];
+      var drop = '<label class="ai-drop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;cursor:pointer">' +
+        "<b>Drop this week's export here</b> or click to choose it<br><span class=\"muted\" style=\"font-size:.82rem\">Search Console, Performance, Generative AI, set the date to the last 7 days, Export, Download CSV. Drop the zip as it is.</span>" +
+        '<input type="file" accept=".zip,.csv" multiple hidden></label><div class="ai-gsc-status"></div>';
+      if (!cur) { box.innerHTML = '<div class="notice info">Google doesn\'t offer this report through its API yet, so the hub reads the report\'s export instead. Once a week takes about two minutes. The Today page reminds you when it\'s due.</div>' + drop; wire(); return; }
+      var pp = perfByPage(), share = function (url) { var k = norm(gscUrl(url, (perfData() || {}).home)); return pp[k] ? pp[k].impressions : null; };
+      var change = prev && prev.perDay ? Math.round((cur.perDay - prev.perDay) / (prev.perDay || 1) * 100) : null;
+      var missing = Object.keys(pp).filter(function (k) { return pp[k].impressions >= 100 && !cur.pages.some(function (x) { return norm(gscUrl(x.key, (perfData() || {}).home)) === k; }); })
+        .sort(function (a, b) { return pp[b].impressions - pp[a].impressions; }).slice(0, 8);
+      var max = Math.max.apply(null, cur.days.map(function (d) { return d.impressions; }).concat([1]));
+      box.innerHTML = '<div class="stats">' +
+        stat(fmtNum(cur.total), "AI impressions" + (cur.from ? ", " + fmtDate(cur.from) + " to " + fmtDate(cur.to) : "")) +
+        stat(cur.perDay == null ? "–" : cur.perDay, "A day on average") +
+        stat(change == null ? "–" : (change > 0 ? "+" : "") + change + "%", "Change on the export before", change != null && change < 0) +
+        stat(cur.pages.length, "Pages shown in AI answers") + "</div>" +
+        (cur.days.length ? '<div class="ai-bars" title="AI impressions by day" style="display:flex;align-items:flex-end;gap:3px;height:70px;margin:8px 0 2px">' + cur.days.map(function (d) { return '<span title="' + esc(fmtDate(d.key) + ": " + d.impressions) + '" style="flex:1;background:var(--accent);opacity:.75;border-radius:3px 3px 0 0;height:' + Math.max(2, Math.round(d.impressions / max * 100)) + '%"></span>'; }).join("") + '</div><p class="muted mono" style="font-size:.75rem">' + esc(fmtDate(cur.from)) + " to " + esc(fmtDate(cur.to)) + "</p>" : "") +
+        '<div class="table-wrap"><table><thead><tr><th>Page</th><th class="num">AI impressions</th><th class="num">Google search impressions</th></tr></thead><tbody>' +
+        cur.pages.slice(0, 15).map(function (r) { var s2 = share(r.key); return "<tr><td>" + esc(shortPath(r.key)) + '</td><td class="num">' + fmtNum(r.impressions) + '</td><td class="num">' + (s2 == null ? "–" : fmtNum(s2)) + "</td></tr>"; }).join("") + "</tbody></table></div>" +
+        (missing.length ? '<p style="margin-top:10px"><b>Seen in Google search but not in AI answers</b> <span class="muted">(100+ search impressions, no AI impressions in this export)</span></p><ul>' + missing.map(function (k) { return "<li>" + esc(shortPath(k)) + ' <span class="muted">' + fmtNum(pp[k].impressions) + " search impressions</span></li>"; }).join("") + '</ul><p class="muted" style="font-size:.85rem">These are the pages to give clear, answer-first content to next. Ask Claude and it will write them as fixes.</p>' : "") +
+        '<p class="muted mono" style="font-size:.75rem;margin-top:8px">' + h.length + " weekly export" + (h.length === 1 ? "" : "s") + " saved · last imported " + esc(fmtDate(cur.imported)) + "</p>" + drop;
+      wire();
+    }
+    function wire() {
+      var input = box.querySelector("input[type=file]"), label = box.querySelector(".ai-drop"), st = box.querySelector(".ai-gsc-status");
+      function take(files) {
+        files = Array.prototype.slice.call(files || []); if (!files.length) return;
+        st.innerHTML = '<div class="notice info">Reading the export\u2026</div>';
+        var all = {}, zips = files.filter(function (f) { return /\.zip$/i.test(f.name); });
+        var go = zips.length ? aiGscImport(zips[0]) : Promise.all(files.map(function (f) { return f.text().then(function (t) { all[f.name] = t; }); })).then(function () { var rec = aiGscParse(all, files.map(function (f) { return f.name; }).join(", ")); aiGscSave(rec); return rec; });
+        go.then(function (rec) { toast("AI report imported: " + fmtNum(rec.total) + " impressions"); logChange({ id: "ai-gsc-" + rec.imported, when: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }), page: "Search Console", link: "https://search.google.com/search-console", type: "AI report", action: "Imported Google AI impressions" + (rec.from ? " for " + rec.from + " to " + rec.to : "") }); draw(); updateNav(); },
+          function (e) { st.innerHTML = '<div class="notice">' + esc(e.message) + "</div>"; });
+      }
+      input.addEventListener("change", function () { take(input.files); });
+      label.addEventListener("dragover", function (e) { e.preventDefault(); label.style.borderColor = "var(--accent)"; });
+      label.addEventListener("dragleave", function () { label.style.borderColor = ""; });
+      label.addEventListener("drop", function (e) { e.preventDefault(); label.style.borderColor = ""; take(e.dataTransfer.files); });
+    }
+    draw();
   }
 
   /* ---------- AI visibility: score a pasted answer ----------
@@ -1814,6 +1861,60 @@
 
   /* ---------- Search performance (Search Console and Analytics via Rank Math) ---------- */
   function perfData() { return load("search-perf", null); }
+
+  /* ---------- Google AI impressions (Search Console's Generative AI report) ----------
+     Google doesn't offer this report through its API yet, so the hub reads the report's own export: the
+     zip Search Console downloads (or the CSV files inside it). Each import is kept, so weeks can be compared. */
+  function aiGscHistory() { return load("ai-gsc", []) || []; }
+  function aiGscLatest() { return aiGscHistory()[0] || null; }
+  function aiGscDue() { var l = aiGscLatest(); return !l || (Date.now() - l.importedTs) > 7 * 864e5; }
+  /* Unzip in the browser (zip files from Search Console use plain "deflate"). Resolves to { name: text }. */
+  function unzipText(buf) {
+    var b = new Uint8Array(buf), dv = new DataView(buf), out = {}, jobs = [];
+    var eocd = -1; for (var i = b.length - 22; i >= 0; i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    if (eocd < 0) return Promise.reject(new Error("That file isn't a zip the hub can read."));
+    var n = dv.getUint16(eocd + 10, true), off = dv.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = dv.getUint16(off + 10, true), size = dv.getUint32(off + 20, true), nameLen = dv.getUint16(off + 28, true), extra = dv.getUint16(off + 30, true), comment = dv.getUint16(off + 32, true), local = dv.getUint32(off + 42, true);
+      var name = new TextDecoder().decode(b.subarray(off + 46, off + 46 + nameLen));
+      var start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true), data = b.subarray(start, start + size);
+      (function (name, method, data) {
+        if (method === 0) { out[name] = new TextDecoder().decode(data); return; }
+        if (method !== 8 || typeof DecompressionStream === "undefined") return;
+        jobs.push(new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text().then(function (t) { out[name] = t; }));
+      })(name, method, data);
+      off += 46 + nameLen + extra + comment;
+    }
+    return Promise.all(jobs).then(function () { return out; });
+  }
+  /* Turns the export's CSV files into one weekly record: total, by day, by page, by country and device. */
+  function aiGscParse(files, name) {
+    var rec = { importedTs: Date.now(), imported: today(), file: name || "", total: 0, days: [], pages: [], countries: [], devices: [] };
+    Object.keys(files).forEach(function (fname) {
+      var rows = parseCsv(String(files[fname] || "").replace(/^\ufeff/, ""));
+      if (rows.length < 2) return;
+      var h = rows[0].map(function (x) { return x.trim().toLowerCase(); }), imp = h.findIndex(function (x) { return /impression/.test(x); });
+      if (imp < 0) return;
+      var kind = /page|url/.test(h[0]) ? "pages" : /date|day/.test(h[0]) ? "days" : /countr/.test(h[0]) ? "countries" : /device/.test(h[0]) ? "devices" : "";
+      if (!kind) return;
+      rec[kind] = rows.slice(1).map(function (r) { return { key: (r[0] || "").trim(), impressions: +String(r[imp] || "0").replace(/[^0-9.]/g, "") || 0 }; }).filter(function (r) { return r.key; });
+    });
+    if (!rec.days.length && !rec.pages.length) throw new Error("No AI impressions found in that file. Export it from Search Console's Generative AI report (Performance, then Generative AI), then drop the zip here.");
+    rec.days.sort(function (a, b) { return a.key < b.key ? -1 : 1; });
+    rec.pages.sort(function (a, b) { return b.impressions - a.impressions; });
+    rec.total = rec.days.length ? rec.days.reduce(function (n, r) { return n + r.impressions; }, 0) : rec.pages.reduce(function (n, r) { return n + r.impressions; }, 0);
+    rec.from = rec.days.length ? rec.days[0].key : ""; rec.to = rec.days.length ? rec.days[rec.days.length - 1].key : "";
+    rec.perDay = rec.days.length ? Math.round(rec.total / rec.days.length * 10) / 10 : null;
+    return rec;
+  }
+  function aiGscSave(rec) {
+    var h = aiGscHistory().filter(function (x) { return !(x.from && x.from === rec.from && x.to === rec.to); });
+    h.unshift(rec); save("ai-gsc", h.slice(0, 60));
+  }
+  function aiGscImport(file) {
+    var read = /\.zip$/i.test(file.name) ? file.arrayBuffer().then(unzipText) : file.text().then(function (t) { var o = {}; o[file.name] = t; return o; });
+    return read.then(function (files) { var rec = aiGscParse(files, file.name); aiGscSave(rec); return rec; });
+  }
   function gscUrl(page, home) { return /^https?:/.test(page) ? page : String(home || "https://westpiertech.com/").replace(/\/$/, "") + "/" + String(page || "").replace(/^\//, ""); }
   function perfByPage() {
     var d = perfData(), out = {};
@@ -4700,7 +4801,8 @@
       aiChecked: ai.length,
       aiNamed: ai.filter(function (r) { return r.named === "Yes"; }).length,
       speedMobile: psi ? avgSpeed(psi.pages) : null,
-      speedDesktop: psi && psi.withDesktop ? avgSpeed(psi.desktop) : null
+      speedDesktop: psi && psi.withDesktop ? avgSpeed(psi.desktop) : null,
+      aiImprDay: aiGscLatest() ? aiGscLatest().perDay : null
     };
   }
   function snapHistory() { return (load("seo-history", []) || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }); }
@@ -4743,6 +4845,7 @@
     rows.push({ label: "Keyword average position", a: a.kwAvg, b: b.kwAvg, lower: true, note: "Tracked searches on Website & SEO" });
     rows.push({ label: "Keywords in Google's top 10", a: a.kwTop10, b: b.kwTop10, lower: false });
     rows.push({ label: "AI answers naming WPT", a: a.aiNamed, b: b.aiNamed, lower: false });
+    rows.push({ label: "Google AI impressions a day", a: a.aiImprDay, b: b.aiImprDay, lower: false, note: "From the weekly Search Console Generative AI export" });
     return rows;
   }
   /* Website changes made after the start date, up to and including the end date. */

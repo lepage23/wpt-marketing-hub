@@ -6,6 +6,18 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.38.0 · 2026-10-23
+
+Google AI tracking.
+
+- **New panel on Website & SEO, AI visibility:** how often Google's AI Overviews and AI Mode showed a link to westpiertech.com. These are Google's own numbers from Search Console's Generative AI report, not prompt checks.
+- **One export a week.** Google doesn't offer this report through its API, so the hub reads the export. Drop the zip from Search Console on the panel as it is. The hub unpacks it, keeps every week and compares each one with the week before.
+- **Shows** total AI impressions, the daily average and its change, a day-by-day chart, and the pages shown in AI answers next to their normal search impressions.
+- **Gaps list:** pages with 100 or more search impressions that got no AI impressions. These are the pages to improve next.
+- **Today page** reminds you when the export is more than seven days old.
+- **Progress report** gains a line: Google AI impressions a day.
+- **Old FAQ cards** no longer claim FAQ schema helps. Google stopped showing FAQ rich results in May 2026.
+
 ## v0.37.0 · 2026-10-23 10:45 BST
 
 Content for the 11 thin pages, all push-ready.

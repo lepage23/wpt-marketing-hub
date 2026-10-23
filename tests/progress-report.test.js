@@ -3,7 +3,8 @@ const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');
 function grab(n){const i=src.indexOf('function '+n+'(');if(i<0)throw new Error('missing '+n);let d=0,j=src.indexOf('{',i);for(let k=j;k<src.length;k++){if(src[k]=='{')d++;else if(src[k]=='}'){d--;if(!d)return src.slice(i,k+1);}}}
 function grabVar(n){const i=src.indexOf('var '+n+' =');return src.slice(i,src.indexOf('];',i)+2);}
 eval(grabVar('PROGRESS_CHECKS')+'\n'+src.slice(src.indexOf('var COUNTED_CHANGE'),src.indexOf('\n',src.indexOf('var COUNTED_CHANGE')))+'\n'+src.slice(src.indexOf('var MONTHS'),src.indexOf('\n',src.indexOf('var MONTHS')))+'\n'+
-  ['logDate','avgSpeed','buildSnapshot','delta','metricRows','changesBetween','pageMoves','fmtVal'].map(grab).join('\n'));
+  ['aiGscHistory','aiGscLatest','logDate','avgSpeed','buildSnapshot','delta','metricRows','changesBetween','pageMoves','fmtVal'].map(grab).join('\n'));
+function load(k,d){return d}
 const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)process.exitCode=1;};
 const pg=(link,issues)=>({link,title:link,issues});
 const before={when:'12 Oct 2026, 09:00',pages:[pg('/a',['Thin content (120 words)','No meta description']),pg('/b',['No H1','2 images missing alt text']),pg('/c',[]),{link:'/old',title:'old',redirectTo:'/c',issues:[]}]};
@@ -23,7 +24,7 @@ let d=delta(25,11,true);ok(d.cls==='up'&&d.pct==='56% better'&&d.txt==='-14','fe
 d=delta(50,56,true);ok(d.cls==='down'&&d.pct==='12% worse','more issues reads as worse');
 d=delta(66.7,80.6,false,' pts');ok(d.cls==='up'&&d.txt==='+13.9 pts','score change in points');
 ok(delta(3,3,true).txt==='no change'&&delta(0,2,true).pct==='worse'&&delta(null,2).pct==='–','no change, from zero, and missing values');
-ok(metricRows(a,b).length===3+12+5,'scorecard lists every measure');
+ok(metricRows(a,b).length===3+12+6,'scorecard lists every measure, including Google AI impressions');
 ok(logDate({when:'19 Oct 2026, 14:30'})==='2026-10-19'&&logDate({when:'3 Sept 2026, 09:05'})==='2026-09-03'&&logDate({date:'2026-01-02',when:'x'})==='2026-01-02','reads old change log dates');
 const log=[{action:'Pushed live',date:'2026-10-15'},{action:'Undone',date:'2026-10-16'},{action:'Image fixed',when:'19 Oct 2026, 10:00'},{action:'Pushed live',date:'2026-10-12'},{action:'Marked done (already sorted)',date:'2026-10-14'},{action:'Pushed live',date:'2026-10-20'}];
 ok(changesBetween(log,a,b)===2,'counts real changes after the start date up to the end date');
