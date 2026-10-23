@@ -1,7 +1,7 @@
 <?php
 // Version 16: an H1 the hub makes keeps the colour it had as an H2.
 $src = file_get_contents( $argv[1] );
-preg_match( '#function wpt_hub_keep_look.*?\n}\nfunction wpt_hub_keep_class.*?\n}\n.*?function wpt_hub_keep_widget.*?\n}\n#s', $src, $m );
+preg_match( "#if \\( ! function_exists\\( 'wpt_hub_keep_look' \\) \\) \\{.*?\\n\\}\\n#s", $src, $m );
 eval( $m[0] );
 function ok( $c, $msg ) { echo ( $c ? 'PASS ' : 'FAIL ' ) . $msg . "\n"; if ( ! $c ) { $GLOBALS['bad'] = 1; } }
 ok( wpt_hub_keep_look( '<h1>', 2 ) === '<h1 class="wpt-was-h2">', 'plain H1 gets the keep-look class' );
@@ -13,7 +13,11 @@ $w = array( 'title' => 'x', 'css_classes' => 'wpt-was-h2' );
 ok( wpt_hub_keep_widget( $w, 2 ) && 'wpt-was-h2' === $w['_css_classes'] && ! isset( $w['css_classes'] ), 'widget class goes in _css_classes, the version 16 slip is tidied' );
 $w2 = array( '_css_classes' => 'hero wpt-was-h2' );
 ok( ! wpt_hub_keep_widget( $w2, 2 ), 'already repaired widget counts as no change' );
-ok( false !== strpos( $src, "'version' => 19" ), 'reports version 19' );
+ok( false !== strpos( $src, "'version' => 20" ), 'reports version 20' );
+// Version 20: Code Snippets refuses a function that already exists unless that exact name is guarded.
+preg_match_all( '#^\s*function (wpt_\w+)\(#m', $src, $fn );
+$unguarded = array_filter( $fn[1], function ( $n ) use ( $src ) { return false === strpos( $src, "function_exists( '" . $n . "' )" ); } );
+ok( count( $fn[1] ) >= 6 && ! $unguarded, 'every function has its own function_exists guard' );
 // Version 19: print the head style with a Blocksy-like theme setting and check the sizes.
 $GLOBALS['mods'] = array( 'h3Typography' => array( 'size' => array( 'desktop' => '30px', 'tablet' => '26px', 'mobile' => 'bad;}' ) ) );
 if ( ! function_exists( 'get_theme_mod' ) ) { function get_theme_mod( $k ) { return isset( $GLOBALS['mods'][ $k ] ) ? $GLOBALS['mods'][ $k ] : null; } }

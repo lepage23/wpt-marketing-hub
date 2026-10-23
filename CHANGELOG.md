@@ -6,6 +6,21 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.35.0 · 2026-10-23 10:05 BST
+
+The hub now updates its own page checker. No more copying and pasting into Snippets.
+
+- **Update card at the top of the Fix queue** whenever the hub's page checker is newer than the site's. Approve it and the hub keeps a copy of the current code, switches the snippet off, saves the new code and switches it back on through Code Snippets, then checks the site reports the new version. If Code Snippets rejects the code, or the version doesn't change, the old code goes back on the same way. Undo puts the old version back too.
+- **Switching off first means two versions never load at once**, which is what Code Snippets would otherwise reject as "Cannot redeclare".
+- **Automatic check cards** that need a newer page checker now offer "Update the page checker, then check" instead of the code to paste.
+- **Page checker 20:** every function has its own guard, so future updates are safe even if a version loads twice. The heading check now copies a heading's own inline style before comparing, so Let's get started (set to 2rem by hand, same as before) passes.
+- Tested against a pretend Code Snippets that tests code on save: normal update, code rejected, version not reported, and Undo. All four behave.
+- 527 tests, all passing.
+
+## Backup · 2026-10-23 09:50 BST
+
+`backup/v0.34.0-2026-10-23-0950`, taken before v0.35.0.
+
 ## v0.34.0 · 2026-10-23 09:45 BST
 
 The heading check is automatic. No more checking pages by hand.

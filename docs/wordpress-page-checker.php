@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 19: a heading the hub turns into the H1 keeps its size as well as its colour).
+ * WPT Marketing Hub: page checker (version 20: every function is guarded, so the hub can update this snippet itself).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -24,33 +24,40 @@
 /* Version 16: when the hub turns a heading into the H1, the theme's H1 style takes over (white on this
  * site, made for dark banners), so a heading on a white background vanished. The new H1 is tagged
  * wpt-was-h2 (or h3...) and a small style rule, printed on every page, keeps it the colour it was. */
-function wpt_hub_keep_look( $open, $level ) {
-	$level = max( 2, min( 6, (int) $level ) );
-	$cls   = 'wpt-was-h' . $level;
-	if ( false !== stripos( $open, 'wpt-was-h' ) ) {
-		return $open;
+/* Version 20: guarded, so a newer copy of this snippet can load alongside this one while it's being updated. */
+if ( ! function_exists( 'wpt_hub_keep_look' ) ) {
+	function wpt_hub_keep_look( $open, $level ) {
+		$level = max( 2, min( 6, (int) $level ) );
+		$cls   = 'wpt-was-h' . $level;
+		if ( false !== stripos( $open, 'wpt-was-h' ) ) {
+			return $open;
+		}
+		if ( preg_match( '#\sclass\s*=\s*(["\'])#i', $open ) ) {
+			return preg_replace( '#(\sclass\s*=\s*(["\']))#i', '$1' . $cls . ' ', $open, 1 );
+		}
+		return preg_replace( '#^<h1#i', '<h1 class="' . $cls . '"', $open, 1 );
 	}
-	if ( preg_match( '#\sclass\s*=\s*(["\'])#i', $open ) ) {
-		return preg_replace( '#(\sclass\s*=\s*(["\']))#i', '$1' . $cls . ' ', $open, 1 );
+	if ( ! function_exists( 'wpt_hub_keep_class' ) ) {
+		function wpt_hub_keep_class( $classes, $level ) {
+			$cls = 'wpt-was-h' . max( 2, min( 6, (int) $level ) );
+			return false !== strpos( (string) $classes, 'wpt-was-h' ) ? (string) $classes : trim( $classes . ' ' . $cls );
+		}
 	}
-	return preg_replace( '#^<h1#i', '<h1 class="' . $cls . '"', $open, 1 );
-}
-function wpt_hub_keep_class( $classes, $level ) {
-	$cls = 'wpt-was-h' . max( 2, min( 6, (int) $level ) );
-	return false !== strpos( (string) $classes, 'wpt-was-h' ) ? (string) $classes : trim( $classes . ' ' . $cls );
-}
-/* Version 17: Elementor keeps a widget's CSS classes in "_css_classes" (sections and containers use
- * "css_classes"). Version 16 wrote the wrong one, so tidy that away too. Returns true if anything changed. */
-function wpt_hub_keep_widget( &$settings, $level ) {
-	$was = isset( $settings['_css_classes'] ) ? (string) $settings['_css_classes'] : '';
-	$new = wpt_hub_keep_class( $was, $level );
-	$changed = $new !== $was;
-	$settings['_css_classes'] = $new;
-	if ( isset( $settings['css_classes'] ) && preg_match( '#^\s*wpt-was-h[2-6]\s*$#', (string) $settings['css_classes'] ) ) {
-		unset( $settings['css_classes'] );
-		$changed = true;
+	/* Version 17: Elementor keeps a widget's CSS classes in "_css_classes" (sections and containers use
+	 * "css_classes"). Version 16 wrote the wrong one, so tidy that away too. Returns true if anything changed. */
+	if ( ! function_exists( 'wpt_hub_keep_widget' ) ) {
+		function wpt_hub_keep_widget( &$settings, $level ) {
+			$was = isset( $settings['_css_classes'] ) ? (string) $settings['_css_classes'] : '';
+			$new = wpt_hub_keep_class( $was, $level );
+			$changed = $new !== $was;
+			$settings['_css_classes'] = $new;
+			if ( isset( $settings['css_classes'] ) && preg_match( '#^\s*wpt-was-h[2-6]\s*$#', (string) $settings['css_classes'] ) ) {
+				unset( $settings['css_classes'] );
+				$changed = true;
+			}
+			return $changed;
+		}
 	}
-	return $changed;
 }
 
 /* Write a page's text exactly as given (version 15). Saving through wp_update_post strips backslashes
@@ -79,9 +86,11 @@ if ( ! function_exists( 'wpt_hub_write_elementor' ) ) {
 	 * Elementor's layout is full of them (every \" in embed code), so before version 18 the hub's Undo
 	 * copies were damaged and an Undo could leave a page with no layout. Copies are now slashed first,
 	 * so they come back exactly, and marked v18 so older ones can be told apart. */
-	function wpt_hub_bk( $id, $bid, $rec ) {
-		$rec['v'] = 18;
-		update_post_meta( $id, '_wpt_hub_bk_' . $bid, wp_slash( $rec ) );
+	if ( ! function_exists( 'wpt_hub_bk' ) ) {
+		function wpt_hub_bk( $id, $bid, $rec ) {
+			$rec['v'] = 18;
+			update_post_meta( $id, '_wpt_hub_bk_' . $bid, wp_slash( $rec ) );
+		}
 	}
 	function wpt_hub_write_elementor( $id, $data, $raw = null ) {
 		$json = null !== $raw ? (string) $raw : wp_json_encode( $data );
@@ -369,7 +378,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 19, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 20, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -1936,6 +1945,8 @@ add_action( 'wp_footer', function () {
       if (!lv || !shown(h)) return;
       var probe = document.createElement("h" + lv);
       probe.className = h.className.replace(/wpt-was-h[2-6]/, "").trim();
+      /* Keep the heading's own inline style (like font-size: 2rem) so the comparison is like for like. */
+      if (h.getAttribute("style")) probe.setAttribute("style", h.getAttribute("style"));
       probe.textContent = "x"; probe.style.position = "absolute"; probe.style.visibility = "hidden";
       h.parentNode.insertBefore(probe, h);
       var a = getComputedStyle(h), b = getComputedStyle(probe), da = parseFloat(a.fontSize), db = parseFloat(b.fontSize);

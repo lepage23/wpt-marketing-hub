@@ -313,6 +313,8 @@
       if (!lv || !shown(h)) return;
       var probe = document.createElement("h" + lv);
       probe.className = h.className.replace(/wpt-was-h[2-6]/, "").trim();
+      /* Keep the heading's own inline style (like font-size: 2rem) so the comparison is like for like. */
+      if (h.getAttribute("style")) probe.setAttribute("style", h.getAttribute("style"));
       probe.textContent = "x"; probe.style.position = "absolute"; probe.style.visibility = "hidden";
       h.parentNode.insertBefore(probe, h);
       var a = getComputedStyle(h), b = getComputedStyle(probe), da = parseFloat(a.fontSize), db = parseFloat(b.fontSize);

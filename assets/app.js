@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.34.0";
-  var BUILT = "2026-10-23 09:29 BST";
+  var VERSION = "0.35.0";
+  var BUILT = "2026-10-23 09:57 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2834,17 +2834,17 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check", snippet_update: "Hub update" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
   function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
   function goLabel(p) {
     if (p.type === "content_set") return "Approve and repair the page";
     if (p.type === "site_edit") return { h1: "Approve and make it the H1", h1_one: "Approve and keep one H1", alt: "Approve and add the alt text", relink: "Approve and fix the link", menu_add: "Approve and add to the menu", css: "Approve and fix the display", llms: "Approve and publish llms.txt", option: p.params && p.params.key === "blog_public" ? "Approve and let Google index the site" : "Approve and save the setting", meta: p.params && p.params.key === "rank_math_robots" ? "Approve and let Google index it" : "Approve and clear it", redirect_code: "Approve and make it permanent" }[p.op] || "Approve and push";
-    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : "Approve and push live";
+    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : p.type === "snippet_update" ? "Approve and update the page checker" : "Approve and push live";
   }
   /* Fixes whose box only describes what happens, rather than holding text to edit. */
-  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|elementor_h1_look|content_set/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
+  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|elementor_h1_look|content_set|snippet_update/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
   function parseFaq(text) {
@@ -2892,7 +2892,7 @@
   var PRI_CHIP = { critical: "bad", high: "flag", medium: "info", low: "" };
   function proposals() {
     syncFixProgress();
-    var list = (window.WPT_PROPOSALS || []).concat(load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []), load("auto-fixes-mobile", []), load("auto-fixes-display", []), load("auto-fixes-links", []));
+    var list = (window.WPT_PROPOSALS || []).concat(checkerCards(), load("auto-fixes", []), load("auto-fixes-gsc", []), load("auto-fixes-ga4", []), load("auto-fixes-claims", []), load("auto-fixes-rules", []), load("auto-fixes-mobile", []), load("auto-fixes-display", []), load("auto-fixes-links", []));
     return list.map(function (p, i) { return { p: p, i: i }; }).sort(function (a, b) {
       return (PRI_ORDER[a.p.priority || "medium"] - PRI_ORDER[b.p.priority || "medium"]) || a.i - b.i;
     }).map(function (x) { return x.p; });
@@ -3111,6 +3111,7 @@
 
   function pushFix(p, text) {
     if (p.example) return Promise.reject(new Error("This is an example. It can't be pushed."));
+    if (p.type === "snippet_update") return pushChecker(p);
     if (p.type === "site_edit" && p.siteWide) return pushSite(p, text);
     /* Replacement-rule fixes are rebuilt from the live page just before pushing, so a fix saved by an
        older version of the hub (or before the page changed) can't push stale wording. */
@@ -3425,9 +3426,17 @@
       wpFetch("/wpt-hub/v1/analytics?days=7").then(function (d) {
         var v = (d && d.version) || 0;
         if (v < (p.needs || 0)) {
-          status.className = "notice"; status.innerHTML = "<b>The page checker on the site is version " + v + ", and this check needs version " + p.needs + ".</b> Copy the code, paste it over everything in Snippets, WPT Hub page checker, save, then click Check again. That's the only step the hub can't do itself." +
-            '<div class="row" style="margin-top:8px"><button type="button" class="btn small primary">Copy page checker code</button></div>';
-          status.querySelector("button").addEventListener("click", function () { copyText((window.WPT_SNIPPETS || {}).checker || "", "Page checker code copied. Paste it into Snippets in WordPress."); });
+          status.className = "notice"; status.innerHTML = "<b>The page checker on the site is version " + v + ", and this check needs version " + p.needs + ".</b> The hub can update it now, then run the check." +
+            '<div class="row" style="margin-top:8px"><button type="button" class="btn small primary">Update the page checker, then check</button></div>';
+          status.querySelector("button").addEventListener("click", function () {
+            var b = this; b.disabled = true; b.textContent = "Updating\u2026";
+            var card0 = checkerCards()[0];
+            pushChecker(card0 || {}).then(function (r) {
+              var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+              if (card0) { setFix(card0.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, backup: r.backup }); logChange({ id: card0.id, when: when, page: "Page checker", link: card0.link, type: "Hub update", action: r.after }); }
+              status.className = "notice info"; status.textContent = r.after + ". Checking the pages now\u2026"; go.click();
+            }, function (e) { status.className = "notice"; status.textContent = e.message; b.disabled = false; b.textContent = "Try again"; });
+          });
           go.disabled = false; go.textContent = "Check again";
           return;
         }
@@ -3464,7 +3473,74 @@
     });
     return card;
   }
+  /* ---------- Self-updating page checker (Code Snippets REST API) ----------
+     The hub's own copy of the page checker (data/snippets.js) carries a version number. When it's newer than
+     the one on the site, a card asks to update it. Approving it: the old code is kept in this browser, the
+     snippet is switched off, the new code is saved and switched on (Code Snippets tests it as it saves), then
+     the hub checks the site reports the new version. Any problem puts the old code back the same way. */
+  function bundledChecker() { var m = String((window.WPT_SNIPPETS || {}).checker || "").match(/'version' => (\d+), 'days'/); return m ? +m[1] : 0; }
+  function checkerCards() {
+    var a = wpAuth(), want = bundledChecker(), id = "update-checker-v" + want;
+    if (!a || !a.checker || !want) return [];
+    var have = a.checkerVersion || 0, st = (load("fix-state", {}) || {})[id];
+    if (have >= want && !st) return [];
+    return [{ id: id, auto: true, type: "snippet_update", size: "small", priority: "critical", category: "Structure", batch: "Hub update", created: today(),
+      pageTitle: "Page checker (Snippets in WordPress)", link: a.site, issue: "Update the page checker to version " + want,
+      current: "Version " + (have || "unknown") + " is on the site.",
+      proposed: "Version " + want + ". The hub keeps a copy of the current code, switches the snippet off, saves the new code and switches it on (Code Snippets tests it as it saves), then checks the site reports version " + want + ". If anything is wrong it puts the old code back the same way. Undo puts the old version back too.",
+      why: "New fixes and checks need the latest page checker. Updating it here means no copying and pasting in WordPress." }];
+  }
+  function csSave(id, body) { return wpFetch("/code-snippets/v1/snippets/" + id, { method: "POST", body: body }); }
+  function findChecker() {
+    return wpFetch("/code-snippets/v1/snippets").then(function (list) {
+      var s = (list || []).filter(function (x) { return /WPT Hub page checker/i.test(x.name || ""); })[0];
+      if (!s) throw new Error("Couldn't find a snippet called \u201cWPT Hub page checker\u201d in Code Snippets. Nothing was changed.");
+      return wpFetch("/code-snippets/v1/snippets/" + s.id);
+    }, function (e) {
+      throw new Error(/no route|404/i.test(e.message) ? "The hub can't reach Code Snippets on the site, so it can't update the page checker. Nothing was changed." : /401|403|not allowed|permission/i.test(e.message) ? "The WordPress account the hub uses isn't allowed to change snippets (it needs to be an administrator). Nothing was changed." : e.message);
+    });
+  }
+  function siteChecker() { return wpFetch("/wpt-hub/v1/analytics?days=7").then(function (d) { return (d && d.version) || 0; }, function () { return 0; }); }
+  function waitChecker(want, tries) {
+    return siteChecker().then(function (v) {
+      if (v >= want || tries <= 1) return v;
+      return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return waitChecker(want, tries - 1); });
+    });
+  }
+  function putCheckerBack(id, code) {
+    return csSave(id, { active: false }).then(function () { return csSave(id, { code: code, active: true }); });
+  }
+  function setCheckerVersion(v) { var a = wpAuth(); if (a) { a.checkerVersion = v; save("wp-auth", a); } }
+  function pushChecker(p) {
+    var want = bundledChecker(), code = (window.WPT_SNIPPETS || {}).checker || "", sn, before;
+    if (!want || code.length < 1000) return Promise.reject(new Error("The hub's copy of the page checker is missing. Pull the latest hub from GitHub. Nothing was changed."));
+    return findChecker().then(function (s) { sn = s; return siteChecker(); }).then(function (v) {
+      before = v;
+      if (v >= want) { setCheckerVersion(v); return { before: "Version " + v, after: "Version " + v + " was already on the site. Nothing to change.", backup: "" }; }
+      var key = "checker-backup-" + Date.now();
+      save(key, { id: sn.id, code: sn.code, active: sn.active, version: v, ts: Date.now() });
+      return csSave(sn.id, { active: false }).then(function () { return csSave(sn.id, { code: code, active: true }); }).then(function (res) {
+        if (!res || res.code_error || !res.active) {
+          var why = res && res.code_error ? " Code Snippets said: " + [].concat(res.code_error).join(", line ") + "." : "";
+          return putCheckerBack(sn.id, sn.code).then(function () { throw new Error("Code Snippets wouldn't switch the new version on." + why + " The old version has been put back and is running. Tell Claude."); });
+        }
+        return waitChecker(want, 5).then(function (now) {
+          if (now < want) return putCheckerBack(sn.id, sn.code).then(function () { throw new Error("The site still reported version " + now + " after the update, so the old version has been put back and is running. Tell Claude."); });
+          setCheckerVersion(now);
+          return { before: "Version " + before, after: "Version " + now + ", switched on and checked", backup: key };
+        });
+      }, function (e) {
+        return putCheckerBack(sn.id, sn.code).then(function () { throw new Error(e.message + " The old version has been put back."); }, function () { throw new Error(e.message + " Putting the old version back also failed, so open Snippets in WordPress and check \u201cWPT Hub page checker\u201d is switched on."); });
+      });
+    });
+  }
+  function undoChecker(st) {
+    var b = load(st.backup || "", null);
+    if (!b || !b.code) return Promise.reject(new Error("The saved copy of the old page checker isn't in this browser, so Undo can't put it back. Nothing was changed."));
+    return putCheckerBack(b.id, b.code).then(function () { return waitChecker(b.version, 3); }).then(function (v) { setCheckerVersion(v); return { ok: true }; });
+  }
   function undoFix(p, st, force) {
+    if (p.type === "snippet_update") return undoChecker(st);
     if (!(p.pageId > 0) && st.pageId) p = Object.assign({}, p, { pageId: st.pageId });
     /* Site fixes (page checker 13) keep their copy under an id starting with "s". */
     if (st.backup && /^s\d/.test(st.backup)) return wpFetch("/wpt-hub/v1/site-undo", { method: "POST", body: { backup: st.backup, force: force ? 1 : 0 } });
