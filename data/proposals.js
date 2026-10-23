@@ -20,6 +20,8 @@
      Waiting for you in the same release: set reopen to a new stamp (date-time) and reopenNote to why it's back.
      Connor should never have to move a failed fix back himself. Its last push stays in the card's history.
    page_restore: a broken page. The card lists Elementor's own saved versions to restore from.
+   Human checks: anything Claude thinks a person should look at (how a page reads, feels or works for a visitor,
+     not just how Google sees it) goes into Your jobs as a "Human check" job, with what to look at and why.
    Size: "small" pushes after one approval. "big" asks for a second confirmation. */
 
 window.WPT_PROPOSALS = [
@@ -1812,6 +1814,14 @@ window.WPT_PROPOSALS = [
 
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
+ {
+  "id": "human-check-contact-1",
+  "job": "Human check: the Contact page, as a visitor would see it",
+  "page": "Contact (westpiertech.com/contact/)",
+  "details": "The Contact page is where leads turn into enquiries, so it's worth five minutes as a customer rather than as Google. Open it on your laptop and on your phone. Claude looked at it this morning and thinks these need your eye. Tick off what you agree with and tell Claude which ones to turn into fixes.\n\nFirst impression\n1. A big empty strip at the top (the theme adds 152px of space), then a form with no heading. Nothing tells someone they're in the right place until they scroll past the form.\n2. Your address, phone numbers and emails sit below the form. Someone who'd rather ring has to scroll past it to find a number. Should the details sit above or beside the form?\n3. The H1 is \"📞 Contact Us\". Would \"Contact West Pier Technologies\" with a one-line intro (who you'll speak to, how fast you reply) read better?\n\nOn a phone\n4. None of the phone numbers are tappable links. On a mobile, people expect to tap a number to call. Check it on your phone.\n\nThe form\n5. The button just says \"Submit\". Something like \"Send my enquiry\" tells people what happens.\n6. There's no line about what you do with their details (a privacy note or link). Public sector buyers in particular look for this.\n7. Send yourself a test enquiry and check it reaches the right inbox, and how fast someone would see it.\n\nDetails to confirm\n8. The emails all use @westpiertele.com while the site is westpiertech.com. Are those still the right addresses? There's already a job to check info@ still delivers.\n9. Four numbers are listed, with 01273 391200 as the 24/7 Helpdesk. Is that the number you want new customers to ring, or should sales get its own line at the top?\n10. The map is labelled \"West Pier Telecom\". Old name?\n\nTell Claude what you decide. The layout, heading and spacing can be written as push-ready fixes, and the rest as text changes.",
+  "size": "",
+  "alt": ""
+ },
  {
   "id": "avaya-list-1",
   "job": "Check the Avaya email list, then find our contacts for each company in Quistor",

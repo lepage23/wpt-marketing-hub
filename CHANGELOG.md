@@ -6,6 +6,16 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.32.2 · 2026-10-23 08:33 BST
+
+- **New job: Human check of the Contact page.** Ten things Claude thinks need a person's eye, from the empty strip at the top and the form with no heading, to phone numbers you can't tap on a mobile and the old @westpiertele.com emails.
+- **Human checks are now part of how Claude works.** Anything about how a page reads or works for a visitor, not just for Google, goes into Your jobs for you to check.
+- 517 tests, all passing.
+
+## Backup · 2026-10-23 08:29 BST
+
+`backup/v0.32.1-2026-10-23-0829`, taken before v0.32.2.
+
 ## v0.32.1 · 2026-10-23 08:28 BST
 
 - **Rejecting a fix is now logged.** Moving a card to Not doing writes a line to the Progress & change log with the date, time and page, like a push.
