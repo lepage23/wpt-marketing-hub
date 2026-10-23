@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.39.0 · 2026-10-23
+
+Weekly tasks on the main page.
+
+- **New "Weekly tasks" panel on Today.** Jobs that come round every week, with the steps written out and buttons to open the right places.
+- **First task: import the Google AI report.** It ticks itself off when you drop the export on the AI visibility tab, and resets every Monday. If a whole week is missed, it turns red.
+- **New counter on Today:** weekly tasks left this week.
+- The one-off reminder in "Needs you today" is gone, as the panel replaces it.
+
 ## v0.38.0 · 2026-10-23
 
 Google AI tracking.

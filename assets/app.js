@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.38.0";
-  var BUILT = "2026-10-23 14:02 BST";
+  var VERSION = "0.39.0";
+  var BUILT = "2026-10-23 14:12 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -249,6 +249,7 @@
       (function () { var d = psiData(); if (!d || !d.pages) return ""; var ok = Object.keys(d.pages).map(function (k) { return d.pages[k]; }).filter(function (r) { return !r.error && r.perf != null; }); if (!ok.length) return ""; var a = Math.round(ok.reduce(function (s, r) { return s + r.perf; }, 0) / ok.length); return stat(a + "/100", "Average mobile speed score", a < 50); })() +
       stat(pendingFixes().length, "Website fixes waiting for approval", pendingFixes().length > 0) +
       stat(jobsToDo(), "Your jobs to do", false) +
+      stat(weeklyLeft(), "Weekly tasks left this week", weeklyLeft() > 0) +
       stat(inbox.length, "Inbox items flagged", inbox.length > 0) +
       stat(plan.length, "Content pieces in progress", false) + "</div>"));
 
@@ -259,7 +260,7 @@
     }).concat((function () { var fs = fixState(); return proposals().filter(function (p) { return !p.example && isDueBackFix(fs[p.id]); }).map(function (p) {
       var st = fs[p.id];
       return { chip: '<span class="chip info">Fix</span>', t: p.issue || p.pageTitle || "Fix", s: "Back from In progress, next action due " + fmtDay(st.nextDate) + (st.progressNote ? " · " + st.progressNote : "") };
-    }); })()).concat(aiGscDue() ? [{ chip: '<span class="chip info">AI</span>', t: "Import this week's Google AI report", s: "Search Console, Performance, Generative AI, last 7 days, Export. Drop the zip on Website & SEO, AI visibility. About two minutes." }] : []).concat(inbox.slice(0, 5).map(function (m) {
+    }); })()).concat(inbox.slice(0, 5).map(function (m) {
       return { chip: '<span class="chip ' + (m.category === "Lead" ? "flag" : m.category === "Complaint" ? "bad" : "info") + '">' + esc(m.category) + "</span>", t: m.subject, s: m.from + " · " + (m.why || "") };
     }));
     p1.appendChild(el(items.length ? '<div class="list">' + items.map(function (i) {
@@ -274,10 +275,41 @@
       }).join("") + "</div>"));
     }
     grid.appendChild(p1); grid.appendChild(p2); main.appendChild(grid);
+    grid.insertAdjacentElement("beforebegin", weeklyPanel());
     var gu = el('<div id="today-google"></div>'); grid.insertAdjacentElement("beforebegin", gu);
     gu.innerHTML = updateNotice(load("google-updates", null));
     googleUpdates(false).then(function (d) { if (gu.isConnected) gu.innerHTML = updateNotice(d); }, function () { /* the status page is optional */ });
   }
+  /* Weekly tasks: jobs that come round every Monday. Each one ticks itself off when the hub sees it done,
+     so there's nothing to remember to tick. Add more to WEEKLY_TASKS as they come up. */
+  function weekStart(d) { d = new Date(d || Date.now()); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d; }
+  var WEEKLY_TASKS = [
+    { id: "ai-gsc", t: "Import the Google AI report", mins: "About 2 minutes",
+      steps: ["Open Search Console, then Performance, then Generative AI.", "Set the date to the last 7 days.", "Click Export, then Download CSV.", "Drop the zip on the AI visibility tab. This task ticks itself off."],
+      open: { href: "https://search.google.com/search-console", label: "Open Search Console", ext: true }, go: { href: "#seo", tab: "ai", label: "Go to the drop zone" },
+      last: function () { var l = aiGscLatest(); return l ? l.importedTs : null; } }
+  ];
+  function weeklyState(task, now) {
+    var last = task.last(), mon = weekStart(now).getTime(), prevMon = mon - 7 * 864e5;
+    if (last && last >= mon) return { done: true, label: "Done " + new Date(last).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) };
+    if (!last) return { done: false, label: "Not done yet", late: false };
+    return { done: false, late: last < prevMon, label: last < prevMon ? "Missed last week too" : "Due this week" };
+  }
+  function weeklyPanel() {
+    var st = WEEKLY_TASKS.map(function (t) { return weeklyState(t); }), left = st.filter(function (x) { return !x.done; }).length;
+    var p = panel("Weekly tasks", left ? left + " to do this week. They reset every Monday." : "All done this week. They reset on Monday.");
+    p.appendChild(el('<div class="list">' + WEEKLY_TASKS.map(function (t, i) {
+      var s = st[i];
+      return '<div class="list-item"><span class="chip ' + (s.done ? "good" : s.late ? "bad" : "flag") + '">' + (s.done ? "\u2713 Done" : "To do") + '</span><div><div class="t">' + esc(t.t) + ' <span class="muted" style="font-weight:400">· ' + esc(t.mins) + "</span></div>" +
+        '<div class="s">' + esc(s.label) + "</div>" +
+        (s.done ? "" : '<ol class="s" style="margin:6px 0 8px 18px;padding:0">' + t.steps.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>" +
+          '<div class="row"><a class="btn" href="' + t.open.href + '"' + (t.open.ext ? ' target="_blank" rel="noopener"' : "") + ">" + esc(t.open.label) + '</a> <a class="btn primary" href="' + t.go.href + '" data-seotab="' + t.go.tab + '">' + esc(t.go.label) + "</a></div>") +
+        "</div><span></span></div>";
+    }).join("") + "</div>"));
+    return p;
+  }
+  function weeklyLeft() { return WEEKLY_TASKS.filter(function (t) { return !weeklyState(t).done; }).length; }
+
   function stat(n, label, flag) {
     return '<div class="stat' + (flag ? " flag" : "") + '"><span class="n">' + esc(n) + '</span><span class="l">' + esc(label) + "</span></div>";
   }
