@@ -1728,6 +1728,14 @@ window.WPT_PROPOSALS = [
 /* Jobs only Connor can do. They appear in Your jobs. */
 window.WPT_JOBS = [
  {
+  "id": "avaya-list-1",
+  "job": "Check the Avaya email list, then find our contacts for each company in Quistor",
+  "page": "Leads (prospects/Avaya-email-targets.xlsx)",
+  "details": "25 organisations we think run Avaya, each with an email draft that explains what's changed at Avaya and why it matters to them. Both sheets are in the hub folder under prospects (pull origin in GitHub Desktop first).\n\n- Avaya-email-targets.xlsx: the 25 to email, with who to target, subject line and draft.\n- Avaya-users-UK.xlsx: the wider list of 61, including public sector.\n\n1. Read through the email list. Delete anyone who isn't a fit and fix any draft that doesn't sound like you.\n2. Check the Notes column. Rows built on old or unverified evidence (Saga, Think Money, HomeServe, Places for People, Findel) need a quick look on LinkedIn or their careers page to confirm they're still on Avaya.\n3. Sussex Police is our own customer. Check with Garry before anything goes to them.\n4. In Quistor, filter by the 25 company names and export the contacts to a spreadsheet. Include name, job title, email, phone and the date each record was last updated.\n5. Send the export to Claude. It'll match each company to the best primary contact, flag records that look out of date (the database hasn't had a proper refresh in about two years) and fill in the gaps by role.\n6. Send the emails one at a time from Outlook, not iContact.\n\nThe Avaya facts in the drafts are sourced on the sheet's \"Avaya facts used\" tab.",
+  "size": "",
+  "alt": ""
+ },
+ {
   "id": "php-security-1",
   "job": "Urgent: check the website's PHP has the 21 October security fix",
   "page": "SiteGround Site Tools (westpiertech.com)",

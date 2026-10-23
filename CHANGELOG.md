@@ -6,6 +6,15 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.30.3 · 2026-10-23 07:35 BST
+
+- **New job:** check the Avaya email list, then pull our contacts for each company from Quistor and send the export to Claude to match.
+- **New folder `prospects/`** with the two Avaya spreadsheets: the 25 email targets with drafts, and the wider list of 61 UK Avaya users.
+
+## Backup · 2026-10-23 07:30 BST
+
+`backup/v0.30.2-2026-10-23-0730`, taken before v0.30.3.
+
 ## v0.30.2 · 2026-10-22 18:15 BST
 
 - **Urgent repair, top of the Fix queue: Feature Comparison.** One push puts the page back to the 20 Aug 2026 version with its code intact. The hub reads the page back afterwards and checks it matches byte for byte; if it doesn't, it puts the old text back and says so. Works with the page checker you have now, and with version 15. Undo is in Done.
