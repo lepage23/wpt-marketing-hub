@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.30.3";
-  var BUILT = "2026-10-23 07:30 BST";
+  var VERSION = "0.31.0";
+  var BUILT = "2026-10-23 07:47 BST";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -1731,7 +1731,7 @@
     noH1.forEach(function (r) {
       out.push({ id: "auto-h1-" + autoKey(r.link), auto: true, type: "elementor_h1", size: "small", created: today, batch: "Found by audit", priority: "high", category: "Structure",
         postType: "pages", pageId: 0, pageTitle: r.title, link: r.link, issue: "No H1 heading",
-        current: "(no H1 on the live page)", proposed: "The first heading on the page becomes the H1. Its wording stays the same.",
+        current: "(no H1 on the live page)", proposed: "The first heading on the page becomes the H1. Its wording and colour stay the same.",
         why: "The H1 is the main heading that tells search engines and AI tools what the page is about. Only the tag on the top heading changes, its wording stays. It may look bigger afterwards, so check the page and use Undo if it looks wrong." });
     });
     var multiH1 = idx.filter(function (p) { return (p.h1 || []).length > 1; }).map(function (p) { return pageRef(p, p.h1.length + " H1s: " + p.h1.slice(0, 3).join(" / ")); });
@@ -2538,7 +2538,8 @@
     button_wrap: "Button text wraps onto two lines", text_clipped: "Text cut off", overflow: "Sticks out past the screen edge", no_alt: "Image with no alt text",
     stranded_punct: "Punctuation on its own line", overflow_box: "Image hangs out of its box", repeat_word: "Same word twice in a heading",
     misaligned: "Doesn't line up with the text above", off_centre: "Box isn't centred", uneven_space: "Much more space below than above",
-    broken_word: "Word broken across two lines", loose_lines: "Big gaps between heading lines", big_padding: "Too much empty space in a box"
+    broken_word: "Word broken across two lines", loose_lines: "Big gaps between heading lines", big_padding: "Too much empty space in a box",
+    invisible_text: "Heading you can't see (same colour as the background)"
   };
   var FIT_SET = { "object-fit": "contain", "object-fit_tablet": "contain", "object-fit_mobile": "contain", "object-position": "center center" };
   function modeOf(w) { return w >= 1025 ? "desktop" : w >= 768 ? "tablet" : "phone"; }
@@ -2700,9 +2701,10 @@
       misaligned: ["Open the page in Elementor and click the item listed.", "In Advanced, set its left margin and padding to match the text above (usually 0).", "Update."],
       off_centre: ["Open the page in Elementor and click the box (the section or container).", "In Advanced or Layout, make the left and right margins the same, or set the content width so it centres.", "Update."],
       uneven_space: ["Open the page in Elementor and click the box.", "In Advanced, make the bottom padding match the top.", "Update."],
+      invisible_text: ["Tell Claude straight away. It writes a repair card that sets the heading back to a colour you can see.", "If you need it fixed before then: open the page in Elementor, click the heading, and in Style set Text Color to the dark navy (#0C1B2C).", "Update, then run the display check again."],
       no_alt: ["Open the image in the Media Library.", "Fill in Alternative Text with a short description of what it shows (or the company name for a logo).", "Save. Google and AI tools use this to understand the image."]
     };
-    var PRI = { broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
+    var PRI = { invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
     /* Words breaking, loose heading lines and wrapping buttons outside Elementor widgets the hub can edit:
        one small style fix, scoped to the pages where they were seen. */
     var cssFix = displayCss(groups, today);
@@ -2829,17 +2831,17 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
   function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
   function goLabel(p) {
     if (p.type === "content_set") return "Approve and repair the page";
     if (p.type === "site_edit") return { h1: "Approve and make it the H1", h1_one: "Approve and keep one H1", alt: "Approve and add the alt text", relink: "Approve and fix the link", menu_add: "Approve and add to the menu", css: "Approve and fix the display", llms: "Approve and publish llms.txt", option: p.params && p.params.key === "blog_public" ? "Approve and let Google index the site" : "Approve and save the setting", meta: p.params && p.params.key === "rank_math_robots" ? "Approve and let Google index it" : "Approve and clear it", redirect_code: "Approve and make it permanent" }[p.op] || "Approve and push";
-    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : "Approve and push live";
+    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : "Approve and push live";
   }
   /* Fixes whose box only describes what happens, rather than holding text to edit. */
-  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|content_set/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
+  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|elementor_h1_look|content_set/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
   function parseFaq(text) {
@@ -2893,7 +2895,23 @@
     }).map(function (x) { return x.p; });
   }
   function fixState() { return load("fix-state", {}); }
-  function setFix(id, patch) { var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s); }
+  function setFix(id, patch) {
+    /* Every change of state is time-stamped, so Done can list the newest first and each card shows when it happened. */
+    if (patch && /^(pushed|done|undone|rejected)$/.test(patch.status || "") && !patch.ts) patch = Object.assign({ ts: Date.now() }, patch);
+    var s = fixState(); s[id] = Object.assign({}, s[id] || {}, patch); save("fix-state", s);
+  }
+  /* When a fix last moved: the stamp if there is one, otherwise the date shown on older cards. */
+  function fixTime(st) {
+    if (!st) return 0;
+    if (st.ts) return st.ts;
+    var txt = st.status === "undone" ? st.undoneAt : st.status === "pushed" ? st.pushedAt : st.doneAt;
+    var t = Date.parse(String(txt || st.pushedAt || st.doneAt || "").replace(",", ""));
+    return isNaN(t) ? (st.doneTs || 0) : t;
+  }
+  function stampText(ts) { return new Date(ts).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  function newestFirst(list, s) {
+    return list.map(function (p, i) { return { p: p, i: i, t: fixTime(s[p.id]) }; }).sort(function (a, b) { return b.t - a.t || a.i - b.i; }).map(function (x) { return x.p; });
+  }
   function pendingFixes() {
     var s = fixState();
     return proposals().filter(function (p) { return !p.example && !p.parent && cardMode(p) !== "job" && isOpenFix(s[p.id]); });
@@ -3128,6 +3146,13 @@
           return needsV12(err);
         });
     }
+    if (p.type === "elementor_h1_look") {
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: "h1_look", find: p.find, level: p.level || 2 } })
+        .then(function (r) { return { before: r.before, after: r.after, backup: r.backup }; }, function (err) {
+          if (/Unknown edit type|no route/i.test(err.message)) throw new Error("This repair needs page checker version 16. On the Website & SEO page click Copy page checker code, replace the code in Snippets, WPT Hub page checker, save, then push again. Nothing was changed.");
+          throw err;
+        });
+    }
     if (p.type === "elementor_faq") {
       var faq;
       try { faq = parseFaq(text); } catch (e) { return Promise.reject(e); }
@@ -3285,7 +3310,7 @@
     if (p.type === "text_swap") p = Object.assign({}, p, { type: st.backup ? "elementor_swap" : "content_replace" });
     if (p.type === "content_set") return wpFetch(base + p.pageId, { method: "POST", body: { content: st.before || "" } });
     var base = "/wp/v2/" + p.postType + "/";
-    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq" || p.type === "elementor_h1") {
+    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq" || p.type === "elementor_h1" || p.type === "elementor_h1_look") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
     }
     if (p.type === "set_status") return wpFetch(base + p.pageId, { method: "POST", body: { status: st.before || "publish" } });
@@ -3338,8 +3363,8 @@
       var groups = {
         waiting: sortFixGroup(all.filter(function (p) { return !p.parent && cardMode(p) !== "job" && isOpenFix(s[p.id]); }), s, "waiting"),
         inprogress: sortFixGroup(all.filter(function (p) { return !p.parent && cardMode(p) !== "job" && isParkedFix(s[p.id]); }), s, "inprogress"),
-        pushed: all.filter(function (p) { return s[p.id] && /^(pushed|undone|done)$/.test(s[p.id].status); }),
-        rejected: all.filter(function (p) { return s[p.id] && s[p.id].status === "rejected"; })
+        pushed: newestFirst(all.filter(function (p) { return s[p.id] && /^(pushed|undone|done)$/.test(s[p.id].status); }), s),
+        rejected: newestFirst(all.filter(function (p) { return s[p.id] && s[p.id].status === "rejected"; }), s)
       };
       var names = { waiting: "Waiting for you", inprogress: "In progress", pushed: "Done", rejected: "Not doing" };
       tabs.innerHTML = Object.keys(groups).map(function (g) {
@@ -3368,7 +3393,17 @@
     return '<div class="row">' + '<span class="chip ' + PRI_CHIP[p.priority || "medium"] + '">' + PRI_LABEL[p.priority || "medium"] + "</span>" +
       '<span class="chip info">' + esc(typeLabel(p)) + "</span>" + '<span class="chip">' + esc(p.category || "Content") + "</span>" +
       (p.auto ? '<span class="chip">Found by audit</span>' : "") + (p.example ? '<span class="chip ex">example</span>' : "") +
-      (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">Still found on the last audit</span>' : "") + "</div>";
+      (st.status === "done" ? '<span class="chip good">Done</span>' : "") + (st.reopened && !st.status ? '<span class="chip bad">Still found on the last audit</span>' : "") +
+      timeChip(p, st) + "</div>";
+  }
+  /* Date and time on every card: when it was pushed, done or undone, or when Claude wrote it. */
+  function timeChip(p, st) {
+    var raw = fixState()[p.id] || {}, t = fixTime(raw), what = { pushed: "Pushed", undone: "Undone", done: "Done", rejected: "Closed" }[raw.status];
+    if (what && t) return '<span class="chip time" title="' + esc(new Date(t).toISOString()) + '">' + what + " " + esc(stampText(t)) + "</span>";
+    if (!p.created) return "";
+    var c = Date.parse(String(p.created).replace(" ", "T"));
+    if (isNaN(c)) return '<span class="chip time">Written ' + esc(p.created) + "</span>";
+    return '<span class="chip time">Written ' + esc(/\d:\d/.test(p.created) ? stampText(c) : new Date(c).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })) + "</span>";
   }
   function offerAlreadyDone(p, box, redraw) {
     var b = el('<div class="row" style="margin-top:8px"><span class="muted" style="font-size:.86rem">If this has already been sorted, close it.</span><button type="button" class="btn small primary">Close it, already sorted</button></div>');
@@ -4186,7 +4221,7 @@
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
           if (r.skipped && r.skipped.length) toast(r.skipped.length + " image" + (r.skipped.length > 1 ? "s" : "") + " skipped: not in the Media Library");
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: typeLabel(p), action: p.type === "site_edit" ? (SITE_OP_LABEL[p.op] || "Site fix") + " pushed" : p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : "Pushed live" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: typeLabel(p), action: p.type === "site_edit" ? (SITE_OP_LABEL[p.op] || "Site fix") + " pushed" : p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : p.type === "elementor_h1_look" ? "H1 colour repaired" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {

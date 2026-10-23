@@ -38,7 +38,7 @@ $page[0]['elements'][0]['elements'][1]['settings']['title']='';
 $META[10]['_elementor_data']=json_encode($page);
 $h=$edit(new WP_REST_Request(array('post_id'=>10,'op'=>'h1')));
 $now=json_decode($META[10]['_elementor_data'],true); $html=$now[0]['elements'][0]['elements'][0]['settings']['html'];
-ok(!is_wp_error($h) && strpos($html,'<h1 class="ct">📞 Contact Us</h1>')!==false,'no usable heading widget: the heading in the HTML block becomes the H1, class kept');
+ok(!is_wp_error($h) && strpos($html,'<h1 class="wpt-was-h2 ct">📞 Contact Us</h1>')!==false,'no usable heading widget: the heading in the HTML block becomes the H1, class kept, colour kept');
 ok(strpos($html,'<b>West Pier Telecom Ltd</b>')!==false,'the rest of the block is untouched');
 $u=$undo(new WP_REST_Request(array('post_id'=>10,'backup'=>$h['backup'])));
 ok(!is_wp_error($u) && json_decode($META[10]['_elementor_data'],true)==$page,'undo puts the H2 back');

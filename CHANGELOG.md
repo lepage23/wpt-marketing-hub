@@ -6,6 +6,21 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.31.0 · 2026-10-23 08:05 BST
+
+Fix for headings turning invisible after the hub's H1 fix. **Needs page checker version 16.**
+
+- **What went wrong.** Elementor's Site Settings colour every H1 white, for the dark banners. When the hub turned an H2 into the H1 on a light page, it went white on white. Claude checked all 41 pages: two are affected, Let's get started and 8x8 Feature Matrix with Engage Voice.
+- **Two urgent repair cards, top of the Fix queue.** Each keeps the heading as the H1 and puts it back to the dark navy it was. Nothing changes until you approve. Undo is in Done.
+- **Future H1 fixes keep their colour.** Page checker 16 tags any heading the hub turns into the H1, and a small style rule keeps it the colour it had.
+- **The display check now spots invisible headings** (text the same colour as its background) and raises them as critical.
+- **Done lists the newest first**, and every card shows when it happened: Pushed, Done or Undone with the date and time, or Written with the date for cards still waiting.
+- 508 tests, all passing.
+
+## Backup · 2026-10-23 07:43 BST
+
+`backup/v0.30.3-2026-10-23-0743`, taken before v0.31.0.
+
 ## v0.30.3 · 2026-10-23 07:35 BST
 
 - **New job:** check the Avaya email list, then pull our contacts for each company from Quistor and send the export to Claude to match.

@@ -32,7 +32,7 @@ function e($p){global $E;return $E(new WP_REST_Request($p));} function u($b,$f=0
 /* H1 on a block editor page */
 $POSTS[40]=$orig="<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph -->\n<!-- wp:heading --><h2 class=\"wp-block-heading\">Feature table</h2><!-- /wp:heading -->";
 $r=e(array('op'=>'h1','post_id'=>40));
-ok(!is_wp_error($r)&&strpos($POSTS[40],'<!-- wp:heading {"level":1} --><h1 class="wp-block-heading">Feature table</h1>')!==false,'h1: block heading becomes H1, block comment kept valid');
+ok(!is_wp_error($r)&&strpos($POSTS[40],'<!-- wp:heading {"level":1} --><h1 class="wpt-was-h2 wp-block-heading">Feature table</h1>')!==false,'h1: block heading becomes H1, block comment kept valid');
 u($r['backup']); ok($POSTS[40]===$orig,'h1: undo puts it back exactly');
 /* H1 on the blog page */
 $r=e(array('op'=>'h1','post_id'=>30));
@@ -111,7 +111,7 @@ ok(!is_wp_error($r)&&$OPT['rank-math-options-titles']['open_graph_image_id']===5
 /* The Feature Comparison case: code with backslashes must come through untouched */
 $POSTS[60]=$o60="<h2>Feature Comparison</h2>\n<script>var re=/\\d+/; var s=\"a\\nb\"; document.querySelector('select');</script>";
 $r=e(array('op'=>'h1','post_id'=>60));
-ok(!is_wp_error($r)&&strpos($POSTS[60],'<h1>Feature Comparison</h1>')===0&&strpos($POSTS[60],'/\\d+/')!==false&&strpos($POSTS[60],'"a\\nb"')!==false,'h1: page code keeps every backslash');
+ok(!is_wp_error($r)&&strpos($POSTS[60],'<h1 class="wpt-was-h2">Feature Comparison</h1>')===0&&strpos($POSTS[60],'/\\d+/')!==false&&strpos($POSTS[60],'"a\\nb"')!==false,'h1: page code keeps every backslash');
 u($r['backup']); ok($POSTS[60]===$o60,'undo: page code back exactly');
 /* Repairing a page: the whole text goes back exactly, checked, and can be undone */
 $POSTS[61]=$broken='<script>html += "<th class="tpfc">";</script>';

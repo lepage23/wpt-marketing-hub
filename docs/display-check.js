@@ -281,6 +281,30 @@
         padTop: Math.round(pt), padBottom: Math.round(pb), padTo: PADTO, detail: Math.round(pt) + "px empty at the top, " + Math.round(pb) + "px at the bottom" });
     });
 
+    /* Text you can't see: headings and short text the same colour as what's behind them (version 16).
+       Catches a heading turned white by the theme's H1 style on a white background. */
+    function rgb(c) { var m = String(c).match(/[\d.]+/g); return m ? m.map(Number) : null; }
+    function lum(c) { return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2]); }
+    function ch(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    function behind(el) {
+      for (var e = el; e && e !== document.documentElement; e = e.parentElement) {
+        var cs = getComputedStyle(e);
+        if (cs.backgroundImage && cs.backgroundImage !== "none") return null;
+        var c = rgb(cs.backgroundColor);
+        if (c && (c.length < 4 || c[3] > 0.5)) return c;
+      }
+      return [255, 255, 255];
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("h1, h2, h3, h4, .elementor-heading-title"), function (el) {
+      var t = el.textContent.replace(/\s+/g, " ").trim();
+      if (t.length < 3 || !shown(el) || inHiddenSlide(el)) return;
+      var fg = rgb(getComputedStyle(el).color), bg = behind(el);
+      if (!fg || !bg || (fg.length > 3 && fg[3] < 0.5)) return;
+      var a = lum(fg), b = lum(bg), ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      if (ratio < 1.6) add({ kind: "invisible_text", text: t.slice(0, 60), tag: el.tagName.toLowerCase(), widget: widgetOf(el), at: where(el),
+        detail: el.tagName + " text is almost the same colour as the background (contrast " + Math.round(ratio * 10) / 10 + " to 1)" });
+    });
+
     var m = document.body.className.match(/(?:page-id|postid)-(\d+)/);
     var msg = { wpt: "display-check", url: location.href.split("?")[0], width: W, pageId: m ? +m[1] : 0, issues: out };
     try { (window.opener || window.parent).postMessage(msg, "*"); } catch (e) {}

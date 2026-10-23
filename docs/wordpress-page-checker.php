@@ -1,6 +1,6 @@
 <?php
 /**
- * WPT Marketing Hub: page checker (version 15: every change is written exactly, and any page can be restored from its saved revisions).
+ * WPT Marketing Hub: page checker (version 16: a heading the hub turns into the H1 keeps the colour it had, instead of taking the theme's H1 style).
  *
  * Lets the hub see the site the way a search engine does.
  *
@@ -20,6 +20,25 @@
  * Replace everything in the code box with everything below this comment block,
  * then Save Changes. (New install: Snippets > Add New, type PHP, Run everywhere.)
  */
+
+/* Version 16: when the hub turns a heading into the H1, the theme's H1 style takes over (white on this
+ * site, made for dark banners), so a heading on a white background vanished. The new H1 is tagged
+ * wpt-was-h2 (or h3...) and a small style rule, printed on every page, keeps it the colour it was. */
+function wpt_hub_keep_look( $open, $level ) {
+	$level = max( 2, min( 6, (int) $level ) );
+	$cls   = 'wpt-was-h' . $level;
+	if ( false !== stripos( $open, 'wpt-was-h' ) ) {
+		return $open;
+	}
+	if ( preg_match( '#\sclass\s*=\s*(["\'])#i', $open ) ) {
+		return preg_replace( '#(\sclass\s*=\s*(["\']))#i', '$1' . $cls . ' ', $open, 1 );
+	}
+	return preg_replace( '#^<h1#i', '<h1 class="' . $cls . '"', $open, 1 );
+}
+function wpt_hub_keep_class( $classes, $level ) {
+	$cls = 'wpt-was-h' . max( 2, min( 6, (int) $level ) );
+	return false !== strpos( (string) $classes, 'wpt-was-h' ) ? (string) $classes : trim( $classes . ' ' . $cls );
+}
 
 /* Write a page's text exactly as given (version 15). Saving through wp_update_post strips backslashes
  * (and, for some accounts, scripts), which broke the Feature Comparison tool's code. A revision of the
@@ -324,7 +343,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 15, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 16, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -657,11 +676,16 @@ add_action( 'rest_api_init', function () {
 				if ( isset( $pick['kind'] ) && 'html' === $pick['kind'] ) {
 					/* Only the tag changes. Keep any class or style on it, so it looks the same. */
 					$h1 = preg_replace( '#^<h[1-6]#i', '<h1', preg_replace( '#</h[1-6]>$#i', '</h1>', $pick['whole'] ) );
+					$h1 = preg_replace_callback( '#^<h1[^>]*>#i', function ( $o ) use ( $pick ) {
+						return wpt_hub_keep_look( $o[0], (int) substr( $pick['tag'], 1 ) );
+					}, $h1, 1 );
 					$node['settings'][ $pick['key'] ] = substr_replace( (string) $node['settings'][ $pick['key'] ], $h1, $pick['at'], strlen( $pick['whole'] ) );
 				} elseif ( isset( $pick['kind'] ) && 'box' === $pick['kind'] ) {
-					$node['settings']['title_size'] = 'h1';
+					$node['settings']['title_size']  = 'h1';
+					$node['settings']['css_classes'] = wpt_hub_keep_class( isset( $node['settings']['css_classes'] ) ? $node['settings']['css_classes'] : '', (int) substr( $pick['tag'], 1 ) );
 				} else {
 					$node['settings']['header_size'] = 'h1';
+					$node['settings']['css_classes'] = wpt_hub_keep_class( isset( $node['settings']['css_classes'] ) ? $node['settings']['css_classes'] : '', (int) substr( $pick['tag'], 1 ) );
 				}
 				$wtype = isset( $node['widgetType'] ) ? $node['widgetType'] : 'heading';
 				unset( $node );
@@ -669,6 +693,62 @@ add_action( 'rest_api_init', function () {
 				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
 				return array( 'ok' => true, 'backup' => $bid, 'element' => $pick['id'], 'widget' => $wtype, 'before' => $label, 'after' => 'H1: ' . $plain( $pick['text'] ) );
+			}
+			if ( 'h1_look' === $op ) {
+				/* h1_look (version 16): repair an H1 the hub made before version 16, so it keeps the colour it had
+				 * as an H2 (or H3...). Only H1s whose text matches "find" are touched. Nothing else on the page changes. */
+				$was = max( 2, min( 6, $level ? $level : 2 ) );
+				if ( strlen( $find ) < 3 ) {
+					return new WP_Error( 'wpt_edit', 'The fix doesn\'t say which heading to repair.', array( 'status' => 400 ) );
+				}
+				$before = wp_json_encode( $data );
+				$n      = 0;
+				$fixw   = function ( &$els ) use ( &$fixw, &$n, $find, $plain, $was ) {
+					foreach ( $els as &$el ) {
+						$w  = isset( $el['widgetType'] ) ? $el['widgetType'] : '';
+						if ( isset( $el['settings'] ) && is_array( $el['settings'] ) ) {
+							$st = &$el['settings'];
+							if ( 'heading' === $w && isset( $st['header_size'] ) && 'h1' === $st['header_size'] && isset( $st['title'] ) && false !== stripos( $plain( $st['title'] ), $find ) ) {
+								$new = wpt_hub_keep_class( isset( $st['css_classes'] ) ? $st['css_classes'] : '', $was );
+								if ( ! isset( $st['css_classes'] ) || $new !== $st['css_classes'] ) {
+									$st['css_classes'] = $new;
+									$n++;
+								}
+							}
+							if ( ( 'icon-box' === $w || 'image-box' === $w ) && isset( $st['title_size'] ) && 'h1' === $st['title_size'] && isset( $st['title_text'] ) && false !== stripos( $plain( $st['title_text'] ), $find ) ) {
+								$new = wpt_hub_keep_class( isset( $st['css_classes'] ) ? $st['css_classes'] : '', $was );
+								if ( ! isset( $st['css_classes'] ) || $new !== $st['css_classes'] ) {
+									$st['css_classes'] = $new;
+									$n++;
+								}
+							}
+							foreach ( array( 'editor', 'html' ) as $k ) {
+								if ( isset( $st[ $k ] ) && is_string( $st[ $k ] ) && false !== stripos( $st[ $k ], '<h1' ) ) {
+									$st[ $k ] = preg_replace_callback( '#(<h1(?:\s[^>]*)?>)(.*?)(</h1>)#is', function ( $m ) use ( &$n, $find, $plain, $was ) {
+										if ( false === stripos( $plain( $m[2] ), $find ) || false !== stripos( $m[1], 'wpt-was-h' ) ) {
+											return $m[0];
+										}
+										$n++;
+										return wpt_hub_keep_look( $m[1], $was ) . $m[2] . $m[3];
+									}, $st[ $k ] );
+								}
+							}
+							unset( $st );
+						}
+						if ( ! empty( $el['elements'] ) ) {
+							$fixw( $el['elements'] );
+						}
+					}
+					unset( $el );
+				};
+				$fixw( $data );
+				if ( ! $n ) {
+					return new WP_Error( 'wpt_edit', 'No H1 with that text needs repairing on this page (it may already be fixed). Nothing was changed.', array( 'status' => 409 ) );
+				}
+				$bid = 'b' . time() . wp_rand( 100, 999 );
+				update_post_meta( $id, '_wpt_hub_bk_' . $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				$save( $id, $data );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => '', 'widget' => 'h1', 'before' => 'H1 "' . $find . '" in the theme\'s H1 colour', 'after' => 'H1 "' . $find . '" kept in its H' . $was . ' colour' );
 			}
 			if ( 'faq' === $op ) {
 				/* faq: add an FAQ block to the page, or replace the one the hub added before (version 11).
@@ -1792,6 +1872,30 @@ add_action( 'wp_footer', function () {
         padTop: Math.round(pt), padBottom: Math.round(pb), padTo: PADTO, detail: Math.round(pt) + "px empty at the top, " + Math.round(pb) + "px at the bottom" });
     });
 
+    /* Text you can't see: headings and short text the same colour as what's behind them (version 16).
+       Catches a heading turned white by the theme's H1 style on a white background. */
+    function rgb(c) { var m = String(c).match(/[\d.]+/g); return m ? m.map(Number) : null; }
+    function lum(c) { return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2]); }
+    function ch(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    function behind(el) {
+      for (var e = el; e && e !== document.documentElement; e = e.parentElement) {
+        var cs = getComputedStyle(e);
+        if (cs.backgroundImage && cs.backgroundImage !== "none") return null;
+        var c = rgb(cs.backgroundColor);
+        if (c && (c.length < 4 || c[3] > 0.5)) return c;
+      }
+      return [255, 255, 255];
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("h1, h2, h3, h4, .elementor-heading-title"), function (el) {
+      var t = el.textContent.replace(/\s+/g, " ").trim();
+      if (t.length < 3 || !shown(el) || inHiddenSlide(el)) return;
+      var fg = rgb(getComputedStyle(el).color), bg = behind(el);
+      if (!fg || !bg || (fg.length > 3 && fg[3] < 0.5)) return;
+      var a = lum(fg), b = lum(bg), ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      if (ratio < 1.6) add({ kind: "invisible_text", text: t.slice(0, 60), tag: el.tagName.toLowerCase(), widget: widgetOf(el), at: where(el),
+        detail: el.tagName + " text is almost the same colour as the background (contrast " + Math.round(ratio * 10) / 10 + " to 1)" });
+    });
+
     var m = document.body.className.match(/(?:page-id|postid)-(\d+)/);
     var msg = { wpt: "display-check", url: location.href.split("?")[0], width: W, pageId: m ? +m[1] : 0, issues: out };
     try { (window.opener || window.parent).postMessage(msg, "*"); } catch (e) {}
@@ -1868,6 +1972,11 @@ add_action( 'rest_api_init', function () {
 		}
 		$new = preg_replace( '#<h[1-6](\s|>)#i', '<' . $to . '$1', $new, 1 );
 		$new = preg_replace( '#</h[1-6]>\s*$#i', '</' . $to . '>', $new );
+		if ( 'h1' === $to && (int) $m[1][0] > 1 ) {
+			$new = preg_replace_callback( '#<h1(\s[^>]*)?>#i', function ( $o ) use ( $m ) {
+				return wpt_hub_keep_look( $o[0], (int) $m[1][0] );
+			}, $new, 1 );
+		}
 		return substr_replace( $html, $new, $at, strlen( $whole ) );
 	};
 	$heading_re = '#(?:<!-- wp:heading(?: \{.*?\})? -->\s*)?<h([1-6])(\s[^>]*)?>(.*?)</h\1>#is';
@@ -2335,6 +2444,13 @@ add_action( 'init', function () {
 	}
 } );
 add_action( 'wp_head', function () {
+	/* Version 16: H1s the hub made keep the colour they had as an H2 (or H3...). The theme's own
+	 * heading colour is used, falling back to the page's text colour. */
+	$keep = array();
+	for ( $i = 2; $i <= 6; $i++ ) {
+		$keep[] = 'body h1.wpt-was-h' . $i . ', body .wpt-was-h' . $i . ' h1.elementor-heading-title, body .wpt-was-h' . $i . ' h1.elementor-icon-box-title, body .wpt-was-h' . $i . ' h1.elementor-image-box-title { color: var(--theme-heading-' . $i . '-color, var(--theme-headings-color, inherit)); }';
+	}
+	echo "\n<style id=\"wpt-hub-h1-look\">" . implode( ' ', $keep ) . "</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- fixed text.
 	$css = get_option( 'wpt_hub_css', '' );
 	if ( $css ) {
 		echo "\n<style id=\"wpt-hub-css\">\n" . wp_strip_all_tags( $css ) . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput

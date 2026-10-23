@@ -137,6 +137,7 @@ td input:hover, td select:hover, td input:focus, td select:focus { border-color:
 .chip.flag { background: var(--flag-soft); color: var(--flag); }
 .chip.bad { background: var(--bad-soft); color: var(--bad); }
 .chip.info { background: var(--accent-soft); color: var(--accent); }
+.chip.time { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
 .chip.ex { background: transparent; border: 1px dashed var(--muted); }
 
 .notice { border-left: 3px solid var(--flag); background: var(--flag-soft); padding: 10px 14px; border-radius: 0 var(--radius) var(--radius) 0; font-size: .88rem; }
