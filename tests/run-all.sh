@@ -3,6 +3,9 @@
 cd "$(dirname "$0")/.." || exit 1
 out=$( {
   node tests/push-undo.test.js assets/app.js
+  node tests/ai-gsc.test.js assets/app.js
+  node tests/weekly-tasks.test.js assets/app.js
+  node tests/full-audit.test.js assets/app.js
   node tests/done-order.test.js assets/app.js
   node tests/checker-update.test.js assets/app.js ./data/snippets.js
   node tests/content-append.test.js assets/app.js ./data/proposals.js
