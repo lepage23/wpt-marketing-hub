@@ -2288,7 +2288,15 @@ window.WPT_JOBS = [
    "Ask Matt to update the footer badge link to a copy of the certificate on westpiertech.com.",
    "Tell Claude which email address to use and it can sweep the rest of the site for westpiertele.com links."
   ]
- }
+ },
+{
+ "id": "moz-score-1",
+ "job": "Look at the Moz score for westpiertech.com",
+ "page": "moz.com (Domain Analysis), Website & SEO",
+ "details": "Moz gives every site a Domain Authority score from 1 to 100, based mostly on how many other sites link to it and how good those sites are. Google doesn't use it, but it's a fair way to see how our link profile compares with rivals, and a baseline to measure the Google reviews and directory work against.\n\n1. Go to moz.com and use the free Domain Analysis tool (a free Moz account is enough, no card needed). Enter westpiertech.com.\n2. Note four numbers: Domain Authority, linking root domains, Spam Score and ranking keywords.\n3. Run the same check for Focus Group, Opus, Yo Telecom, Wavenet and Techvu. The free account has a monthly limit, so do ours first.\n4. Look at the top linking domains for us. Anything that looks like spam, or a link still pointing at westpiertele.com, is worth noting.\n5. Paste the numbers to Claude. It will add them to the progress report and turn any gaps into jobs or fixes, for example directories rivals are listed on and we aren't.\n\nWorth checking again every three months. Domain Authority moves slowly, so week to week changes mean little.",
+ "size": "",
+ "alt": ""
+}
 ];
 
 /* AI visibility: buyer questions to ask ChatGPT, Google and the rest each week. Ten a week, all 30 every three weeks. */

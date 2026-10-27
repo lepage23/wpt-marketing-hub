@@ -6,6 +6,12 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.40.1 · 2026-10-27 10:23 GMT
+
+New job.
+
+- **Your jobs: "Look at the Moz score for westpiertech.com".** Check Domain Authority, linking domains and Spam Score with Moz's free tool, compare with the five main rivals, then paste the numbers to Claude.
+
 ## v0.40.0 · 2026-10-23
 
 One-click full website audit, run weekly.

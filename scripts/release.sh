@@ -19,7 +19,8 @@ rm -f assets/app.js.bak
 
 ./tests/run-all.sh || { echo "Tests failed, release stopped."; exit 1; }
 git add -A
-git commit -q -m "v${NEW}: ${SUMMARY}"
+git commit -q -m "v${NEW}: ${SUMMARY}" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018i5161K3cV96FhUyckAwm7"
 git tag -a "v${NEW}" -m "v${NEW} released ${HUMAN}. ${SUMMARY}"
 echo "Tagged v${NEW} at ${HUMAN}"
 
