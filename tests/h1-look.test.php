@@ -13,7 +13,7 @@ $w = array( 'title' => 'x', 'css_classes' => 'wpt-was-h2' );
 ok( wpt_hub_keep_widget( $w, 2 ) && 'wpt-was-h2' === $w['_css_classes'] && ! isset( $w['css_classes'] ), 'widget class goes in _css_classes, the version 16 slip is tidied' );
 $w2 = array( '_css_classes' => 'hero wpt-was-h2' );
 ok( ! wpt_hub_keep_widget( $w2, 2 ), 'already repaired widget counts as no change' );
-ok( false !== strpos( $src, "'version' => 22" ) && false !== strpos( $src, '.wpt-hub-blog-h1 { grid-column: 1 / -1;' ), 'reports version 22, blog H1 spans the grid' );
+ok( false !== strpos( $src, "'version' => 23" ) && false !== strpos( $src, '.wpt-hub-blog-h1 { grid-column: 1 / -1;' ), 'reports version 23, blog H1 spans the grid' );
 // Version 20: Code Snippets refuses a function that already exists unless that exact name is guarded.
 preg_match_all( '#^\s*function (wpt_\w+)\(#m', $src, $fn );
 $unguarded = array_filter( $fn[1], function ( $n ) use ( $src ) { return false === strpos( $src, "function_exists( '" . $n . "' )" ); } );

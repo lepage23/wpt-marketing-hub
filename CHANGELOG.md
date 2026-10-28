@@ -6,6 +6,22 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.41.0 · 2026-10-28 GMT
+
+Squeezed layouts fixed automatically, starting with the police page.
+
+- **The display check missed boxes that fade in.** Elementor keeps boxes with an entrance animation hidden until they scroll into view, and in the hub's small preview that didn't always happen. The check skipped hidden boxes, which is why "Warwicksh / ire" on the police page never reached the Fix queue. It now shows every animated box before measuring (in its own view only, nothing on the site changes).
+- **New check: text squeezed into narrow columns.** Body text that reads three or four words a line, and headings that run one word a line, on desktop and tablets.
+- **New fix type: "Layout fix" for rows of cards.** When a row has too many boxes side by side, the hub works out a new arrangement (each card's text just over half the row, its picture beside it, one card per line; one box per line on phones). Before it writes the card, it tries the arrangement on the live page in your browser and measures the text again. Only an arrangement that actually fixes the text becomes a push-ready card. If it doesn't, the card goes to Claude instead. Only box widths and row wrapping change. One Undo puts the whole row back.
+- **Matching headings stay matching.** When a word breaks in one heading of a row of cards, the text size fix now changes the matching headings beside it to the same size, in one save with one Undo.
+- **A broken word inside a squeezed row** is covered by the layout fix, so you don't get two cards for one problem. If it also breaks on phones, a phone-only text size card is added.
+- **Page checker 23.** Adds both edits. The hub offers the update as a card at the top of the Fix queue, so there's nothing to paste.
+- 578 tests, all passing.
+
+## Backup · 2026-10-28 16:54 GMT
+
+`backup/v0.40.1-2026-10-28-1654`, taken before v0.41.0.
+
 ## v0.40.1 · 2026-10-27 10:23 GMT
 
 New job.

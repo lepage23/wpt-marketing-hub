@@ -24,6 +24,8 @@ out=$( {
   node tests/display-check.test.js assets/app.js tests/fixtures/display-report.json
   node tests/display-fixes.test.js assets/app.js tests/fixtures/display-report-2.json
   node tests/display-widths.test.js assets/app.js tests/fixtures/display-run-3.json
+  node tests/display-cramped.test.js assets/app.js
+  php tests/arrange.test.php docs/wordpress-page-checker.php
   node tests/mobile.test.js assets/app.js tests/fixtures/psi_fixture.json
   node tests/mobile-retry.test.js assets/app.js tests/fixtures/psi_fixture.json
   node tests/progress.test.js assets/app.js

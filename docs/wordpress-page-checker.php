@@ -378,7 +378,7 @@ add_action( 'rest_api_init', function () {
 			$pre    = $wpdb->prefix . 'rank_math_analytics_';
 			$days   = (int) $req->get_param( 'days' );
 			$days   = $days >= 7 && $days <= 90 ? $days : 28;
-			$out    = array( 'version' => 22, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
+			$out    = array( 'version' => 23, 'days' => $days, 'home' => home_url( '/' ), 'tables' => array() );
 			$tables = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $pre ) . '%' ) );
 			foreach ( $tables as $t ) {
 				$out['tables'][ substr( $t, strlen( $pre ) ) ] = (array) $wpdb->get_col( "DESCRIBE `{$t}`", 0 );
@@ -567,12 +567,25 @@ add_action( 'rest_api_init', function () {
 			};
 			if ( 'type' === $op ) {
 				/* Change one element's font size or line spacing (version 10). If it uses a global font from the
-				 * site kit, the kit's settings are copied onto the element first so only the size or spacing changes. */
-				$elid = preg_replace( '/[^a-z0-9]/i', '', (string) $r->get_param( 'element' ) );
-				$path = $elid ? $by_id( $data, $elid ) : null;
-				if ( ! $path ) {
-					return new WP_Error( 'wpt_edit', 'That part of the page isn\'t there any more, so someone may have changed it. Nothing was changed.', array( 'status' => 409 ) );
+				 * site kit, the kit's settings are copied onto the element first so only the size or spacing changes.
+				 * "also" (version 23): more element ids that get the same change in the same save, so matching
+				 * headings in a row of cards stay the same size. One Undo puts them all back. */
+				$ids = array( preg_replace( '/[^a-z0-9]/i', '', (string) $r->get_param( 'element' ) ) );
+				foreach ( array_slice( (array) $r->get_param( 'also' ), 0, 8 ) as $more ) {
+					$more = preg_replace( '/[^a-z0-9]/i', '', (string) $more );
+					if ( $more && ! in_array( $more, $ids, true ) ) {
+						$ids[] = $more;
+					}
 				}
+				$paths = array();
+				foreach ( $ids as $one ) {
+					$p1 = $one ? $by_id( $data, $one ) : null;
+					if ( ! $p1 ) {
+						return new WP_Error( 'wpt_edit', 'That part of the page isn\'t there any more, so someone may have changed it. Nothing was changed.', array( 'status' => 409 ) );
+					}
+					$paths[ $one ] = $p1;
+				}
+				$elid    = $ids[0];
 				$allowed = array();
 				foreach ( array( 'typography_font_size', 'typography_line_height' ) as $b ) {
 					foreach ( array( '', '_tablet', '_mobile' ) as $sfx ) {
@@ -586,43 +599,108 @@ add_action( 'rest_api_init', function () {
 					}
 				}
 				$before = wp_json_encode( $data );
-				$node   = &$data;
-				foreach ( $path as $k ) {
-					$node = &$node[ $k ];
-				}
-				if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) {
-					$node['settings'] = array();
-				}
-				$was  = array();
-				$glob = isset( $node['settings']['__globals__']['typography_typography'] ) ? (string) $node['settings']['__globals__']['typography_typography'] : '';
-				if ( $glob && preg_match( '/[?&]id=([a-z0-9_-]+)/i', $glob, $gm ) ) {
-					$kid = (int) get_option( 'elementor_active_kit' );
-					$ks  = $kid ? get_post_meta( $kid, '_elementor_page_settings', true ) : array();
-					foreach ( array( 'system_typography', 'custom_typography' ) as $kk ) {
-						foreach ( ( is_array( $ks ) && isset( $ks[ $kk ] ) ) ? (array) $ks[ $kk ] : array() as $t ) {
-							if ( isset( $t['_id'] ) && $t['_id'] === $gm[1] ) {
-								foreach ( $t as $tk => $tv ) {
-									if ( 0 === strpos( $tk, 'typography_' ) && ! isset( $node['settings'][ $tk ] ) ) {
-										$node['settings'][ $tk ] = $tv;
+				$kid    = (int) get_option( 'elementor_active_kit' );
+				$ks     = $kid ? get_post_meta( $kid, '_elementor_page_settings', true ) : array();
+				$was    = array();
+				$type   = '';
+				foreach ( $paths as $one => $path ) {
+					$node = &$data;
+					foreach ( $path as $k ) {
+						$node = &$node[ $k ];
+					}
+					if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) {
+						$node['settings'] = array();
+					}
+					$w1   = array();
+					$glob = isset( $node['settings']['__globals__']['typography_typography'] ) ? (string) $node['settings']['__globals__']['typography_typography'] : '';
+					if ( $glob && preg_match( '/[?&]id=([a-z0-9_-]+)/i', $glob, $gm ) ) {
+						foreach ( array( 'system_typography', 'custom_typography' ) as $kk ) {
+							foreach ( ( is_array( $ks ) && isset( $ks[ $kk ] ) ) ? (array) $ks[ $kk ] : array() as $t ) {
+								if ( isset( $t['_id'] ) && $t['_id'] === $gm[1] ) {
+									foreach ( $t as $tk => $tv ) {
+										if ( 0 === strpos( $tk, 'typography_' ) && ! isset( $node['settings'][ $tk ] ) ) {
+											$node['settings'][ $tk ] = $tv;
+										}
 									}
 								}
 							}
 						}
+						$w1['__globals__.typography_typography'] = $glob;
+						unset( $node['settings']['__globals__']['typography_typography'] );
 					}
-					$was['__globals__.typography_typography'] = $glob;
-					unset( $node['settings']['__globals__']['typography_typography'] );
+					$node['settings']['typography_typography'] = 'custom';
+					foreach ( $set as $k => $v ) {
+						$w1[ $k ]               = isset( $node['settings'][ $k ] ) ? $node['settings'][ $k ] : '';
+						$node['settings'][ $k ] = array( 'unit' => isset( $v['unit'] ) ? sanitize_key( $v['unit'] ) : 'px', 'size' => (float) $v['size'], 'sizes' => array() );
+					}
+					if ( '' === $type ) {
+						$type = isset( $node['widgetType'] ) ? $node['widgetType'] : '';
+					}
+					$was = 1 === count( $paths ) ? $w1 : array_merge( $was, array( $one => $w1 ) );
+					unset( $node );
 				}
-				$node['settings']['typography_typography'] = 'custom';
-				foreach ( $set as $k => $v ) {
-					$was[ $k ]              = isset( $node['settings'][ $k ] ) ? $node['settings'][ $k ] : '';
-					$node['settings'][ $k ] = array( 'unit' => isset( $v['unit'] ) ? sanitize_key( $v['unit'] ) : 'px', 'size' => (float) $v['size'], 'sizes' => array() );
-				}
-				$type = isset( $node['widgetType'] ) ? $node['widgetType'] : '';
-				unset( $node );
 				$bid = 'b' . time() . wp_rand( 100, 999 );
 				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
 				$save( $id, $data );
-				return array( 'ok' => true, 'backup' => $bid, 'element' => $elid, 'widget' => $type, 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => $elid, 'elements' => $ids, 'widget' => $type, 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( $set ) );
+			}
+			if ( 'arrange' === $op ) {
+				/* arrange (version 23): fix a row of cards squeezed so tight the text reads a word or two a line.
+				 * Changes only how wide boxes are and whether a row may wrap onto a second line, on several boxes
+				 * in one save. Every box must still be there, or nothing changes. One Undo puts it all back. */
+				$items = array_slice( (array) $r->get_param( 'items' ), 0, 16 );
+				if ( ! $items ) {
+					return new WP_Error( 'wpt_edit', 'The fix doesn\'t say which boxes to change. Nothing was changed.', array( 'status' => 400 ) );
+				}
+				$allowed = array();
+				foreach ( array( 'width', 'flex_wrap' ) as $b ) {
+					foreach ( array( '', '_tablet', '_mobile' ) as $sfx ) {
+						$allowed[] = $b . $sfx;
+					}
+				}
+				$plan = array();
+				foreach ( $items as $it ) {
+					$it   = (array) $it;
+					$one  = preg_replace( '/[^a-z0-9]/i', '', isset( $it['element'] ) ? (string) $it['element'] : '' );
+					$p1   = $one ? $by_id( $data, $one ) : null;
+					if ( ! $p1 ) {
+						return new WP_Error( 'wpt_edit', 'Part of that row isn\'t on the page any more, so someone may have changed it. Nothing was changed. Run the display check again for a fresh fix.', array( 'status' => 409 ) );
+					}
+					$set1 = array();
+					foreach ( isset( $it['set'] ) ? (array) $it['set'] : array() as $k => $v ) {
+						if ( ! in_array( $k, $allowed, true ) ) {
+							return new WP_Error( 'wpt_edit', 'The hub can only change box widths and row wrapping here. Nothing was changed.', array( 'status' => 400 ) );
+						}
+						if ( 0 === strpos( $k, 'flex_wrap' ) ) {
+							$set1[ $k ] = in_array( $v, array( 'wrap', 'nowrap' ), true ) ? $v : 'wrap';
+						} else {
+							$v          = (array) $v;
+							$size       = isset( $v['size'] ) ? max( 0, min( 100, (float) $v['size'] ) ) : 100;
+							$set1[ $k ] = array( 'unit' => '%', 'size' => $size, 'sizes' => array() );
+						}
+					}
+					$plan[ $one ] = array( 'path' => $p1, 'set' => isset( $plan[ $one ] ) ? array_merge( $plan[ $one ]['set'], $set1 ) : $set1 );
+				}
+				$before = wp_json_encode( $data );
+				$was    = array();
+				foreach ( $plan as $one => $pl ) {
+					$node = &$data;
+					foreach ( $pl['path'] as $k ) {
+						$node = &$node[ $k ];
+					}
+					if ( ! isset( $node['settings'] ) || ! is_array( $node['settings'] ) ) {
+						$node['settings'] = array();
+					}
+					foreach ( $pl['set'] as $k => $v ) {
+						$was[ $one ][ $k ]      = isset( $node['settings'][ $k ] ) ? $node['settings'][ $k ] : '';
+						$node['settings'][ $k ] = $v;
+					}
+					unset( $node );
+				}
+				$bid = 'b' . time() . wp_rand( 100, 999 );
+				wpt_hub_bk( $id, $bid, array( 'data' => $before, 'after' => md5( wp_json_encode( $data ) ), 'time' => time() ) );
+				$save( $id, $data );
+				return array( 'ok' => true, 'backup' => $bid, 'element' => array_keys( $plan )[0], 'elements' => array_keys( $plan ), 'widget' => 'container', 'before' => wp_json_encode( $was ), 'after' => wp_json_encode( array_map( function ( $x ) { return $x['set']; }, $plan ) ) );
 			}
 			if ( 'h1' === $op ) {
 				/* h1: make one heading widget the page's H1 (version 11). Without "element" it picks the first
@@ -1662,13 +1740,20 @@ add_action( 'wp_footer', function () {
     for (var y = 0; y < h; y += Math.max(300, innerHeight * 0.8)) { scrollTo(0, y); await wait(200); h = document.documentElement.scrollHeight; }
     scrollTo(0, 0); await wait(900);
   }
+  /* Boxes with an entrance animation stay hidden until they scroll into view, and in the hub's small
+     preview that doesn't always happen. Hidden boxes were skipped, so problems in them were missed
+     (version 23). Show them all, in this view only, before measuring. */
+  function reveal() {
+    Array.prototype.forEach.call(document.querySelectorAll(".elementor-invisible"), function (el) { el.classList.remove("elementor-invisible"); el.style.animation = "none"; });
+  }
   async function run() {
     await wait(1500); await scrollAll();
+    reveal(); await wait(300);
     await check();
   }
   /* The hub resizes the frame to other screen widths and asks for the check again, without reloading. */
   addEventListener("message", function (e) {
-    if (e.data && e.data.wpt === "display-rerun") { HEADS = null; setTimeout(check, 700); }
+    if (e.data && e.data.wpt === "display-rerun") { HEADS = null; reveal(); setTimeout(check, 700); }
   });
   async function check() {
     var out = [], seen = {};
@@ -1871,6 +1956,118 @@ add_action( 'wp_footer', function () {
       sp.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;top:0;font:" + cs.font + ";letter-spacing:" + cs.letterSpacing + ";text-transform:" + cs.textTransform;
       document.body.appendChild(sp); var w = sp.getBoundingClientRect().width; sp.remove(); return w;
     }
+    /* Two boxes in the same parent sit side by side. Uses layout positions, not drawn ones, so boxes still
+       sliding in on an entrance animation don't confuse it. */
+    function besideFirst(k, first) { return k !== first && Math.abs(k.offsetTop - first.offsetTop) < 40 && Math.abs(k.offsetLeft - first.offsetLeft) > 40; }
+    /* The nearest box that lays its contents side by side (a row of cards). */
+    function rowOf(el) {
+      var p = el.closest(".elementor-element[data-id]");
+      p = p && p.parentElement;
+      while (p && p !== document.body) {
+        if (p.matches && p.matches(".e-con[data-id], .elementor-section[data-id]")) {
+          var kids = Array.prototype.filter.call(p.querySelectorAll(":scope > .e-con, :scope > .e-con-inner > .e-con, :scope > .elementor-container > .elementor-column, :scope > .elementor-widget, :scope > .e-con-inner > .elementor-widget"), shown);
+          if (kids.length > 1 && kids.some(function (k) { return besideFirst(k, kids[0]); })) return p;
+        }
+        p = p.parentElement;
+      }
+      return null;
+    }
+    /* Headings in the same row that look the same (same tag, same size): cards side by side. Shrinking one
+       heading on its own would leave the row mismatched, so the fix changes them together. */
+    function peersOf(el) {
+      var row = rowOf(el), me = el.closest(".elementor-element[data-id]"); if (!row || !me) return [];
+      var fs = getComputedStyle(el).fontSize, tag = el.tagName, ids = [];
+      Array.prototype.forEach.call(row.querySelectorAll(".elementor-widget-heading .elementor-heading-title"), function (h) {
+        var w = h.closest(".elementor-element[data-id]");
+        if (!w || w === me || h.tagName !== tag || getComputedStyle(h).fontSize !== fs || !shown(h) || inHiddenSlide(h)) return;
+        if (ids.indexOf(w.getAttribute("data-id")) < 0) ids.push(w.getAttribute("data-id"));
+      });
+      return ids.slice(0, 8);
+    }
+    /* Text lines in one widget: how many, and how full. */
+    function lineStats(wEl) {
+      var isHead = wEl.classList.contains("elementor-widget-heading");
+      var t = wEl.textContent.replace(/\s+/g, " ").trim();
+      var target = wEl.querySelector(isHead ? ".elementor-heading-title" : ".elementor-widget-container") || wEl;
+      var rg = document.createRange(); rg.selectNodeContents(target);
+      var tops = {}; Array.prototype.forEach.call(rg.getClientRects(), function (q) { if (q.width > 0) tops[Math.round(q.top / 4)] = 1; });
+      var lines = Object.keys(tops).length || 1;
+      return { isHead: isHead, text: t, lines: lines, cpl: Math.round(t.length / lines), words: t.split(" ").length / lines };
+    }
+    function isCramped(s) { return s.isHead ? s.text.length >= 18 && s.lines >= 3 && s.words <= 1.5 : s.text.length >= 90 && s.lines >= 6 && s.cpl <= 24; }
+    /* A row of cards squeezed so tight the text reads a word or two a line (version 23). Works out a new
+       arrangement using only box widths and row wrapping: each card's text gets 55% of the row and its
+       picture 45%, one card per line, on desktop and tablets (phones get one box per line). It tries the arrangement here, in this view only, measures the text
+       again, then takes it off. Only an arrangement that actually fixes the text is offered as a fix. */
+    function kidsOf(box) {
+      var inner = box.querySelector(":scope > .e-con-inner") || box;
+      return Array.prototype.filter.call(inner.children, function (k) { return k.matches(".elementor-element[data-id]") && getComputedStyle(k).display !== "none"; });
+    }
+    function sideBySide(box) {
+      var ks = kidsOf(box).filter(shown); if (ks.length < 2) return false;
+      return ks.some(function (k) { return besideFirst(k, ks[0]); });
+    }
+    function hasText(k) { return Array.prototype.some.call(k.querySelectorAll(".elementor-widget-text-editor, .elementor-widget-heading"), function (w) { return shown(w) && w.textContent.trim().length > 3; }) || (k.matches(".elementor-widget-text-editor, .elementor-widget-heading") && k.textContent.trim().length > 3); }
+    function hasPic(k) { return k.matches(".elementor-widget-image") || Array.prototype.some.call(k.querySelectorAll(".elementor-widget-image, img"), shown); }
+    function setOn(items, id, set) {
+      var it = items.filter(function (x) { return x.element === id; })[0];
+      if (!it) items.push(it = { element: id, set: {} });
+      Object.keys(set).forEach(function (k) { it.set[k] = set[k]; });
+    }
+    function planRow(row, items) {
+      setOn(items, row.getAttribute("data-id"), { flex_wrap: "wrap", flex_wrap_tablet: "wrap", flex_wrap_mobile: "wrap" });
+      var kids = kidsOf(row), held = null;
+      /* Only boxes (containers) get a width. A picture widget keeps its own size and sits beside the text. */
+      function put(k, pc) { if (k.matches(".e-con[data-id]")) setOn(items, k.getAttribute("data-id"), { width: { unit: "%", size: pc }, width_tablet: { unit: "%", size: pc }, width_mobile: { unit: "%", size: 100 } }); }
+      kids.forEach(function (k) {
+        var tx = hasText(k), pc = hasPic(k);
+        if (tx && pc && k.matches(".e-con[data-id]") && sideBySide(k)) { if (held) { put(held, 100); held = null; } put(k, 100); planRow(k, items); return; }
+        if (tx && !pc || pc && !tx) {
+          if (held && hasText(held) !== tx) { put(held, hasText(held) ? 55 : 45); put(k, tx ? 55 : 45); held = null; return; }
+          if (held) put(held, 100);
+          held = k; return;
+        }
+        if (held) { put(held, 100); held = null; }
+        put(k, 100);
+      });
+      if (held) put(held, 100);
+    }
+    function planCramped(found) {
+      var rows = [];
+      found.forEach(function (o) {
+        var r = document.querySelector('[data-id="' + o.row + '"]'); if (!r) return;
+        /* Use the outermost squeezed row, so one fix covers cards nested inside each other. */
+        var up = r.parentElement && r.parentElement.closest(".e-con[data-id], .elementor-section[data-id]");
+        while (up && sideBySide(up) && up.querySelector('[data-id="' + o.widget.id + '"]')) { r = up; up = r.parentElement && r.parentElement.closest(".e-con[data-id], .elementor-section[data-id]"); }
+        if (rows.indexOf(r) < 0) rows.push(r);
+      });
+      rows = rows.filter(function (r) { return !rows.some(function (o) { return o !== r && o.contains(r); }); });
+      rows.forEach(function (row) {
+        var items = []; planRow(row, items);
+        var widgets = found.filter(function (o) { return row.querySelector('[data-id="' + o.widget.id + '"]'); });
+        /* Try it: same widths and wrapping as the fix would set, in this view only. */
+        var css = items.map(function (it) {
+          var s = it.set, sel = ".elementor-element.elementor-element-" + it.element;
+          return (s.flex_wrap ? sel + ", " + sel + " > .e-con-inner { flex-wrap: wrap !important; }\n" : "") +
+            (s.width ? sel + " { --width: " + s.width.size + "% !important; width: " + s.width.size + "% !important; max-width: " + s.width.size + "% !important; }" : "");
+        }).join("\n");
+        var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+        var after = widgets.map(function (o) { var w = document.querySelector('[data-id="' + o.widget.id + '"]'); return w ? lineStats(w) : null; });
+        var rr = row.getBoundingClientRect(), spills = Array.prototype.some.call(row.querySelectorAll(".elementor-widget"), function (w) { var q = w.getBoundingClientRect(); return shown(w) && (q.right > rr.right + 2 || q.left < rr.left - 2); });
+        var broken = Array.prototype.some.call(row.querySelectorAll(".elementor-heading-title"), function (h) {
+          var tw = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), tn;
+          while ((tn = tw.nextNode())) { var re = /\S{4,}/g, mm; while ((mm = re.exec(tn.data))) { var g = document.createRange(); g.setStart(tn, mm.index); g.setEnd(tn, mm.index + mm[0].length); var rs = Array.prototype.filter.call(g.getClientRects(), function (q) { return q.width > 0; }); if (rs.length > 1 && Math.abs(rs[rs.length - 1].top - rs[0].top) > 4) return true; } }
+          return false;
+        });
+        st.remove();
+        var fixed = after.every(function (s) { return s && !isCramped(s); }) && !spills && !broken;
+        add({ kind: "cramped_row", text: (row.querySelector(".elementor-heading-title") || row).textContent.replace(/\s+/g, " ").trim().slice(0, 60), widget: { id: row.getAttribute("data-id"), type: "container" }, at: where(row),
+          items: items, works: fixed, widgets: widgets.map(function (o) { return o.widget.id; }),
+          before: widgets.map(function (o) { return o.text.slice(0, 30) + ": " + o.detail; }),
+          afterLines: after.map(function (s, i) { return s ? widgets[i].text.slice(0, 30) + ": " + (s.isHead ? s.lines + " line" + (s.lines > 1 ? "s" : "") : "about " + s.cpl + " letters a line") : ""; }),
+          detail: widgets.length + " bit" + (widgets.length > 1 ? "s" : "") + " of text squeezed into narrow columns at " + W + "px wide" });
+      });
+    }
     Array.prototype.forEach.call(document.querySelectorAll("h1,h2,h3,h4,h5,h6,.elementor-heading-title,p,li,.elementor-button-text,a.elementor-button"), function (el) {
       if (!shown(el) || inHiddenSlide(el) || el.querySelector("h1,h2,h3,h4,h5,h6,p,li")) return;
       var tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), tn, done = false;
@@ -1885,12 +2082,27 @@ add_action( 'wp_footer', function () {
             var word = mm[0].replace(/[^\w'’-]+$/, ""), ww = measure(word, el);
             var need = ww > 0 ? Math.floor(fs * (box / ww) * 0.96) : Math.floor(fs * 0.8);
             add({ kind: "broken_word", text: el.textContent.replace(/\s+/g, " ").trim().slice(0, 60), word: word, fontSize: Math.round(fs), fitSize: Math.max(10, need), widget: widgetOf(el), at: where(el),
-              detail: "“" + word + "” splits across two lines at " + W + "px wide" });
+              peers: peersOf(el), detail: "“" + word + "” splits across two lines at " + W + "px wide" });
             done = true;
           }
         }
       }
     });
+
+    /* Text squeezed into a column so narrow it reads three or four words a line (version 23). Desktop and
+       tablet only: on phones short lines are normal. Reports the column and the row it sits in. */
+    if (W >= 768) {
+      Array.prototype.forEach.call(document.querySelectorAll(".elementor-widget-text-editor, .elementor-widget-heading"), function (wEl) {
+        if (!shown(wEl) || inHiddenSlide(wEl)) return;
+        var s = lineStats(wEl); if (!isCramped(s)) return;
+        var row = rowOf(wEl), col = wEl.parentElement && wEl.parentElement.closest(".e-con[data-id], .elementor-column[data-id]"), bw = Math.round(wEl.getBoundingClientRect().width);
+        add({ kind: "cramped_text", text: s.text.slice(0, 60), widget: widgetOf(wEl), at: where(wEl), heading: s.isHead, lines: s.lines, perLine: s.isHead ? Math.round(s.words * 10) / 10 : s.cpl,
+          boxWidth: bw, column: col ? col.getAttribute("data-id") : "", row: row ? row.getAttribute("data-id") : "",
+          detail: s.isHead ? "about one word a line (" + s.lines + " lines) in a " + bw + "px column at " + W + "px wide"
+            : "about " + s.cpl + " letters a line (" + s.lines + " lines) in a " + bw + "px column at " + W + "px wide" });
+      });
+      planCramped(out.filter(function (o) { return o.kind === "cramped_text" && o.row; }));
+    }
 
     /* Big headings with loose line spacing (big gaps between the lines) */
     Array.prototype.forEach.call(document.querySelectorAll("h1,h2,h3,.elementor-heading-title"), function (el) {

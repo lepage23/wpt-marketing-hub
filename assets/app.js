@@ -4,8 +4,8 @@
 (function () {
   "use strict";
 
-  var VERSION = "0.40.1";
-  var BUILT = "2026-10-27 10:23 GMT";
+  var VERSION = "0.41.0";
+  var BUILT = "2026-10-28 17:05 GMT";
   var PREFIX = "wpt-hub:";
 
   /* ---------- small helpers ---------- */
@@ -2754,7 +2754,8 @@
     broken_word: "Word broken across two lines", loose_lines: "Big gaps between heading lines", big_padding: "Too much empty space in a box",
     invisible_text: "Heading you can't see (same colour as the background)",
     h1_look: "Heading the hub made the H1 looks different from the rest",
-    h1_squashed: "Page heading squeezed into a grid slot"
+    h1_squashed: "Page heading squeezed into a grid slot",
+    cramped_text: "Text squeezed into a narrow column", cramped_row: "Row of cards squeezed too tight"
   };
   var FIT_SET = { "object-fit": "contain", "object-fit_tablet": "contain", "object-fit_mobile": "contain", "object-position": "center center" };
   function modeOf(w) { return w >= 1025 ? "desktop" : w >= 768 ? "tablet" : "phone"; }
@@ -2804,6 +2805,15 @@
           (x.byMode[mode] = x.byMode[mode] || []).push(it);
         });
       });
+      /* Rows of cards the page itself tried a new arrangement for, and found it fixed the text
+         (display check version 23). Everything squeezed inside them is handled by that one fix. */
+      var rowFixed = {};
+      Object.keys(seen).forEach(function (k) {
+        var r = seen[k]; if (r.kind !== "cramped_row") return;
+        var big = (r.byMode.desktop || []).concat(r.byMode.tablet || []);
+        r._works = big.length > 0 && big.every(function (x) { return x.works; });
+        if (r._works) (r.widgets || []).forEach(function (w) { rowFixed[w] = 1; });
+      });
       Object.keys(seen).forEach(function (k) {
         var it = seen[k], onWhat = describeModes(it.modes);
         var wtype = it.widget.type, wid = it.widget.id;
@@ -2811,16 +2821,33 @@
         var base = { auto: true, created: today, batch: "Found by display check", category: "Mobile", size: "small", postType: "pages", pageId: pg.pageId || 0, pageTitle: shortPath(u), link: u, element: wid,
           why: "Found by the display check, which looks at each page the way a visitor sees it. Small layout slips like this make a page look unfinished." };
         function mk(id, o) { var f = Object.assign({}, base, o); f.id = "disp-" + id + "-" + (shortPath(u) + "-" + wid).replace(/\W+/g, "-").slice(0, 80); if (!out.some(function (x) { return x.id === f.id; })) out.push(f); }
+        if (wid && it.kind === "cramped_text" && rowFixed[wid]) return;
+        if (wid && it.kind === "broken_word" && rowFixed[wid] && it.modes.indexOf("phone") < 0) return;
+        if (wid && it.kind === "cramped_row" && it._works) {
+          var plan = (it.byMode.desktop || it.byMode.tablet)[0];
+          mk("arrange", { type: "elementor_arrange", priority: "high", category: "Content", items: plan.items, element: wid,
+            issue: "Row of cards squeezed so tight the text reads a word or two a line" + near,
+            current: (plan.before || []).join("\n") + "\n\nSeen on " + onWhat + " (" + it.widths.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return b - a; }).join(", ") + "px wide).",
+            proposed: "Gives each card its own line: the text takes just over half the row and its picture sits beside it. The words, pictures and text sizes don't change, only how wide the boxes are" +
+              ". Tablets get the same, phones get one box per line. The display check tried this on the live page in your browser before writing the card, and the text came out:\n" + (plan.afterLines || []).join("\n") + "\n\nUndo puts it back.",
+            why: "Text three or four words a line is hard to read and makes the page look broken. It's usually a row built with too many boxes side by side. Fixing the row fixes every bit of text in it, including any word split in half." });
+          return;
+        }
         if (wid && it.kind === "broken_word") {
-          var setF = {}, sizes = [];
-          ["desktop", "tablet", "phone"].forEach(function (m) {
+          var setF = {}, sizes = [], also = [];
+          (it.peers || []).forEach(function (pid) { if (pid !== wid && also.indexOf(pid) < 0) also.push(pid); });
+          Object.keys(it.byMode).forEach(function (m) { it.byMode[m].forEach(function (x) { (x.peers || []).forEach(function (pid) { if (pid !== wid && also.indexOf(pid) < 0) also.push(pid); }); }); });
+          /* Where the row fix already sorts desktop and tablets, only phones need a smaller size. */
+          (rowFixed[wid] ? ["phone"] : ["desktop", "tablet", "phone"]).forEach(function (m) {
             var items = it.byMode[m]; if (!items) return;
             var fit = Math.min.apply(null, items.map(function (x) { return x.fitSize; }));
             setF["typography_font_size" + SFX[m]] = { unit: "px", size: fit }; sizes.push(m + " " + items[0].fontSize + "px to " + fit + "px");
           });
-          mk("word", { type: "elementor_type", priority: "high", category: "Content", set: setF, issue: "\u201c" + it.word + "\u201d breaks in the middle of the word" + near,
+          mk("word", { type: "elementor_type", priority: "high", category: "Content", set: setF, also: also.slice(0, 8), issue: "\u201c" + it.word + "\u201d breaks in the middle of the word" + near,
             current: it.text + "\n\n\u201c" + it.word + "\u201d splits across two lines on " + onWhat + " (seen at " + it.widths.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return b - a; }).join(", ") + "px wide). The box is too narrow for the word at this text size.",
-            proposed: "Makes the text a little smaller so the whole word fits at every width checked: " + sizes.join(", ") + ". Screen types where it didn't break keep their size. The words don't change. Undo puts it back.",
+            proposed: "Makes the text a little smaller so the whole word fits at every width checked: " + sizes.join(", ") + ". Screen types where it didn't break keep their size." +
+              (also.length ? " The " + also.length + " matching heading" + (also.length > 1 ? "s" : "") + " beside it in the same row change" + (also.length > 1 ? "" : "s") + " to the same size, so the cards still match." : "") +
+              " The words don't change. Undo puts it back.",
             why: "A word split in half looks broken and is hard to read, and it's usually in the biggest heading on the page." });
           return;
         }
@@ -2920,9 +2947,11 @@
       h1_squashed: ["Tell Claude which page. It writes a style fix so the heading spans the full width."],
       h1_look: ["Update the page checker to the latest version (Website & SEO, Copy page checker code).", "Run the display check again. If it's still listed, tell Claude which page."],
       invisible_text: ["Tell Claude straight away. It writes a repair card that sets the heading back to a colour you can see.", "If you need it fixed before then: open the page in Elementor, click the heading, and in Style set Text Color to the dark navy (#0C1B2C).", "Update, then run the display check again."],
+      cramped_text: ["Tell Claude which page. The hub couldn't find a row it could safely rearrange, so Claude writes the layout fix and it comes back here ready to push."],
+      cramped_row: ["Tell Claude which page. The hub tried a new arrangement but the text was still squeezed, so Claude writes a different layout fix and it comes back here ready to push."],
       no_alt: ["Open the image in the Media Library.", "Fill in Alternative Text with a short description of what it shows (or the company name for a logo).", "Save. Google and AI tools use this to understand the image."]
     };
-    var PRI = { h1_squashed: "high", h1_look: "high", invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low" };
+    var PRI = { h1_squashed: "high", h1_look: "high", invisible_text: "critical", broken: "high", overflow: "high", distorted: "medium", cropped: "high", button_wrap: "medium", text_clipped: "medium", no_alt: "low", stranded_punct: "high", broken_word: "high", loose_lines: "medium", big_padding: "medium", overflow_box: "medium", repeat_word: "medium", misaligned: "medium", off_centre: "medium", uneven_space: "low", cramped_text: "high", cramped_row: "high" };
     /* Words breaking, loose heading lines and wrapping buttons outside Elementor widgets the hub can edit:
        one small style fix, scoped to the pages where they were seen. */
     var cssFix = displayCss(groups, today);
@@ -2937,7 +2966,7 @@
     return out;
   }
   function renderDisplayCheck(main) {
-    var p = panel("Display check", "Opens every live page at ten screen widths and looks at it the way a visitor does: words breaking across lines, big gaps and empty space, images (cut off, squashed, broken, hanging out of their box), text (punctuation on its own line, a word repeated in a heading, cut-off text) and layout (things not lining up, boxes off-centre, uneven spacing, wrapped buttons, anything past the screen edge). Read-only.");
+    var p = panel("Display check", "Opens every live page at ten screen widths and looks at it the way a visitor does: words breaking across lines, text squeezed into narrow columns, big gaps and empty space, images (cut off, squashed, broken, hanging out of their box), text (punctuation on its own line, a word repeated in a heading, cut-off text) and layout (things not lining up, boxes off-centre, uneven spacing, wrapped buttons, anything past the screen edge). Read-only.");
     var body = el('<div style="display:flex;flex-direction:column;gap:12px"></div>'); p.appendChild(body); main.appendChild(p);
     var stop = false;
     function draw() {
@@ -3050,17 +3079,17 @@
 
   /* ---------- Fix queue ---------- */
   var TYPE_LABEL = { meta_title: "SEO title", meta_description: "Meta description", content_replace: "Content change", new_draft: "New draft", manual: "Steps",
-    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check", snippet_update: "Hub update", content_append: "Add text to page" };
+    elementor_set: "Page text change", elementor_swap: "Phrase change", elementor_remove: "Remove from page", set_status: "Unpublish page", page_build: "New page build", elementor_style: "Image fix", elementor_tidy: "Punctuation fix", elementor_layout: "Layout fix", elementor_type: "Text size fix", elementor_arrange: "Layout fix", elementor_faq: "FAQ block", elementor_h1: "H1 fix", elementor_h1_look: "H1 colour repair", page_restore: "Restore a page", page_check: "Automatic check", snippet_update: "Hub update", content_append: "Add text to page" };
   var SITE_OP_LABEL = { h1: "H1 fix", h1_one: "One H1", alt: "Alt text", relink: "Link fix", menu_add: "Menu link", css: "Display fix", llms: "llms.txt", option: "Site setting", meta: "Page setting", redirect_code: "Redirect fix" };
   function typeLabel(p) { return p.type === "content_set" ? "Page repair" : p.type === "site_edit" ? SITE_OP_LABEL[p.op] || "Site fix" : p.type === "text_swap" ? "Phrase change" : p.type === "group" ? p.groupLabel || "Fixes" : TYPE_LABEL[p.type] || p.type; }
   /* The button says what pushing does. */
   function goLabel(p) {
     if (p.type === "content_set") return "Approve and repair the page";
     if (p.type === "site_edit") return { h1: "Approve and make it the H1", h1_one: "Approve and keep one H1", alt: "Approve and add the alt text", relink: "Approve and fix the link", menu_add: "Approve and add to the menu", css: "Approve and fix the display", llms: "Approve and publish llms.txt", option: p.params && p.params.key === "blog_public" ? "Approve and let Google index the site" : "Approve and save the setting", meta: p.params && p.params.key === "rank_math_robots" ? "Approve and let Google index it" : "Approve and clear it", redirect_code: "Approve and make it permanent" }[p.op] || "Approve and push";
-    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : p.type === "snippet_update" ? "Approve and update the page checker" : p.type === "content_append" ? "Approve and add the text to the page" : "Approve and push live";
+    return p.type === "new_draft" ? "Approve and save as draft" : p.type === "elementor_remove" ? "Approve and remove from page" : p.type === "set_status" ? "Approve and unpublish" : p.type === "elementor_style" ? "Approve and fix the image" : p.type === "elementor_layout" ? "Approve and fix the layout" : p.type === "elementor_tidy" ? "Approve and fix the punctuation" : p.type === "elementor_type" ? "Approve and fix the text size" : p.type === "elementor_arrange" ? "Approve and fix the layout" : p.type === "elementor_faq" ? "Approve and add the FAQ to the page" : p.type === "elementor_h1" ? "Approve and make it the H1" : p.type === "elementor_h1_look" ? "Approve and make the heading visible again" : p.type === "snippet_update" ? "Approve and update the page checker" : p.type === "content_append" ? "Approve and add the text to the page" : "Approve and push live";
   }
   /* Fixes whose box only describes what happens, rather than holding text to edit. */
-  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_h1|elementor_h1_look|content_set|snippet_update/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
+  function fixedText(p) { return /elementor_remove|set_status|elementor_style|elementor_tidy|elementor_layout|elementor_type|elementor_arrange|elementor_h1|elementor_h1_look|content_set|snippet_update/.test(p.type) || (p.type === "site_edit" && !p.textParam && p.op !== "alt"); }
   /* FAQ fixes are written as plain text so Connor can edit them in the box:
      "Heading: ..." on the first line, then "Q: ..." and "A: ..." pairs. Answers can run over several lines. */
   /* Questions and answers as plain HTML for a page that isn't built with Elementor: a heading, then each
@@ -3109,6 +3138,10 @@
   }
   function needsV12(err) {
     if (/no heading widget to turn into the H1|appears in more than one place|no route|unknown edit type/i.test(err.message)) throw new Error("This fix needs version 12 of the page checker. Click Copy page checker code on the Website & SEO page, replace the code in WordPress and save, then click Save and test: it should say version 12. Then push again.");
+    throw err;
+  }
+  function needsV23(err) {
+    if (/no route|unknown edit type|can only change font size|can only change margin|doesn't say which/i.test(err.message)) throw new Error("This fix needs version 23 of the page checker. Approve the \u201cUpdate the page checker to version 23\u201d card in the Fix queue, then push this again.");
     throw err;
   }
   function needsV9(err) {
@@ -3390,6 +3423,18 @@
           return { before: before, after: text };
         });
       });
+    }
+    if (p.type === "elementor_arrange" || (p.type === "elementor_type" && p.also && p.also.length)) {
+      /* Several boxes in one save (page checker 23). An older checker would quietly change only the first. */
+      var cv = (wpAuth() || {}).checkerVersion || 0;
+      if (cv && cv < 23) return Promise.reject(new Error("This fix needs version 23 of the page checker. Approve the \u201cUpdate the page checker to version 23\u201d card at the top of the Fix queue first, then push this again."));
+      return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: p.type === "elementor_arrange"
+        ? { post_id: p.pageId, op: "arrange", items: p.items || [] }
+        : { post_id: p.pageId, op: "type", element: p.element, also: p.also, set: p.set || {} } })
+        .then(function (r) {
+          if (!r.elements || r.elements.length < (p.type === "elementor_arrange" ? 1 : 1 + p.also.length)) throw new Error("WordPress saved the change but didn't confirm every box. Undo it and update the page checker to version 23.");
+          return { before: p.current, after: p.proposed, backup: r.backup };
+        }, needsV23);
     }
     if (p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type") {
       return wpFetch("/wpt-hub/v1/elementor-edit", { method: "POST", body: { post_id: p.pageId, op: p.type === "elementor_tidy" ? "tidy" : p.type === "elementor_type" ? "type" : "layout", element: p.element, set: p.set || {}, clear_negative_margin: p.clearNeg ? 1 : 0 } })
@@ -3785,7 +3830,7 @@
     if (p.type === "text_swap") p = Object.assign({}, p, { type: st.backup ? "elementor_swap" : "content_replace" });
     if (p.type === "content_set") return wpFetch(base + p.pageId, { method: "POST", body: { content: st.before || "" } });
     var base = "/wp/v2/" + p.postType + "/";
-    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_faq" || p.type === "elementor_h1" || p.type === "elementor_h1_look") {
+    if (p.type === "elementor_set" || p.type === "elementor_remove" || p.type === "elementor_swap" || p.type === "elementor_style" || p.type === "elementor_tidy" || p.type === "elementor_layout" || p.type === "elementor_type" || p.type === "elementor_arrange" || p.type === "elementor_faq" || p.type === "elementor_h1" || p.type === "elementor_h1_look") {
       return wpFetch("/wpt-hub/v1/elementor-undo", { method: "POST", body: { post_id: p.pageId, backup: st.backup, force: force ? 1 : 0 } });
     }
     if (p.type === "set_status") return wpFetch(base + p.pageId, { method: "POST", body: { status: st.before || "publish" } });
@@ -4698,7 +4743,7 @@
           var when = new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
           setFix(p.id, { status: "pushed", before: r.before, after: r.after, pushedAt: when, editLink: r.editLink || "", pageId: r.pageId || p.pageId, backup: r.backup || "" });
           if (r.skipped && r.skipped.length) toast(r.skipped.length + " image" + (r.skipped.length > 1 ? "s" : "") + " skipped: not in the Media Library");
-          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: typeLabel(p), action: p.type === "site_edit" ? (SITE_OP_LABEL[p.op] || "Site fix") + " pushed" : p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : p.type === "elementor_h1_look" ? "H1 colour repaired" : "Pushed live" });
+          logChange({ id: p.id, when: when, page: p.pageTitle, link: p.link, type: typeLabel(p), action: p.type === "site_edit" ? (SITE_OP_LABEL[p.op] || "Site fix") + " pushed" : p.type === "new_draft" ? "Draft saved" : p.type === "elementor_remove" ? "Removed from page" : p.type === "set_status" ? "Unpublished" : p.type === "elementor_style" ? "Image fixed" : p.type === "elementor_layout" ? "Layout fixed" : p.type === "elementor_tidy" ? "Punctuation fixed" : p.type === "elementor_type" ? "Text size fixed" : p.type === "elementor_arrange" ? "Layout fixed" : p.type === "elementor_faq" ? "FAQ added" : p.type === "elementor_h1" ? "H1 set" : p.type === "elementor_h1_look" ? "H1 colour repaired" : "Pushed live" });
           toast(p.type === "new_draft" ? "Saved as a draft in WordPress" : "Live on the site");
           redraw(); updateNav();
         }).catch(function (err) {
