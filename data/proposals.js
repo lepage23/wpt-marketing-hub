@@ -2296,6 +2296,22 @@ window.WPT_JOBS = [
  "details": "Moz gives every site a Domain Authority score from 1 to 100, based mostly on how many other sites link to it and how good those sites are. Google doesn't use it, but it's a fair way to see how our link profile compares with rivals, and a baseline to measure the Google reviews and directory work against.\n\n1. Go to moz.com and use the free Domain Analysis tool (a free Moz account is enough, no card needed). Enter westpiertech.com.\n2. Note four numbers: Domain Authority, linking root domains, Spam Score and ranking keywords.\n3. Run the same check for Focus Group, Opus, Yo Telecom, Wavenet and Techvu. The free account has a monthly limit, so do ours first.\n4. Look at the top linking domains for us. Anything that looks like spam, or a link still pointing at westpiertele.com, is worth noting.\n5. Paste the numbers to Claude. It will add them to the progress report and turn any gaps into jobs or fixes, for example directories rivals are listed on and we aren't.\n\nWorth checking again every three months. Domain Authority moves slowly, so week to week changes mean little.",
  "size": "",
  "alt": ""
+},
+{
+ "id": "support-email-replies-1",
+ "job": "See if customers can reply to support by email and update their ticket",
+ "page": "support@westpiertele.com, techsupport@, the ticket portal (with Matt)",
+ "details": "Customers are emailing support@westpiertele.com more and more, and it doesn't come through to techsupport@. The latest was Abdi Dahir, Service Desk Manager at Law Debenture, late on 29 October. One of his call handlers had found our WestPier Technical Support account logged into their SafeCall queue on 8x8 and showing as ready to take calls. Jon picked it up after you forwarded it.\n\nThe ticket portal also sends from a no-reply address, so customers can't answer a ticket by email. Mark wants replies to update the ticket, but has heard it's costly. You and Mark have both asked Matt.\n\n1. Ask Matt why support@ doesn't reach techsupport@, and whether a simple forward or alias fixes it today.\n2. Find out what the ticket portal is and whether it can take email replies (often called email piping or reply-to-ticket). Note what it costs, if anything.\n3. If it can't, look at a cheap middle ground: a monitored reply-to address on portal emails that goes to techsupport@.\n4. Check which support email the website shows. The site still lists @westpiertele.com addresses.\n5. Tell Claude what you find. Anything on the website becomes a fix.",
+ "size": "",
+ "alt": ""
+},
+{
+ "id": "claude-business-1",
+ "job": "Look into a Claude business plan for Garry, Kelly and you",
+ "page": "claude.com pricing, with Garry",
+ "details": "Three seats: Garry, Kelly and you.\n\n1. Compare the Team plan with paying for three separate Pro accounts. Note the monthly cost per seat, any minimum seats, and annual versus monthly billing.\n2. Check what Team adds that matters to WPT: shared Projects, admin controls, and that business data isn't used for training.\n3. Think about what Garry and Kelly would actually use it for (quotes, proposals, finance admin), so the cost has a reason behind it.\n4. You still pay for ChatGPT. Decide whether that carries on alongside this.\n5. Ask Claude for a short summary to send Garry when you've got the numbers.",
+ "size": "",
+ "alt": ""
 }
 ];
 

@@ -6,6 +6,13 @@ To roll back to any point, open its branch on GitHub or run `git checkout <branc
 Backups are branches named `backup/v<version>-<date>-<time>`.
 Finished versions are branches named `release/v<version>`.
 
+## v0.41.1 · 2026-10-30 GMT
+
+Two new jobs.
+
+- **Your jobs: "See if customers can reply to support by email and update their ticket".** Customers keep emailing support@westpiertele.com, which doesn't reach techsupport@, and portal emails are no-reply. Find out with Matt what a fix would take and cost.
+- **Your jobs: "Look into a Claude business plan for Garry, Kelly and you".** Compare Team with three Pro seats and get the numbers to Garry.
+
 ## v0.41.0 · 2026-10-28 GMT
 
 Squeezed layouts fixed automatically, starting with the police page.
